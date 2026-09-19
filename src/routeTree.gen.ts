@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthenticatedAlertsRouteImport } from './routes/_authenticated/alerts'
 import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
 import { Route as AuthenticatedCompetitorsRouteImport } from './routes/_authenticated/competitors'
@@ -22,6 +23,7 @@ import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedResponsesRouteImport } from './routes/_authenticated/responses'
 import { Route as AuthenticatedReviewsRouteImport } from './routes/_authenticated/reviews'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as ApiPublicGoogleBusinessCallbackRouteImport } from './routes/api/public/google-business/callback'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -35,6 +37,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAlertsRoute = AuthenticatedAlertsRouteImport.update({
@@ -88,10 +95,17 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPublicGoogleBusinessCallbackRoute =
+  ApiPublicGoogleBusinessCallbackRouteImport.update({
+    id: '/api/public/google-business/callback',
+    path: '/api/public/google-business/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/alerts': typeof AuthenticatedAlertsRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/competitors': typeof AuthenticatedCompetitorsRoute
@@ -102,10 +116,12 @@ export interface FileRoutesByFullPath {
   '/responses': typeof AuthenticatedResponsesRoute
   '/reviews': typeof AuthenticatedReviewsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/api/public/google-business/callback': typeof ApiPublicGoogleBusinessCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/alerts': typeof AuthenticatedAlertsRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/competitors': typeof AuthenticatedCompetitorsRoute
@@ -116,12 +132,14 @@ export interface FileRoutesByTo {
   '/responses': typeof AuthenticatedResponsesRoute
   '/reviews': typeof AuthenticatedReviewsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/api/public/google-business/callback': typeof ApiPublicGoogleBusinessCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/_authenticated/alerts': typeof AuthenticatedAlertsRoute
   '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
   '/_authenticated/competitors': typeof AuthenticatedCompetitorsRoute
@@ -132,12 +150,14 @@ export interface FileRoutesById {
   '/_authenticated/responses': typeof AuthenticatedResponsesRoute
   '/_authenticated/reviews': typeof AuthenticatedReviewsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/api/public/google-business/callback': typeof ApiPublicGoogleBusinessCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/auth'
+    | '/reset-password'
     | '/alerts'
     | '/analytics'
     | '/competitors'
@@ -148,10 +168,12 @@ export interface FileRouteTypes {
     | '/responses'
     | '/reviews'
     | '/settings'
+    | '/api/public/google-business/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
+    | '/reset-password'
     | '/alerts'
     | '/analytics'
     | '/competitors'
@@ -162,11 +184,13 @@ export interface FileRouteTypes {
     | '/responses'
     | '/reviews'
     | '/settings'
+    | '/api/public/google-business/callback'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/reset-password'
     | '/_authenticated/alerts'
     | '/_authenticated/analytics'
     | '/_authenticated/competitors'
@@ -177,12 +201,15 @@ export interface FileRouteTypes {
     | '/_authenticated/responses'
     | '/_authenticated/reviews'
     | '/_authenticated/settings'
+    | '/api/public/google-business/callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
+  ApiPublicGoogleBusinessCallbackRoute: typeof ApiPublicGoogleBusinessCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -206,6 +233,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/alerts': {
@@ -278,6 +312,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/google-business/callback': {
+      id: '/api/public/google-business/callback'
+      path: '/api/public/google-business/callback'
+      fullPath: '/api/public/google-business/callback'
+      preLoaderRoute: typeof ApiPublicGoogleBusinessCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -314,6 +355,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
+  ApiPublicGoogleBusinessCallbackRoute: ApiPublicGoogleBusinessCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

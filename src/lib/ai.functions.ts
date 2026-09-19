@@ -2,6 +2,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { streamText } from "ai";
 import { z } from "zod";
+import { createHash } from "node:crypto";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const DraftInput = z.object({
@@ -20,6 +21,63 @@ async function runGateway(system: string, prompt: string) {
   });
   const text = await result.text;
   return text.trim();
+}
+
+async function workspaceIdFor(context: { supabase: any; userId: string }) {
+  const { data, error } = await context.supabase
+    .from("workspace_members")
+    .select("workspace_id")
+    .eq("user_id", context.userId)
+    .order("created_at")
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("No workspace is assigned to this account.");
+  return data.workspace_id as string;
+}
+
+async function runAudited(
+  context: { supabase: any; userId: string },
+  purpose: "reply_draft" | "feedback_briefing" | "reputation_report",
+  system: string,
+  prompt: string,
+  refs: { reviewId?: string; reportId?: string } = {},
+) {
+  const started = Date.now();
+  const workspaceId = await workspaceIdFor(context);
+  const inputHash = createHash("sha256").update(`${system}\n${prompt}`).digest("hex");
+  try {
+    const output = await runGateway(system, prompt);
+    const { error } = await context.supabase.from("ai_runs").insert({
+      workspace_id: workspaceId,
+      user_id: context.userId,
+      purpose,
+      model: "openai/gpt-6-astra",
+      input_hash: inputHash,
+      output,
+      duration_ms: Date.now() - started,
+      status: "completed",
+      review_id: refs.reviewId ?? null,
+      report_id: refs.reportId ?? null,
+    });
+    if (error) console.error("Could not record AI activity", error);
+    return { output, workspaceId };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "AI request failed";
+    await context.supabase.from("ai_runs").insert({
+      workspace_id: workspaceId,
+      user_id: context.userId,
+      purpose,
+      model: "openai/gpt-6-astra",
+      input_hash: inputHash,
+      duration_ms: Date.now() - started,
+      status: "failed",
+      error_message: message,
+      review_id: refs.reviewId ?? null,
+      report_id: refs.reportId ?? null,
+    });
+    throw error;
+  }
 }
 
 /** Writes a reply to a stored review, in the brand's configured tone. */
@@ -62,7 +120,8 @@ export const draftReply = createServerFn({ method: "POST" })
       .filter(Boolean)
       .join("\n");
 
-    return { reply: await runGateway(system, prompt) };
+    const result = await runAudited(context, "reply_draft", system, prompt, { reviewId: data.reviewId });
+    return { reply: result.output };
   });
 
 const AnalyzeInput = z.object({
@@ -100,7 +159,8 @@ export const analyseFeedback = createServerFn({ method: "POST" })
       )
       .join("\n");
 
-    return { insight: await runGateway(system, prompt) };
+    const result = await runAudited(context, "feedback_briefing", system, prompt);
+    return { insight: result.output };
   });
 
 const ReportInput = z.object({
@@ -146,6 +206,8 @@ export const generateReport = createServerFn({ method: "POST" })
       ...reviews.slice(0, 40).map((r) => `${r.rating}★ ${r.location_name} (${r.platform}): ${r.body}`),
     ].join("\n");
 
+    const workspaceId = await workspaceIdFor(context);
+    const started = Date.now();
     const summary = await runGateway(system, prompt);
 
     const { data: inserted, error: insertError } = await context.supabase
@@ -157,10 +219,24 @@ export const generateReport = createServerFn({ method: "POST" })
         summary,
         status: "ready",
         generated_by: context.userId,
+        workspace_id: workspaceId,
       })
       .select("id")
       .single();
     if (insertError) throw insertError;
+
+    const { error: auditError } = await context.supabase.from("ai_runs").insert({
+      workspace_id: workspaceId,
+      user_id: context.userId,
+      report_id: inserted.id,
+      purpose: "reputation_report",
+      model: "openai/gpt-6-astra",
+      input_hash: createHash("sha256").update(`${system}\n${prompt}`).digest("hex"),
+      output: summary,
+      duration_ms: Date.now() - started,
+      status: "completed",
+    });
+    if (auditError) console.error("Could not record AI activity", auditError);
 
     return { id: inserted.id, summary };
   });

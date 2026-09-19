@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { FileText, Loader2, Sparkles } from "lucide-react";
+import { Download, FileText, Loader2, Sparkles } from "lucide-react";
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip } from "recharts";
 import { AppShell } from "@/components/app/AppShell";
 import { PageHeader, Section, Stars, Trend, PlatformIcon, EmptyState } from "@/components/app/primitives";
@@ -14,6 +14,7 @@ import { useReports, useLiveReviews } from "@/lib/seovale-db";
 import { monthlyTrend, platformPerformance, locationStats } from "@/lib/analytics";
 import { platforms } from "@/lib/domain";
 import { generateReport } from "@/lib/ai.functions";
+import { exportReportPdf } from "@/lib/report-export.functions";
 
 export const Route = createFileRoute("/_authenticated/reports")({
   head: () => ({
@@ -44,6 +45,7 @@ function ReportsPage() {
   const [lastSummary, setLastSummary] = useState<string | null>(null);
 
   const generateReportFn = useServerFn(generateReport);
+  const exportReportFn = useServerFn(exportReportPdf);
   const qc = useQueryClient();
   const mutation = useMutation({
     mutationFn: () => generateReportFn({ data: { period, scope } }),
@@ -53,6 +55,20 @@ function ReportsPage() {
       void qc.invalidateQueries({ queryKey: ["reports"] });
     },
     onError: (err: Error) => toast.error(err.message || "Could not generate report"),
+  });
+  const exportMutation = useMutation({
+    mutationFn: (id: string) => exportReportFn({ data: { id } }),
+    onSuccess: ({ pdfBase64, fileName }) => {
+      const bytes = Uint8Array.from(atob(pdfBase64), (char) => char.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = fileName;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      toast.success("PDF downloaded");
+    },
+    onError: (err: Error) => toast.error(err.message || "Could not export report"),
   });
 
   const trend = monthlyTrend(reviews ?? [], 6);
@@ -194,6 +210,10 @@ function ReportsPage() {
                   {r.summary && <span className="mt-1 block whitespace-pre-line text-xs text-muted-foreground line-clamp-3">{r.summary}</span>}
                 </span>
                 <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${r.status === "ready" ? "bg-positive-soft text-positive" : "bg-info-soft text-info"}`}>{r.status}</span>
+                <Button size="icon" variant="ghost" title="Download PDF" disabled={exportMutation.isPending} onClick={() => exportMutation.mutate(r.id)}>
+                  {exportMutation.isPending ? <Loader2 className="animate-spin" /> : <Download />}
+                  <span className="sr-only">Download PDF</span>
+                </Button>
               </li>
             ))}
           </ul>

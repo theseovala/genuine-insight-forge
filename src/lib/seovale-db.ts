@@ -23,6 +23,46 @@ export interface ConnectedPlatformRow {
   last_sync_error: string | null;
 }
 
+export interface AlertRulesRow {
+  id: string;
+  workspace_id: string;
+  negative_rating_threshold: number;
+  unanswered_hours: number;
+  rating_drop_threshold: number;
+  volume_spike_percent: number;
+}
+
+async function currentWorkspaceId() {
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError || !auth.user) throw authError ?? new Error("Not signed in");
+  const { data, error } = await supabase
+    .from("workspace_members")
+    .select("workspace_id")
+    .eq("user_id", auth.user.id)
+    .order("created_at")
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("No workspace is assigned to this account.");
+  return data.workspace_id;
+}
+
+export function useCurrentWorkspace() {
+  return useQuery({
+    queryKey: ["current_workspace"],
+    queryFn: async () => {
+      const workspaceId = await currentWorkspaceId();
+      const { data, error } = await supabase
+        .from("workspaces")
+        .select("id, name, slug")
+        .eq("id", workspaceId)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 function initialsOf(name: string) {
   const clean = name.replace(/^@/, "").trim();
   const parts = clean.split(/\s+/).filter(Boolean);
@@ -127,11 +167,13 @@ export function useLiveReviews() {
   return useQuery({
     queryKey: ["reviews"],
     queryFn: async (): Promise<LiveReview[]> => {
+      const workspaceId = await currentWorkspaceId();
       const { data, error } = await supabase
         .from("reviews")
         .select(
           "id, platform, author, rating, sentiment, status, priority, location_name, title, body, tags, unread, reply, replied_at, external_created_at",
         )
+        .eq("workspace_id", workspaceId)
         .order("external_created_at", { ascending: false });
       if (error) throw error;
       return (data as ReviewRow[]).map(toReview);
@@ -143,9 +185,11 @@ export function useLiveAlerts() {
   return useQuery({
     queryKey: ["alerts"],
     queryFn: async (): Promise<Alert[]> => {
+      const workspaceId = await currentWorkspaceId();
       const { data, error } = await supabase
         .from("alerts")
         .select("*")
+        .eq("workspace_id", workspaceId)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data as AlertRow[]).map(toAlert);
@@ -157,9 +201,11 @@ export function useConnectedPlatforms() {
   return useQuery({
     queryKey: ["connected_platforms"],
     queryFn: async (): Promise<ConnectedPlatformRow[]> => {
+      const workspaceId = await currentWorkspaceId();
       const { data, error } = await supabase
         .from("connected_platforms")
         .select("*")
+        .eq("workspace_id", workspaceId)
         .order("display_name");
       if (error) throw error;
       return data as ConnectedPlatformRow[];
@@ -171,9 +217,11 @@ export function useLocations() {
   return useQuery({
     queryKey: ["locations"],
     queryFn: async (): Promise<LocationRecord[]> => {
+      const workspaceId = await currentWorkspaceId();
       const { data, error } = await supabase
         .from("locations")
         .select("id, name, city, country, manager")
+        .eq("workspace_id", workspaceId)
         .order("name");
       if (error) throw error;
       return data as LocationRecord[];
@@ -197,9 +245,11 @@ export function useCompetitors() {
   return useQuery({
     queryKey: ["competitors"],
     queryFn: async (): Promise<Competitor[]> => {
+      const workspaceId = await currentWorkspaceId();
       const { data, error } = await supabase
         .from("competitors")
         .select("*")
+        .eq("workspace_id", workspaceId)
         .order("is_you", { ascending: false });
       if (error) throw error;
       return (data as CompetitorRow[]).map((c) => ({
@@ -236,7 +286,8 @@ export function useBrandSettings() {
   return useQuery({
     queryKey: ["brand_settings"],
     queryFn: async (): Promise<BrandSettings | null> => {
-      const { data, error } = await supabase.from("brand_settings").select("*").limit(1).maybeSingle();
+      const workspaceId = await currentWorkspaceId();
+      const { data, error } = await supabase.from("brand_settings").select("*").eq("workspace_id", workspaceId).limit(1).maybeSingle();
       if (error) throw error;
       return data as BrandSettings | null;
     },
@@ -247,7 +298,8 @@ export function useUpdateBrandSettings() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: Partial<BrandSettings> }) => {
-      const { error } = await supabase.from("brand_settings").update(patch).eq("id", id);
+      const workspaceId = await currentWorkspaceId();
+      const { error } = await supabase.from("brand_settings").update(patch).eq("id", id).eq("workspace_id", workspaceId);
       if (error) throw error;
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["brand_settings"] }),
@@ -268,9 +320,11 @@ export function useReports() {
   return useQuery({
     queryKey: ["reports"],
     queryFn: async (): Promise<ReportRow[]> => {
+      const workspaceId = await currentWorkspaceId();
       const { data, error } = await supabase
         .from("reports")
         .select("*")
+        .eq("workspace_id", workspaceId)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as ReportRow[];
@@ -319,6 +373,7 @@ export function usePublishReply() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, reply }: { id: string; reply: string }) => {
+      const workspaceId = await currentWorkspaceId();
       const { error } = await supabase
         .from("reviews")
         .update({
@@ -327,7 +382,8 @@ export function usePublishReply() {
           status: "replied",
           unread: false,
         })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("workspace_id", workspaceId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -347,7 +403,8 @@ export function useUpdateReview() {
       id: string;
       patch: Partial<{ status: string; priority: string; unread: boolean }>;
     }) => {
-      const { error } = await supabase.from("reviews").update(patch).eq("id", id);
+      const workspaceId = await currentWorkspaceId();
+      const { error } = await supabase.from("reviews").update(patch).eq("id", id).eq("workspace_id", workspaceId);
       if (error) throw error;
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["reviews"] }),
@@ -358,7 +415,8 @@ export function useResolveAlert() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, resolved }: { id: string; resolved: boolean }) => {
-      const { error } = await supabase.from("alerts").update({ resolved }).eq("id", id);
+      const workspaceId = await currentWorkspaceId();
+      const { error } = await supabase.from("alerts").update({ resolved }).eq("id", id).eq("workspace_id", workspaceId);
       if (error) throw error;
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["alerts"] }),
@@ -369,12 +427,42 @@ export function useDisconnectPlatform() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      const workspaceId = await currentWorkspaceId();
       const { error } = await supabase
         .from("connected_platforms")
         .update({ status: "disconnected", last_synced_at: null, account_ref: null })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("workspace_id", workspaceId);
       if (error) throw error;
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["connected_platforms"] }),
+  });
+}
+
+export function useAlertRules() {
+  return useQuery({
+    queryKey: ["alert_rules"],
+    queryFn: async (): Promise<AlertRulesRow | null> => {
+      const workspaceId = await currentWorkspaceId();
+      const { data, error } = await supabase
+        .from("alert_rules")
+        .select("*")
+        .eq("workspace_id", workspaceId)
+        .maybeSingle();
+      if (error) throw error;
+      return data as AlertRulesRow | null;
+    },
+  });
+}
+
+export function useUpdateAlertRules() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: Partial<AlertRulesRow> }) => {
+      const workspaceId = await currentWorkspaceId();
+      const { error } = await supabase.from("alert_rules").update(patch).eq("id", id).eq("workspace_id", workspaceId);
+      if (error) throw error;
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["alert_rules"] }),
   });
 }

@@ -15,9 +15,12 @@ import { AppShell } from "@/components/app/AppShell";
 import { PageHeader, Section, StatCard, StatusBadge, EmptyState } from "@/components/app/primitives";
 import { Button } from "@/components/ui/button";
 import { type Alert } from "@/lib/domain";
-import { useLiveAlerts, useResolveAlert } from "@/lib/seovale-db";
+import { useAlertRules, useLiveAlerts, useResolveAlert, useUpdateAlertRules } from "@/lib/seovale-db";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/_authenticated/alerts")({
   head: () => ({
@@ -56,6 +59,10 @@ function AlertsPage() {
   const [type, setType] = useState<(typeof typeFilters)[number]>("all");
   const { data: alerts = [], isLoading } = useLiveAlerts();
   const resolve = useResolveAlert();
+  const { data: rules } = useAlertRules();
+  const updateRules = useUpdateAlertRules();
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const [ruleForm, setRuleForm] = useState({ negative: 2, unanswered: 24, drop: 0.3, spike: 100 });
 
   const list = alerts.filter((a) => {
     if (tab === "Resolved" && !a.resolved) return false;
@@ -77,7 +84,10 @@ function AlertsPage() {
         description="Every signal that needs a human decision — ranked by impact, with a clear next action on each."
         actions={
           <>
-            <Button variant="outline"><BellOff /> Alert rules</Button>
+            <Button variant="outline" onClick={() => {
+              if (rules) setRuleForm({ negative: rules.negative_rating_threshold, unanswered: rules.unanswered_hours, drop: Number(rules.rating_drop_threshold), spike: rules.volume_spike_percent });
+              setRulesOpen(true);
+            }}><BellOff /> Alert rules</Button>
             <Button
               disabled={open.length === 0 || resolve.isPending}
               onClick={() => {
@@ -240,6 +250,21 @@ function AlertsPage() {
           ))}
         </div>
       </Section>
+      <Dialog open={rulesOpen} onOpenChange={setRulesOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Alert rules</DialogTitle><DialogDescription>Set the thresholds used when new platform reviews are synced.</DialogDescription></DialogHeader>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="space-y-1.5"><Label htmlFor="negative-threshold">Negative rating at or below</Label><Input id="negative-threshold" type="number" min={1} max={5} value={ruleForm.negative} onChange={(event) => setRuleForm((value) => ({ ...value, negative: Number(event.target.value) }))} /></label>
+            <label className="space-y-1.5"><Label htmlFor="unanswered-hours">Unanswered after hours</Label><Input id="unanswered-hours" type="number" min={1} max={720} value={ruleForm.unanswered} onChange={(event) => setRuleForm((value) => ({ ...value, unanswered: Number(event.target.value) }))} /></label>
+            <label className="space-y-1.5"><Label htmlFor="rating-drop">Rating drop</Label><Input id="rating-drop" type="number" min={0.1} max={5} step={0.1} value={ruleForm.drop} onChange={(event) => setRuleForm((value) => ({ ...value, drop: Number(event.target.value) }))} /></label>
+            <label className="space-y-1.5"><Label htmlFor="volume-spike">Volume spike percent</Label><Input id="volume-spike" type="number" min={10} max={1000} value={ruleForm.spike} onChange={(event) => setRuleForm((value) => ({ ...value, spike: Number(event.target.value) }))} /></label>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setRulesOpen(false)}>Cancel</Button><Button disabled={!rules || updateRules.isPending} onClick={() => {
+            if (!rules) return;
+            updateRules.mutate({ id: rules.id, patch: { negative_rating_threshold: ruleForm.negative, unanswered_hours: ruleForm.unanswered, rating_drop_threshold: ruleForm.drop, volume_spike_percent: ruleForm.spike } }, { onSuccess: () => { toast.success("Alert rules updated"); setRulesOpen(false); }, onError: (error) => toast.error(error.message) });
+          }}>Save rules</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }

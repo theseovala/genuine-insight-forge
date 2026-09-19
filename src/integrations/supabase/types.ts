@@ -14,6 +14,117 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_runs: {
+        Row: {
+          created_at: string
+          duration_ms: number
+          error_message: string | null
+          id: string
+          input_hash: string
+          model: string
+          output: string | null
+          purpose: string
+          report_id: string | null
+          review_id: string | null
+          status: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_ms: number
+          error_message?: string | null
+          id?: string
+          input_hash: string
+          model: string
+          output?: string | null
+          purpose: string
+          report_id?: string | null
+          review_id?: string | null
+          status: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number
+          error_message?: string | null
+          id?: string
+          input_hash?: string
+          model?: string
+          output?: string | null
+          purpose?: string
+          report_id?: string | null
+          review_id?: string | null
+          status?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_runs_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "reports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_runs_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "reviews"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_runs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      alert_rules: {
+        Row: {
+          created_at: string
+          id: string
+          negative_rating_threshold: number
+          rating_drop_threshold: number
+          unanswered_hours: number
+          updated_at: string
+          volume_spike_percent: number
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          negative_rating_threshold?: number
+          rating_drop_threshold?: number
+          unanswered_hours?: number
+          updated_at?: string
+          volume_spike_percent?: number
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          negative_rating_threshold?: number
+          rating_drop_threshold?: number
+          unanswered_hours?: number
+          updated_at?: string
+          volume_spike_percent?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alert_rules_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       alerts: {
         Row: {
           created_at: string
@@ -25,6 +136,7 @@ export type Database = {
           review_id: string | null
           severity: string
           title: string
+          workspace_id: string
         }
         Insert: {
           created_at?: string
@@ -36,6 +148,7 @@ export type Database = {
           review_id?: string | null
           severity?: string
           title: string
+          workspace_id: string
         }
         Update: {
           created_at?: string
@@ -47,6 +160,7 @@ export type Database = {
           review_id?: string | null
           severity?: string
           title?: string
+          workspace_id?: string
         }
         Relationships: [
           {
@@ -54,6 +168,13 @@ export type Database = {
             columns: ["review_id"]
             isOneToOne: false
             referencedRelation: "reviews"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alerts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
@@ -71,6 +192,7 @@ export type Database = {
           updated_at: string
           website: string | null
           weekly_digest: boolean
+          workspace_id: string
         }
         Insert: {
           alert_email?: string | null
@@ -84,6 +206,7 @@ export type Database = {
           updated_at?: string
           website?: string | null
           weekly_digest?: boolean
+          workspace_id: string
         }
         Update: {
           alert_email?: string | null
@@ -97,8 +220,17 @@ export type Database = {
           updated_at?: string
           website?: string | null
           weekly_digest?: boolean
+          workspace_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "brand_settings_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       competitors: {
         Row: {
@@ -113,6 +245,7 @@ export type Database = {
           sentiment_score: number
           trend: number
           updated_at: string
+          workspace_id: string
         }
         Insert: {
           created_at?: string
@@ -126,6 +259,7 @@ export type Database = {
           sentiment_score?: number
           trend?: number
           updated_at?: string
+          workspace_id: string
         }
         Update: {
           created_at?: string
@@ -139,8 +273,17 @@ export type Database = {
           sentiment_score?: number
           trend?: number
           updated_at?: string
+          workspace_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "competitors_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       connected_platforms: {
         Row: {
@@ -154,6 +297,7 @@ export type Database = {
           status: string
           supports_oauth: boolean
           updated_at: string
+          workspace_id: string
         }
         Insert: {
           account_ref?: string | null
@@ -166,6 +310,7 @@ export type Database = {
           status?: string
           supports_oauth?: boolean
           updated_at?: string
+          workspace_id: string
         }
         Update: {
           account_ref?: string | null
@@ -178,8 +323,114 @@ export type Database = {
           status?: string
           supports_oauth?: boolean
           updated_at?: string
+          workspace_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "connected_platforms_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      google_business_connections: {
+        Row: {
+          access_token_ciphertext: string
+          created_at: string
+          google_account_email: string | null
+          id: string
+          last_error: string | null
+          last_synced_at: string | null
+          refresh_token_ciphertext: string
+          scopes: string[]
+          status: string
+          token_expires_at: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          access_token_ciphertext: string
+          created_at?: string
+          google_account_email?: string | null
+          id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          refresh_token_ciphertext: string
+          scopes?: string[]
+          status?: string
+          token_expires_at: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          access_token_ciphertext?: string
+          created_at?: string
+          google_account_email?: string | null
+          id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          refresh_token_ciphertext?: string
+          scopes?: string[]
+          status?: string
+          token_expires_at?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_business_connections_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      google_oauth_states: {
+        Row: {
+          code_verifier_ciphertext: string
+          created_at: string
+          expires_at: string
+          id: string
+          redirect_origin: string
+          state_hash: string
+          used_at: string | null
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          code_verifier_ciphertext: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          redirect_origin: string
+          state_hash: string
+          used_at?: string | null
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          code_verifier_ciphertext?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          redirect_origin?: string
+          state_hash?: string
+          used_at?: string | null
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_oauth_states_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       locations: {
         Row: {
@@ -190,6 +441,7 @@ export type Database = {
           id: string
           manager: string | null
           name: string
+          workspace_id: string
         }
         Insert: {
           city: string
@@ -199,6 +451,7 @@ export type Database = {
           id?: string
           manager?: string | null
           name: string
+          workspace_id: string
         }
         Update: {
           city?: string
@@ -208,8 +461,17 @@ export type Database = {
           id?: string
           manager?: string | null
           name?: string
+          workspace_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "locations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       platform_credentials: {
         Row: {
@@ -281,6 +543,7 @@ export type Database = {
           status: string
           summary: string | null
           title: string
+          workspace_id: string
         }
         Insert: {
           created_at?: string
@@ -291,6 +554,7 @@ export type Database = {
           status?: string
           summary?: string | null
           title: string
+          workspace_id: string
         }
         Update: {
           created_at?: string
@@ -301,8 +565,17 @@ export type Database = {
           status?: string
           summary?: string | null
           title?: string
+          workspace_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "reports_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       reviews: {
         Row: {
@@ -326,6 +599,7 @@ export type Database = {
           title: string | null
           unread: boolean
           updated_at: string
+          workspace_id: string
         }
         Insert: {
           author: string
@@ -348,6 +622,7 @@ export type Database = {
           title?: string | null
           unread?: boolean
           updated_at?: string
+          workspace_id: string
         }
         Update: {
           author?: string
@@ -370,6 +645,127 @@ export type Database = {
           title?: string | null
           unread?: boolean
           updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sync_runs: {
+        Row: {
+          alerts_created: number
+          completed_at: string | null
+          error_message: string | null
+          id: string
+          locations_found: number
+          platform: string
+          reviews_created: number
+          reviews_found: number
+          reviews_updated: number
+          started_at: string
+          status: string
+          workspace_id: string
+        }
+        Insert: {
+          alerts_created?: number
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          locations_found?: number
+          platform: string
+          reviews_created?: number
+          reviews_found?: number
+          reviews_updated?: number
+          started_at?: string
+          status?: string
+          workspace_id: string
+        }
+        Update: {
+          alerts_created?: number
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          locations_found?: number
+          platform?: string
+          reviews_created?: number
+          reviews_found?: number
+          reviews_updated?: number
+          started_at?: string
+          status?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_runs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_members: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["workspace_role"]
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["workspace_role"]
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["workspace_role"]
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_members_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspaces: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          slug?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -378,10 +774,29 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      claim_google_oauth_state: {
+        Args: { _state_hash: string }
+        Returns: {
+          code_verifier_ciphertext: string
+          created_at: string
+          expires_at: string
+          id: string
+          redirect_origin: string
+          state_hash: string
+          used_at: string | null
+          user_id: string
+          workspace_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "google_oauth_states"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
     }
     Enums: {
-      [_ in never]: never
+      workspace_role: "owner" | "admin" | "member"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -508,6 +923,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      workspace_role: ["owner", "admin", "member"],
+    },
   },
 } as const

@@ -1,5 +1,6 @@
 # Seovale — build roadmap
 
+- [x] Locked rule: preserve the original Seovale UI/UX for every future file; import useful functionality only
 - [x] Copy the RepuVala command center app into this project
 - [x] Real backend schema (reviews, alerts, locations, platforms, competitors, reports, brand settings, profiles)
 - [x] Realistic seeded review history (260 reviews, 6 locations, 6 platforms, 12 months)
@@ -12,5 +13,11 @@
   - [x] Feedback theme trends only shown when there is enough data to compare
   - [x] Publish reply, resolve alert, settings save and report generation all verified writing to the backend
   - [x] AI reply writing, feedback briefing and report writing verified live
-  - [x] Security lint clean (only the intentionally locked credential store is flagged)
-- [ ] Google Business Profile connection flow (blocked: needs the user's OAuth client ID + secret)
+- [x] Security lint clean, including an explicit deny policy on the server-only credential store
+- [x] Workspace and membership isolation across all business data
+- [x] Google Business Profile OAuth, encrypted tokens, paginated sync, sync history and review alerts
+- [x] AI activity audit records for generated replies, briefings and reports
+- [x] Branded PDF report downloads
+- [x] Password recovery and secure password update
+- [x] Configurable alert thresholds and real response-time analytics
+- [ ] Live Google authorization verification (blocked: needs approved OAuth client ID and secret)
