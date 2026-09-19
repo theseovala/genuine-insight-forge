@@ -56,6 +56,13 @@ export const navItems = [
   { id: "settings", to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
+const navGroups = [
+  { label: "Overview", ids: ["dashboard", "analytics"] },
+  { label: "Reputation", ids: ["reviews", "responses", "alerts", "removals"] },
+  { label: "Growth", ids: ["locations", "competitors", "feedback"] },
+  { label: "Workspace", ids: ["reports", "settings"] },
+] as const;
+
 function NavList({
   collapsed,
   onNavigate,
@@ -66,56 +73,75 @@ function NavList({
   counts: Record<string, number>;
 }) {
   return (
-    <nav className="flex flex-col gap-1 px-3">
-      {navItems.map((item) => {
-        const badge = counts[item.id];
-        const urgent = item.id === "alerts";
-        const link = (
-          <Link
-            key={item.id}
-            to={item.to}
-            onClick={onNavigate}
-            className={cn(
-              "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-muted transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              collapsed && "justify-center px-0",
-            )}
-            activeProps={{
-              className:
-                "bg-sidebar-accent text-sidebar-accent-foreground before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-sidebar-primary",
-            }}
-          >
-            <item.icon className="size-[18px] shrink-0" />
-            {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
-            {!collapsed && !!badge && (
-              <span
+    <nav className={cn("flex flex-col gap-3", collapsed ? "px-2" : "px-3")}>
+      {navGroups.map((group) => (
+        <div key={group.label} className="flex flex-col gap-0.5">
+          {!collapsed && (
+            <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-sidebar-muted/70">
+              {group.label}
+            </p>
+          )}
+          {collapsed && <span className="mx-2 mb-1 h-px bg-sidebar-border/60" />}
+          {group.ids.map((id) => {
+            const item = navItems.find((n) => n.id === id)!;
+            const badge = counts[item.id];
+            const urgent = item.id === "alerts";
+            const link = (
+              <Link
+                key={item.id}
+                to={item.to}
+                onClick={onNavigate}
                 className={cn(
-                  "rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums",
-                  urgent
-                    ? "bg-negative text-destructive-foreground"
-                    : "bg-sidebar-primary/20 text-sidebar-primary",
+                  "group relative flex items-center gap-2.5 rounded-lg text-[13px] font-medium text-sidebar-muted outline-none transition-all duration-200",
+                  "hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-visible:bg-sidebar-accent/70",
+                  collapsed ? "justify-center px-0 py-2" : "px-2.5 py-2 hover:translate-x-0.5",
                 )}
+                activeProps={{
+                  className:
+                    "bg-sidebar-accent text-sidebar-accent-foreground shadow-[var(--shadow-sidebar-active)] before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-r-full before:bg-sidebar-primary [&_[data-icon]]:bg-sidebar-primary/20 [&_[data-icon]]:text-sidebar-primary",
+                }}
               >
-                {badge}
-              </span>
-            )}
-            {collapsed && !!badge && (
-              <span
-                className={cn(
-                  "absolute right-2 top-2 size-2 rounded-full",
-                  urgent ? "bg-negative" : "bg-sidebar-primary",
+                <span
+                  data-icon
+                  className="grid size-7 shrink-0 place-items-center rounded-md bg-sidebar-accent/40 text-current transition-colors duration-200 group-hover:bg-sidebar-primary/15"
+                >
+                  <item.icon className="size-[15px]" strokeWidth={2} />
+                </span>
+                {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
+                {!collapsed && !!badge && (
+                  <span
+                    className={cn(
+                      "num rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                      urgent
+                        ? "bg-negative text-destructive-foreground"
+                        : "bg-sidebar-primary/20 text-sidebar-primary",
+                    )}
+                  >
+                    {badge}
+                  </span>
                 )}
-              />
-            )}
-          </Link>
-        );
-        if (!collapsed) return link;
-        return (
-          <Tooltip key={item.id}>
-            <TooltipTrigger asChild>{link}</TooltipTrigger>
-            <TooltipContent side="right">{item.label}</TooltipContent>
-          </Tooltip>
-        );
-      })}
+                {collapsed && !!badge && (
+                  <span
+                    className={cn(
+                      "absolute right-1.5 top-1 size-2 rounded-full ring-2 ring-sidebar",
+                      urgent ? "bg-negative" : "bg-sidebar-primary",
+                    )}
+                  />
+                )}
+              </Link>
+            );
+            if (!collapsed) return link;
+            return (
+              <Tooltip key={item.id}>
+                <TooltipTrigger asChild>{link}</TooltipTrigger>
+                <TooltipContent side="right" className="font-medium">
+                  {item.label}
+                </TooltipContent>
+              </Tooltip>
+            );
+          })}
+        </div>
+      ))}
     </nav>
   );
 }
@@ -131,32 +157,42 @@ function SidebarInner({
 }) {
   const { brandName } = useApp();
   return (
-    <div className="flex h-full flex-col">
-      <div className={cn("flex items-center gap-3 px-5 py-5", collapsed && "justify-center px-0")}>
+    <div className="flex h-full flex-col border-r border-sidebar-border/70">
+      <div
+        className={cn(
+          "flex items-center gap-2.5 border-b border-sidebar-border/60 py-3.5",
+          collapsed ? "justify-center px-0" : "px-4",
+        )}
+      >
         <BrandMark light />
         {!collapsed && (
-          <div className="leading-tight">
-            <p className="font-display text-base font-extrabold text-sidebar-accent-foreground">
+          <div className="min-w-0 leading-tight">
+            <p className="truncate font-display text-[15px] font-extrabold tracking-tight text-sidebar-accent-foreground">
               {BRAND.name}
             </p>
-            <p className="text-[10px] font-medium tracking-wide text-sidebar-muted">
+            <p className="truncate text-[10px] font-medium tracking-wide text-sidebar-muted">
               Reputation Command Center
             </p>
           </div>
         )}
       </div>
       {!collapsed && (
-        <div className="mx-3 mb-3 rounded-lg border border-sidebar-border bg-sidebar-accent/50 px-3 py-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-sidebar-muted">
+        <div className="mx-3 mt-3 rounded-lg border border-sidebar-border/80 bg-sidebar-accent/40 px-3 py-2 shadow-[var(--shadow-sidebar-active)]">
+          <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-sidebar-muted/80">
             Workspace
           </p>
           <p className="truncate text-xs font-semibold text-sidebar-accent-foreground">{brandName}</p>
         </div>
       )}
-      <div className="scrollbar-thin flex-1 overflow-y-auto py-1">
+      <div className="scrollbar-thin flex-1 overflow-y-auto py-3">
         <NavList collapsed={collapsed} onNavigate={onNavigate} counts={counts} />
       </div>
-      <div className={cn("border-t border-sidebar-border px-5 py-4", collapsed && "px-2 text-center")}>
+      <div
+        className={cn(
+          "border-t border-sidebar-border/60 py-3",
+          collapsed ? "px-2 text-center" : "px-4",
+        )}
+      >
         {collapsed ? (
           <span className="text-[10px] font-bold text-sidebar-muted">SV</span>
         ) : (
