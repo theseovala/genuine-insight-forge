@@ -8,8 +8,9 @@
 - [x] Remove mock data; every page reads stored data
 - [x] Real auth flow: public landing at /, /auth sign-in + sign-up, app behind an authenticated layout
 - [x] Real AI (Lovable AI Gateway): reply writing, review analysis, report summaries
-- [ ] Deep end-to-end recheck of every page, action and number (in progress)
-  - [ ] Fix feedback page theme percentages showing 0%
-  - [ ] Verify publish reply, resolve alert, settings save, report generation write to the backend
-  - [ ] Security lint clean
+- [x] Deep end-to-end recheck of every page, action and number
+  - [x] Feedback theme trends only shown when there is enough data to compare
+  - [x] Publish reply, resolve alert, settings save and report generation all verified writing to the backend
+  - [x] AI reply writing, feedback briefing and report writing verified live
+  - [x] Security lint clean (only the intentionally locked credential store is flagged)
 - [ ] Google Business Profile connection flow (blocked: needs the user's OAuth client ID + secret)
