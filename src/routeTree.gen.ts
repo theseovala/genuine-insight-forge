@@ -10,123 +10,140 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AlertsRouteImport } from './routes/alerts'
-import { Route as AnalyticsRouteImport } from './routes/analytics'
-import { Route as CompetitorsRouteImport } from './routes/competitors'
-import { Route as FeedbackRouteImport } from './routes/feedback'
-import { Route as LocationsRouteImport } from './routes/locations'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as ReportsRouteImport } from './routes/reports'
-import { Route as ResponsesRouteImport } from './routes/responses'
-import { Route as ReviewsRouteImport } from './routes/reviews'
-import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedAlertsRouteImport } from './routes/_authenticated/alerts'
+import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
+import { Route as AuthenticatedCompetitorsRouteImport } from './routes/_authenticated/competitors'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedFeedbackRouteImport } from './routes/_authenticated/feedback'
+import { Route as AuthenticatedLocationsRouteImport } from './routes/_authenticated/locations'
+import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
+import { Route as AuthenticatedResponsesRouteImport } from './routes/_authenticated/responses'
+import { Route as AuthenticatedReviewsRouteImport } from './routes/_authenticated/reviews'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AlertsRoute = AlertsRouteImport.update({
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedAlertsRoute = AuthenticatedAlertsRouteImport.update({
   id: '/alerts',
   path: '/alerts',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AnalyticsRoute = AnalyticsRouteImport.update({
+const AuthenticatedAnalyticsRoute = AuthenticatedAnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const CompetitorsRoute = CompetitorsRouteImport.update({
-  id: '/competitors',
-  path: '/competitors',
-  getParentRoute: () => rootRouteImport,
+const AuthenticatedCompetitorsRoute =
+  AuthenticatedCompetitorsRouteImport.update({
+    id: '/competitors',
+    path: '/competitors',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const FeedbackRoute = FeedbackRouteImport.update({
+const AuthenticatedFeedbackRoute = AuthenticatedFeedbackRouteImport.update({
   id: '/feedback',
   path: '/feedback',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const LocationsRoute = LocationsRouteImport.update({
+const AuthenticatedLocationsRoute = AuthenticatedLocationsRouteImport.update({
   id: '/locations',
   path: '/locations',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReportsRoute = ReportsRouteImport.update({
+const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const ResponsesRoute = ResponsesRouteImport.update({
+const AuthenticatedResponsesRoute = AuthenticatedResponsesRouteImport.update({
   id: '/responses',
   path: '/responses',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const ReviewsRoute = ReviewsRouteImport.update({
+const AuthenticatedReviewsRoute = AuthenticatedReviewsRouteImport.update({
   id: '/reviews',
   path: '/reviews',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const SettingsRoute = SettingsRouteImport.update({
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/alerts': typeof AlertsRoute
-  '/analytics': typeof AnalyticsRoute
-  '/competitors': typeof CompetitorsRoute
-  '/feedback': typeof FeedbackRoute
-  '/locations': typeof LocationsRoute
-  '/login': typeof LoginRoute
-  '/reports': typeof ReportsRoute
-  '/responses': typeof ResponsesRoute
-  '/reviews': typeof ReviewsRoute
-  '/settings': typeof SettingsRoute
+  '/auth': typeof AuthRoute
+  '/alerts': typeof AuthenticatedAlertsRoute
+  '/analytics': typeof AuthenticatedAnalyticsRoute
+  '/competitors': typeof AuthenticatedCompetitorsRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/feedback': typeof AuthenticatedFeedbackRoute
+  '/locations': typeof AuthenticatedLocationsRoute
+  '/reports': typeof AuthenticatedReportsRoute
+  '/responses': typeof AuthenticatedResponsesRoute
+  '/reviews': typeof AuthenticatedReviewsRoute
+  '/settings': typeof AuthenticatedSettingsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/alerts': typeof AlertsRoute
-  '/analytics': typeof AnalyticsRoute
-  '/competitors': typeof CompetitorsRoute
-  '/feedback': typeof FeedbackRoute
-  '/locations': typeof LocationsRoute
-  '/login': typeof LoginRoute
-  '/reports': typeof ReportsRoute
-  '/responses': typeof ResponsesRoute
-  '/reviews': typeof ReviewsRoute
-  '/settings': typeof SettingsRoute
+  '/auth': typeof AuthRoute
+  '/alerts': typeof AuthenticatedAlertsRoute
+  '/analytics': typeof AuthenticatedAnalyticsRoute
+  '/competitors': typeof AuthenticatedCompetitorsRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/feedback': typeof AuthenticatedFeedbackRoute
+  '/locations': typeof AuthenticatedLocationsRoute
+  '/reports': typeof AuthenticatedReportsRoute
+  '/responses': typeof AuthenticatedResponsesRoute
+  '/reviews': typeof AuthenticatedReviewsRoute
+  '/settings': typeof AuthenticatedSettingsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/alerts': typeof AlertsRoute
-  '/analytics': typeof AnalyticsRoute
-  '/competitors': typeof CompetitorsRoute
-  '/feedback': typeof FeedbackRoute
-  '/locations': typeof LocationsRoute
-  '/login': typeof LoginRoute
-  '/reports': typeof ReportsRoute
-  '/responses': typeof ResponsesRoute
-  '/reviews': typeof ReviewsRoute
-  '/settings': typeof SettingsRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/auth': typeof AuthRoute
+  '/_authenticated/alerts': typeof AuthenticatedAlertsRoute
+  '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
+  '/_authenticated/competitors': typeof AuthenticatedCompetitorsRoute
+  '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/feedback': typeof AuthenticatedFeedbackRoute
+  '/_authenticated/locations': typeof AuthenticatedLocationsRoute
+  '/_authenticated/reports': typeof AuthenticatedReportsRoute
+  '/_authenticated/responses': typeof AuthenticatedResponsesRoute
+  '/_authenticated/reviews': typeof AuthenticatedReviewsRoute
+  '/_authenticated/settings': typeof AuthenticatedSettingsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/auth'
     | '/alerts'
     | '/analytics'
     | '/competitors'
+    | '/dashboard'
     | '/feedback'
     | '/locations'
-    | '/login'
     | '/reports'
     | '/responses'
     | '/reviews'
@@ -134,12 +151,13 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/auth'
     | '/alerts'
     | '/analytics'
     | '/competitors'
+    | '/dashboard'
     | '/feedback'
     | '/locations'
-    | '/login'
     | '/reports'
     | '/responses'
     | '/reviews'
@@ -147,30 +165,24 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
-    | '/alerts'
-    | '/analytics'
-    | '/competitors'
-    | '/feedback'
-    | '/locations'
-    | '/login'
-    | '/reports'
-    | '/responses'
-    | '/reviews'
-    | '/settings'
+    | '/_authenticated'
+    | '/auth'
+    | '/_authenticated/alerts'
+    | '/_authenticated/analytics'
+    | '/_authenticated/competitors'
+    | '/_authenticated/dashboard'
+    | '/_authenticated/feedback'
+    | '/_authenticated/locations'
+    | '/_authenticated/reports'
+    | '/_authenticated/responses'
+    | '/_authenticated/reviews'
+    | '/_authenticated/settings'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AlertsRoute: typeof AlertsRoute
-  AnalyticsRoute: typeof AnalyticsRoute
-  CompetitorsRoute: typeof CompetitorsRoute
-  FeedbackRoute: typeof FeedbackRoute
-  LocationsRoute: typeof LocationsRoute
-  LoginRoute: typeof LoginRoute
-  ReportsRoute: typeof ReportsRoute
-  ResponsesRoute: typeof ResponsesRoute
-  ReviewsRoute: typeof ReviewsRoute
-  SettingsRoute: typeof SettingsRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AuthRoute: typeof AuthRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -182,91 +194,126 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/alerts': {
-      id: '/alerts'
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/alerts': {
+      id: '/_authenticated/alerts'
       path: '/alerts'
       fullPath: '/alerts'
-      preLoaderRoute: typeof AlertsRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthenticatedAlertsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/analytics': {
-      id: '/analytics'
+    '/_authenticated/analytics': {
+      id: '/_authenticated/analytics'
       path: '/analytics'
       fullPath: '/analytics'
-      preLoaderRoute: typeof AnalyticsRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthenticatedAnalyticsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/competitors': {
-      id: '/competitors'
+    '/_authenticated/competitors': {
+      id: '/_authenticated/competitors'
       path: '/competitors'
       fullPath: '/competitors'
-      preLoaderRoute: typeof CompetitorsRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthenticatedCompetitorsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/feedback': {
-      id: '/feedback'
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/feedback': {
+      id: '/_authenticated/feedback'
       path: '/feedback'
       fullPath: '/feedback'
-      preLoaderRoute: typeof FeedbackRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthenticatedFeedbackRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/locations': {
-      id: '/locations'
+    '/_authenticated/locations': {
+      id: '/_authenticated/locations'
       path: '/locations'
       fullPath: '/locations'
-      preLoaderRoute: typeof LocationsRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthenticatedLocationsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reports': {
-      id: '/reports'
+    '/_authenticated/reports': {
+      id: '/_authenticated/reports'
       path: '/reports'
       fullPath: '/reports'
-      preLoaderRoute: typeof ReportsRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthenticatedReportsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/responses': {
-      id: '/responses'
+    '/_authenticated/responses': {
+      id: '/_authenticated/responses'
       path: '/responses'
       fullPath: '/responses'
-      preLoaderRoute: typeof ResponsesRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthenticatedResponsesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/reviews': {
-      id: '/reviews'
+    '/_authenticated/reviews': {
+      id: '/_authenticated/reviews'
       path: '/reviews'
       fullPath: '/reviews'
-      preLoaderRoute: typeof ReviewsRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthenticatedReviewsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/settings': {
-      id: '/settings'
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
       path: '/settings'
       fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAlertsRoute: typeof AuthenticatedAlertsRoute
+  AuthenticatedAnalyticsRoute: typeof AuthenticatedAnalyticsRoute
+  AuthenticatedCompetitorsRoute: typeof AuthenticatedCompetitorsRoute
+  AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedFeedbackRoute: typeof AuthenticatedFeedbackRoute
+  AuthenticatedLocationsRoute: typeof AuthenticatedLocationsRoute
+  AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
+  AuthenticatedResponsesRoute: typeof AuthenticatedResponsesRoute
+  AuthenticatedReviewsRoute: typeof AuthenticatedReviewsRoute
+  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAlertsRoute: AuthenticatedAlertsRoute,
+  AuthenticatedAnalyticsRoute: AuthenticatedAnalyticsRoute,
+  AuthenticatedCompetitorsRoute: AuthenticatedCompetitorsRoute,
+  AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedFeedbackRoute: AuthenticatedFeedbackRoute,
+  AuthenticatedLocationsRoute: AuthenticatedLocationsRoute,
+  AuthenticatedReportsRoute: AuthenticatedReportsRoute,
+  AuthenticatedResponsesRoute: AuthenticatedResponsesRoute,
+  AuthenticatedReviewsRoute: AuthenticatedReviewsRoute,
+  AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AlertsRoute: AlertsRoute,
-  AnalyticsRoute: AnalyticsRoute,
-  CompetitorsRoute: CompetitorsRoute,
-  FeedbackRoute: FeedbackRoute,
-  LocationsRoute: LocationsRoute,
-  LoginRoute: LoginRoute,
-  ReportsRoute: ReportsRoute,
-  ResponsesRoute: ResponsesRoute,
-  ReviewsRoute: ReviewsRoute,
-  SettingsRoute: SettingsRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AuthRoute: AuthRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

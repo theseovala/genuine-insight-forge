@@ -1,7 +1,7 @@
 // Reputation score algorithm — derived from real stored reviews.
 // Score 0-100, weighted across rating quality, sentiment balance,
 // review volume confidence and responsiveness.
-import type { Review } from "@/lib/mock-data";
+import type { Review } from "@/lib/domain";
 
 export const SCORE_WEIGHTS = {
   rating: 0.5,

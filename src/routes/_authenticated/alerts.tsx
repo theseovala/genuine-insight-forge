@@ -9,26 +9,29 @@ import {
   ScanEye,
   BellOff,
   CheckCheck,
+  RotateCcw,
 } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { PageHeader, Section, StatCard, StatusBadge, EmptyState } from "@/components/app/primitives";
 import { Button } from "@/components/ui/button";
-import { type Alert } from "@/lib/mock-data";
-import { useLiveAlerts, useResolveAlert } from "@/lib/repuvala-db";
+import { type Alert } from "@/lib/domain";
+import { useLiveAlerts, useResolveAlert } from "@/lib/seovale-db";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/alerts")({
+export const Route = createFileRoute("/_authenticated/alerts")({
   head: () => ({
     meta: [
-      { title: "Reputation Alerts — RepuVala™" },
+      { title: "Reputation Alerts — Seovale" },
       {
         name: "description",
         content:
           "Alert center for negative reviews, rating drops, unusual activity, unresolved feedback and suspicious review patterns.",
       },
-      { property: "og:title", content: "Reputation Alerts — RepuVala™" },
+      { property: "og:title", content: "Reputation Alerts — Seovale" },
       { property: "og:description", content: "Know the moment your reputation needs attention." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: AlertsPage,
@@ -44,12 +47,23 @@ const typeMeta: Record<Alert["type"], { icon: typeof ShieldAlert; label: string;
 };
 
 const tabs = ["Unresolved", "All", "Resolved"] as const;
+const severityFilters = ["all", "critical", "high", "medium", "info"] as const;
+const typeFilters = ["all", ...Object.keys(typeMeta)] as const;
 
 function AlertsPage() {
   const [tab, setTab] = useState<(typeof tabs)[number]>("Unresolved");
+  const [severity, setSeverity] = useState<(typeof severityFilters)[number]>("all");
+  const [type, setType] = useState<(typeof typeFilters)[number]>("all");
   const { data: alerts = [], isLoading } = useLiveAlerts();
   const resolve = useResolveAlert();
-  const list = alerts.filter((a) => (tab === "All" ? true : tab === "Resolved" ? a.resolved : !a.resolved));
+
+  const list = alerts.filter((a) => {
+    if (tab === "Resolved" && !a.resolved) return false;
+    if (tab === "Unresolved" && a.resolved) return false;
+    if (severity !== "all" && a.severity !== severity) return false;
+    if (type !== "all" && a.type !== type) return false;
+    return true;
+  });
 
   const open = alerts.filter((a) => !a.resolved);
   const countBy = (s: Alert["severity"]) => open.filter((a) => a.severity === s).length;
@@ -67,8 +81,9 @@ function AlertsPage() {
             <Button
               disabled={open.length === 0 || resolve.isPending}
               onClick={() => {
+                const count = open.length;
                 open.forEach((a) => resolve.mutate({ id: a.id, resolved: true }));
-                toast.success(`${open.length} alerts resolved`);
+                toast.success(`${count} alerts resolved`);
               }}
             >
               <CheckCheck /> Resolve all
@@ -84,23 +99,56 @@ function AlertsPage() {
         <StatCard label="Resolved" value={resolvedCount} sub="Closed in this workspace" icon={CheckCheck} tone="positive" />
       </div>
 
+      <div className="mb-4 flex flex-wrap items-center gap-4">
+        <div className="inline-flex rounded-lg border bg-card p-1">
+          {tabs.map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={cn(
+                "rounded-md px-4 py-1.5 text-sm font-semibold transition-colors",
+                tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
+              )}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
 
-      <div className="mb-4 inline-flex rounded-lg border bg-card p-1">
-        {tabs.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={cn(
-              "rounded-md px-4 py-1.5 text-sm font-semibold transition-colors",
-              tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
-            )}
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-muted-foreground">Severity:</span>
+          <select
+            value={severity}
+            onChange={(e) => setSeverity(e.target.value as typeof severity)}
+            className="h-9 rounded-lg border bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-ring/40"
           >
-            {t}
-          </button>
-        ))}
+            {severityFilters.map((s) => (
+              <option key={s} value={s}>{s === "all" ? "All" : s}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-muted-foreground">Type:</span>
+          <select
+            value={type}
+            onChange={(e) => setType(e.target.value as typeof type)}
+            className="h-9 rounded-lg border bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-ring/40"
+          >
+            {typeFilters.map((t) => (
+              <option key={t} value={t}>{t === "all" ? "All" : typeMeta[t as Alert["type"]].label}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      {list.length === 0 ? (
+      {isLoading ? (
+        <div className="stagger grid gap-3">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="skeleton-shimmer h-24 rounded-xl" />
+          ))}
+        </div>
+      ) : list.length === 0 ? (
         <Section>
           <EmptyState icon={CheckCheck} title="No alerts here" description="Nothing to review in this view. Your monitoring rules are still watching every connected platform." />
         </Section>
@@ -136,8 +184,41 @@ function AlertsPage() {
                       {a.type === "drop" || a.type === "spike" ? "Analyse" : a.type === "suspicious" ? "Review content" : "Open review"}
                     </Link>
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => toast("Alert assigned (prototype)")}>Assign</Button>
-                  <Button size="sm" variant="ghost" onClick={() => toast.success("Alert resolved (prototype)")}>Resolve</Button>
+                  {a.resolved ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={resolve.isPending}
+                      onClick={() =>
+                        resolve.mutate(
+                          { id: a.id, resolved: false },
+                          {
+                            onSuccess: () => toast.success("Alert reopened"),
+                            onError: (e) => toast.error("Could not reopen alert", { description: (e as Error).message }),
+                          },
+                        )
+                      }
+                    >
+                      <RotateCcw /> Reopen
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={resolve.isPending}
+                      onClick={() =>
+                        resolve.mutate(
+                          { id: a.id, resolved: true },
+                          {
+                            onSuccess: () => toast.success("Alert resolved"),
+                            onError: (e) => toast.error("Could not resolve alert", { description: (e as Error).message }),
+                          },
+                        )
+                      }
+                    >
+                      Resolve
+                    </Button>
+                  )}
                 </div>
               </article>
             );
@@ -145,12 +226,12 @@ function AlertsPage() {
         </div>
       )}
 
-      <Section className="mt-5" title="How alerting works" description="Configure thresholds per location, platform and role">
+      <Section className="mt-5" title="How alerting works" description="Configure thresholds per location and platform">
         <div className="grid gap-4 md:grid-cols-3">
           {[
             ["Detect", "Continuous monitoring across every connected platform, location and keyword."],
             ["Rank", "Each signal is scored by rating impact, reviewer reach, recency and unresolved time."],
-            ["Route", "Alerts are routed to the right role — location manager, reputation manager or agency staff."],
+            ["Route", "Alerts are routed to the right teammate to action."],
           ].map(([t, d]) => (
             <div key={t} className="rounded-xl bg-muted/50 p-4">
               <p className="font-display text-sm font-bold text-primary">{t}</p>

@@ -1,26 +1,34 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
-import { roles, locations, type Role, type Location } from "./mock-data";
+import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { useLocations, useBrandSettings } from "./seovale-db";
+import { BRAND } from "./domain";
+
+export const ALL_LOCATIONS = "All locations";
 
 interface AppState {
-  role: Role;
-  setRole: (id: string) => void;
-  location: Location;
-  setLocation: (id: string) => void;
-  can: (routeId: string) => boolean;
+  /** Selected location name, or "All locations". */
+  location: string;
+  setLocation: (name: string) => void;
+  locationNames: string[];
+  brandName: string;
 }
 
 const Ctx = createContext<AppState | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [role, setRoleState] = useState<Role>(roles[1]!);
-  const [location, setLocationState] = useState<Location>(locations[0]!);
-  const value: AppState = {
-    role,
-    setRole: (id) => setRoleState(roles.find((r) => r.id === id) ?? roles[1]!),
-    location,
-    setLocation: (id) => setLocationState(locations.find((l) => l.id === id) ?? locations[0]!),
-    can: (routeId) => role.nav.includes("all") || role.nav.includes(routeId),
-  };
+  const [location, setLocation] = useState<string>(ALL_LOCATIONS);
+  const { data: locations } = useLocations();
+  const { data: brand } = useBrandSettings();
+
+  const value = useMemo<AppState>(
+    () => ({
+      location,
+      setLocation,
+      locationNames: [ALL_LOCATIONS, ...(locations ?? []).map((l) => l.name)],
+      brandName: brand?.brand_name ?? BRAND.name,
+    }),
+    [location, locations, brand],
+  );
+
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
