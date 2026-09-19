@@ -210,3 +210,18 @@ export function responseTimeHours(reviews: LiveReview[]): number | null {
   }, 0);
   return round1(totals / answered.length / 3_600_000);
 }
+
+export function monthlyResponseTime(reviews: LiveReview[], months = 6) {
+  const now = new Date();
+  return Array.from({ length: months }, (_, index) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - (months - 1 - index), 1);
+    const monthReviews = reviews.filter((review) => {
+      const created = new Date(review.external_created_at);
+      return created.getFullYear() === date.getFullYear() && created.getMonth() === date.getMonth();
+    });
+    return {
+      month: date.toLocaleDateString("en", { month: "short" }),
+      hours: responseTimeHours(monthReviews),
+    };
+  });
+}

@@ -29,6 +29,7 @@ import {
   platformPerformance,
   locationStats,
   responseTimeHours,
+  monthlyResponseTime,
 } from "@/lib/analytics";
 import { computeReputation } from "@/lib/reputation";
 
@@ -78,6 +79,7 @@ function Analytics() {
   const locStats = locationStats(allReviews ?? []);
   const summary = computeReputation(reviews);
   const avgResponseHours = responseTimeHours(reviews);
+  const responseTrend = monthlyResponseTime(reviews, 6);
 
   const prev = trend.length >= 2 ? trend[trend.length - 2] : undefined;
   const last = trend.length >= 1 ? trend[trend.length - 1] : undefined;
@@ -133,7 +135,7 @@ function Analytics() {
           ) : (
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={trend} margin={{ left: -22, right: 8, top: 8 }}>
+                <BarChart data={responseTrend} margin={{ left: -22, right: 8, top: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} stroke="var(--muted-foreground)" />
                   <YAxis tickLine={false} axisLine={false} fontSize={12} stroke="var(--muted-foreground)" />
@@ -178,8 +180,8 @@ function Analytics() {
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} stroke="var(--muted-foreground)" />
                   <YAxis tickLine={false} axisLine={false} fontSize={12} stroke="var(--muted-foreground)" />
-                  <RTooltip {...chartTip} cursor={{ fill: "var(--muted)" }} />
-                  <Bar dataKey="reviews" name="Reviews" fill="var(--chart-3)" radius={[6, 6, 0, 0]} animationDuration={900} />
+                  <RTooltip {...chartTip} cursor={{ fill: "var(--muted)" }} formatter={(value) => [`${value} hours`, "Median response"]} />
+                  <Bar dataKey="hours" name="Median response hours" fill="var(--chart-3)" radius={[6, 6, 0, 0]} animationDuration={900} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
