@@ -32,7 +32,7 @@ export interface AlertRulesRow {
   volume_spike_percent: number;
 }
 
-async function currentWorkspaceId() {
+export async function currentWorkspaceId() {
   const { data: auth, error: authError } = await supabase.auth.getUser();
   if (authError || !auth.user) throw authError ?? new Error("Not signed in");
   const { data, error } = await supabase

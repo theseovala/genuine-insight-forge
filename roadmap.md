@@ -28,3 +28,7 @@
 - [x] Custom domain seovale.com connected (DNS verified, provisioning); published to Lovable URL
 - [x] theseovala@gmail.com now owner of the main workspace; empty duplicate workspace removed
 - [x] Live verified: alert engine fires, AI reply drafted+published (replied_by recorded), PDF download, platforms list
+
+## New task (VPS)
+- User shared a Hostinger VPS (187.53.134.164) and asked to deploy there. SSH password was pasted in chat — advise rotation. Lovable hosting already serves the app; evaluate safe use.
+- Done: Review Removal (auto AI policy scan, removal_cases/removal_scans, page + nav). Claude + OpenAI keys wired as AI fallbacks.

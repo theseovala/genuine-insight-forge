@@ -49,6 +49,8 @@ export const REASONING_OPTIONS = {
 
 /** Model used when falling back to the account's own OpenAI key. */
 export const FALLBACK_MODEL = "gpt-4.1";
+/** Model used when falling back to the account's own Anthropic key. */
+export const CLAUDE_MODEL = "claude-sonnet-4-5";
 
 /**
  * Direct OpenAI provider built from the project's own OPENAI_API_KEY.
@@ -58,4 +60,57 @@ export function createDirectOpenAI() {
   const key = process.env["OPENAI_API_KEY"];
   if (!key) return null;
   return createOpenAI({ apiKey: key });
+}
+
+/** Direct Anthropic provider built from the project's own ANTHROPIC_API_KEY. */
+export async function createDirectAnthropic() {
+  const key = process.env["ANTHROPIC_API_KEY"];
+  if (!key) return null;
+  const { createAnthropic } = await import("@ai-sdk/anthropic");
+  return createAnthropic({ apiKey: key });
+}
+
+/**
+ * Runs one text generation, trying Lovable AI first and falling back to the
+ * project's own OpenAI key, then its Anthropic key, so AI never goes dark.
+ */
+export async function runAiText(system: string, prompt: string) {
+  const { streamText } = await import("ai");
+  const errors: unknown[] = [];
+
+  try {
+    const { provider } = createGateway();
+    const result = streamText({
+      model: provider.responses(AI_MODEL),
+      system,
+      prompt,
+      providerOptions: { openai: { ...REASONING_OPTIONS } },
+    });
+    return { output: (await result.text).trim(), model: AI_MODEL };
+  } catch (error) {
+    errors.push(error);
+  }
+
+  const openai = createDirectOpenAI();
+  if (openai) {
+    try {
+      const result = streamText({
+        model: openai.responses(FALLBACK_MODEL),
+        system,
+        prompt,
+        providerOptions: { openai: { store: false } },
+      });
+      return { output: (await result.text).trim(), model: FALLBACK_MODEL };
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+
+  const anthropic = await createDirectAnthropic();
+  if (anthropic) {
+    const result = streamText({ model: anthropic(CLAUDE_MODEL), system, prompt });
+    return { output: (await result.text).trim(), model: CLAUDE_MODEL };
+  }
+
+  throw errors[0] ?? new Error("AI is not configured for this project.");
 }
