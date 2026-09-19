@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
   Building2,
@@ -9,6 +11,7 @@ import {
   CreditCard,
   Loader2,
   ExternalLink,
+  RefreshCw,
 } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { PageHeader, Section, PlatformIcon, StatusBadge, EmptyState } from "@/components/app/primitives";
@@ -27,6 +30,7 @@ import {
 } from "@/lib/seovale-db";
 import { platformName } from "@/lib/domain";
 import { cn } from "@/lib/utils";
+import { disconnectGoogleBusiness, getGoogleBusinessConnection, startGoogleBusinessConnection, syncGoogleBusinessReviews } from "@/lib/google-business.functions";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({
@@ -196,6 +200,33 @@ function BusinessProfileTab() {
 function PlatformsTab() {
   const { data: platformsList, isLoading } = useConnectedPlatforms();
   const disconnect = useDisconnectPlatform();
+  const queryClient = useQueryClient();
+  const statusFn = useServerFn(getGoogleBusinessConnection);
+  const startFn = useServerFn(startGoogleBusinessConnection);
+  const syncFn = useServerFn(syncGoogleBusinessReviews);
+  const disconnectGoogleFn = useServerFn(disconnectGoogleBusiness);
+  const google = useQuery({ queryKey: ["google_business_connection"], queryFn: () => statusFn() });
+  const connectGoogle = useMutation({
+    mutationFn: () => startFn({ data: { origin: window.location.origin } }),
+    onSuccess: ({ authorizationUrl }) => window.location.assign(authorizationUrl),
+    onError: (error: Error) => toast.error(error.message),
+  });
+  const syncGoogle = useMutation({
+    mutationFn: () => syncFn(),
+    onSuccess: (result) => {
+      toast.success(`Google synced: ${result.reviewsCreated} new, ${result.reviewsUpdated} updated`);
+      void queryClient.invalidateQueries();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+  const removeGoogle = useMutation({
+    mutationFn: () => disconnectGoogleFn(),
+    onSuccess: () => {
+      toast.success("Google Business Profile disconnected");
+      void queryClient.invalidateQueries();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
 
   if (isLoading) {
     return (
@@ -217,7 +248,8 @@ function PlatformsTab() {
     <Section title="Connected platforms" description="Connect a platform to start monitoring reviews and comments" bodyClassName="p-0">
       <ul className="divide-y">
         {platformsList.map((p) => {
-          const connected = p.status === "connected";
+          const isGoogle = p.platform === "google";
+          const connected = isGoogle ? Boolean(google.data?.connected) : p.status === "connected";
           return (
             <li key={p.id} className="flex flex-wrap items-center gap-3 px-5 py-4">
               <PlatformIcon id={p.platform as never} size="lg" />
@@ -225,7 +257,7 @@ function PlatformsTab() {
                 <p className="text-sm font-semibold">{p.display_name || platformName(p.platform)}</p>
                 <p className="text-xs text-muted-foreground">
                   {connected
-                    ? `Last synced ${p.last_synced_at ? relativeTime(p.last_synced_at) : "never"}${p.account_ref ? ` · ${p.account_ref}` : ""}`
+                    ? `Last synced ${(isGoogle ? google.data?.lastSyncedAt : p.last_synced_at) ? relativeTime((isGoogle ? google.data?.lastSyncedAt : p.last_synced_at) as string) : "never"}${(isGoogle ? google.data?.email : p.account_ref) ? ` · ${isGoogle ? google.data?.email : p.account_ref}` : ""}`
                     : p.last_sync_error
                       ? `Not connected — ${p.last_sync_error}`
                       : "Not connected — reviews from this platform are not monitored"}
@@ -233,21 +265,14 @@ function PlatformsTab() {
               </div>
               <StatusBadge status={connected ? "Connected" : "Disconnected"} />
               {connected ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    disconnect.mutate(p.id, {
-                      onSuccess: () => toast.success(`${p.display_name} disconnected`),
-                      onError: (err) => toast.error(err.message || "Could not disconnect"),
-                    })
-                  }
-                  disabled={disconnect.isPending}
-                >
-                  Disconnect
-                </Button>
+                <>
+                  {isGoogle && <Button size="sm" onClick={() => syncGoogle.mutate()} disabled={syncGoogle.isPending}>{syncGoogle.isPending ? <Loader2 className="animate-spin" /> : <RefreshCw />}Sync now</Button>}
+                  <Button size="sm" variant="outline" onClick={() => isGoogle ? removeGoogle.mutate() : disconnect.mutate(p.id, { onSuccess: () => toast.success(`${p.display_name} disconnected`), onError: (err) => toast.error(err.message || "Could not disconnect") })} disabled={disconnect.isPending || removeGoogle.isPending}>Disconnect</Button>
+                </>
               ) : p.supports_oauth ? (
-                <Button size="sm" onClick={() => toast("Platform connection is managed by your workspace admin.")}>Connect</Button>
+                <Button size="sm" disabled={isGoogle && (!google.data?.configured || connectGoogle.isPending)} onClick={() => isGoogle ? connectGoogle.mutate() : toast("This platform connection will be available in a future provider rollout.")}>
+                  {connectGoogle.isPending && isGoogle && <Loader2 className="animate-spin" />}Connect
+                </Button>
               ) : (
                 <Button
                   size="sm"

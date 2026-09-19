@@ -39,6 +39,21 @@ function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  async function sendReset() {
+    if (!email) {
+      setError("Enter your work email first.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setBusy(false);
+    if (resetError) setError(resetError.message);
+    else setNotice("Check your inbox for a secure password reset link.");
+  }
+
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => {
       if (data.session) void navigate({ to: "/dashboard", replace: true });
@@ -173,6 +188,11 @@ function AuthPage() {
               {busy && <Loader2 className="animate-spin" />}
               {mode === "signin" ? "Sign in" : "Create account"}
             </Button>
+            {mode === "signin" && (
+              <Button type="button" variant="link" className="h-auto w-full" disabled={busy} onClick={() => void sendReset()}>
+                Forgot password?
+              </Button>
+            )}
           </form>
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
