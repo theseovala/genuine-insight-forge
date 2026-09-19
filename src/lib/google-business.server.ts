@@ -42,11 +42,16 @@ export function hashValue(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+const ALLOWED_HOST_SUFFIXES = [".lovable.app", ".lovableproject.com", ".lovable.dev", "seovale.com"];
+
 export function assertAllowedOrigin(origin: string) {
   const url = new URL(origin);
   const local = url.hostname === "localhost" || url.hostname === "127.0.0.1";
   if (url.protocol !== "https:" && !local) throw new Error("Google connection requires HTTPS.");
-  if (!local && !url.hostname.endsWith(".lovable.app")) throw new Error("This origin is not allowed.");
+  const allowed =
+    local ||
+    ALLOWED_HOST_SUFFIXES.some((suffix) => url.hostname === suffix.replace(/^\./, "") || url.hostname.endsWith(suffix));
+  if (!allowed) throw new Error("This origin is not allowed.");
   return url.origin;
 }
 
