@@ -1,6 +1,6 @@
 # Seovale — build roadmap
 
-- [x] Preserve the existing Seovale UI; import functionality only from the reference project
+- [x] Locked rule: preserve the original Seovale UI/UX for every future file; import useful functionality only
 - [x] Copy the RepuVala command center app into this project
 - [x] Real backend schema (reviews, alerts, locations, platforms, competitors, reports, brand settings, profiles)
 - [x] Realistic seeded review history (260 reviews, 6 locations, 6 platforms, 12 months)
