@@ -19,7 +19,7 @@ import { Switch } from "@/components/ui/switch";
 import { platforms, teamMembers, roles, locations, type PlatformId } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/settings")({
+export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({
     meta: [
       { title: "Settings — RepuVala™" },

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { competitors, competitorTrend } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/competitors")({
+export const Route = createFileRoute("/_authenticated/competitors")({
   head: () => ({
     meta: [
       { title: "Competitor Intelligence — RepuVala™" },

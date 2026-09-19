@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { locations } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/locations")({
+export const Route = createFileRoute("/_authenticated/locations")({
   head: () => ({
     meta: [
       { title: "Multi-Location Management — RepuVala™" },

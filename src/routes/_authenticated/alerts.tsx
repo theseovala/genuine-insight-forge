@@ -18,7 +18,7 @@ import { useLiveAlerts, useResolveAlert } from "@/lib/seovale-db";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/alerts")({
+export const Route = createFileRoute("/_authenticated/alerts")({
   head: () => ({
     meta: [
       { title: "Reputation Alerts — RepuVala™" },

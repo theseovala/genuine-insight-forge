@@ -16,7 +16,7 @@ import { useLiveReviews, usePublishReply } from "@/lib/seovale-db";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/responses")({
+export const Route = createFileRoute("/_authenticated/responses")({
   head: () => ({
     meta: [
       { title: "Response Center — RepuVala™" },

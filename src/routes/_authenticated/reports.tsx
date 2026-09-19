@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ratingTrend, platformPerformance, platforms, locations } from "@/lib/domain";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/reports")({
+export const Route = createFileRoute("/_authenticated/reports")({
   head: () => ({
     meta: [
       { title: "Reputation Reports — RepuVala™" },

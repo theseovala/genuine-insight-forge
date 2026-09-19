@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { feedbackThemes } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/feedback")({
+export const Route = createFileRoute("/_authenticated/feedback")({
   head: () => ({
     meta: [
       { title: "Customer Feedback — RepuVala™" },

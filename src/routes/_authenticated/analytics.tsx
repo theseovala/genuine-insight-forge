@@ -29,7 +29,7 @@ import {
   locations,
 } from "@/lib/domain";
 
-export const Route = createFileRoute("/analytics")({
+export const Route = createFileRoute("/_authenticated/analytics")({
   head: () => ({
     meta: [
       { title: "Reputation Analytics — RepuVala™" },

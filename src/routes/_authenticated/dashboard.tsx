@@ -45,7 +45,7 @@ import {
 } from "@/lib/domain";
 import { useApp } from "@/lib/app-context";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
     meta: [
       { title: "Reputation Dashboard — RepuVala™" },

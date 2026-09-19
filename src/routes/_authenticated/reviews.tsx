@@ -16,7 +16,7 @@ import { platforms, locations, type PlatformId } from "@/lib/domain";
 import { useConnectedPlatforms, useLiveReviews } from "@/lib/seovale-db";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/reviews")({
+export const Route = createFileRoute("/_authenticated/reviews")({
   head: () => ({
     meta: [
       { title: "Review Center — RepuVala™" },
