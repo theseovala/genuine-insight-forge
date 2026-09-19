@@ -5,22 +5,24 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "press inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-semibold cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow hover:bg-primary/90",
-        destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
+        default:
+          "bg-primary text-primary-foreground shadow-[inset_0_1px_0_oklch(1_0_0_/_0.16),0_1px_2px_oklch(0_0_0_/_0.16)] hover:bg-primary/92 hover:shadow-[inset_0_1px_0_oklch(1_0_0_/_0.2),0_6px_16px_-8px_color-mix(in_oklab,var(--primary)_75%,transparent)]",
+        destructive:
+          "bg-destructive text-destructive-foreground shadow-[inset_0_1px_0_oklch(1_0_0_/_0.16),0_1px_2px_oklch(0_0_0_/_0.16)] hover:bg-destructive/92",
         outline:
-          "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
-        secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
+          "border border-input bg-card shadow-xs hover:bg-accent hover:text-accent-foreground hover:border-primary/35",
+        secondary: "bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-9 px-4 py-2",
-        sm: "h-8 rounded-md px-3 text-xs",
-        lg: "h-10 rounded-md px-8",
+        default: "h-9 px-3.5 py-2",
+        sm: "h-8 rounded-lg px-3 text-xs",
+        lg: "h-10 rounded-lg px-6",
         icon: "h-9 w-9",
       },
     },
