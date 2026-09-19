@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   Inbox,
@@ -12,21 +13,20 @@ import {
   FileText,
   Settings,
   Search,
-  HelpCircle,
   Bell,
   ChevronsUpDown,
   Menu,
   LogOut,
   UserRound,
-  ShieldCheck,
   PanelLeftClose,
   PanelLeftOpen,
-  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useApp } from "@/lib/app-context";
-import { alerts, locations, roles } from "@/lib/domain";
-import { BrandMark, StatusBadge } from "./primitives";
+import { useApp, ALL_LOCATIONS } from "@/lib/app-context";
+import { BRAND } from "@/lib/domain";
+import { useLiveAlerts, useLiveReviews, useProfile } from "@/lib/seovale-db";
+import { supabase } from "@/integrations/supabase/client";
+import { BrandMark } from "./primitives";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import {
@@ -42,11 +42,11 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export const navItems = [
-  { id: "dashboard", to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { id: "reviews", to: "/reviews", label: "Review Center", icon: Inbox, badge: 23 },
-  { id: "responses", to: "/responses", label: "Response Center", icon: MessageSquareReply, badge: 5 },
+  { id: "dashboard", to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "reviews", to: "/reviews", label: "Review Center", icon: Inbox },
+  { id: "responses", to: "/responses", label: "Response Center", icon: MessageSquareReply },
   { id: "analytics", to: "/analytics", label: "Analytics", icon: BarChart3 },
-  { id: "alerts", to: "/alerts", label: "Alerts", icon: BellRing, badge: 4, urgent: true },
+  { id: "alerts", to: "/alerts", label: "Alerts", icon: BellRing },
   { id: "locations", to: "/locations", label: "Locations", icon: MapPin },
   { id: "competitors", to: "/competitors", label: "Competitors", icon: Swords },
   { id: "feedback", to: "/feedback", label: "Customer Feedback", icon: MessageCircleHeart },
@@ -54,21 +54,27 @@ export const navItems = [
   { id: "settings", to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
-function NavList({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: (() => void) | undefined }) {
-  const { can } = useApp();
+function NavList({
+  collapsed,
+  onNavigate,
+  counts,
+}: {
+  collapsed: boolean;
+  onNavigate?: (() => void) | undefined;
+  counts: Record<string, number>;
+}) {
   return (
     <nav className="flex flex-col gap-1 px-3">
       {navItems.map((item) => {
-        const allowed = can(item.id);
+        const badge = counts[item.id];
+        const urgent = item.id === "alerts";
         const link = (
           <Link
             key={item.id}
             to={item.to}
             onClick={onNavigate}
-            activeOptions={{ exact: item.to === "/" }}
             className={cn(
               "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-muted transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              !allowed && "pointer-events-none opacity-35",
               collapsed && "justify-center px-0",
             )}
             activeProps={{
@@ -78,20 +84,25 @@ function NavList({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: (
           >
             <item.icon className="size-[18px] shrink-0" />
             {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
-            {!collapsed && "badge" in item && item.badge && (
+            {!collapsed && !!badge && (
               <span
                 className={cn(
                   "rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums",
-                  "urgent" in item && item.urgent
+                  urgent
                     ? "bg-negative text-destructive-foreground"
                     : "bg-sidebar-primary/20 text-sidebar-primary",
                 )}
               >
-                {item.badge}
+                {badge}
               </span>
             )}
-            {collapsed && "badge" in item && item.badge && (
-              <span className={cn("absolute right-2 top-2 size-2 rounded-full", "urgent" in item && item.urgent ? "bg-negative" : "bg-sidebar-primary")} />
+            {collapsed && !!badge && (
+              <span
+                className={cn(
+                  "absolute right-2 top-2 size-2 rounded-full",
+                  urgent ? "bg-negative" : "bg-sidebar-primary",
+                )}
+              />
             )}
           </Link>
         );
@@ -99,7 +110,7 @@ function NavList({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: (
         return (
           <Tooltip key={item.id}>
             <TooltipTrigger asChild>{link}</TooltipTrigger>
-            <TooltipContent side="right">{item.label}{!allowed && " · not in your role"}</TooltipContent>
+            <TooltipContent side="right">{item.label}</TooltipContent>
           </Tooltip>
         );
       })}
@@ -107,8 +118,16 @@ function NavList({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: (
   );
 }
 
-function SidebarInner({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: (() => void) | undefined }) {
-  const { role } = useApp();
+function SidebarInner({
+  collapsed,
+  onNavigate,
+  counts,
+}: {
+  collapsed: boolean;
+  onNavigate?: (() => void) | undefined;
+  counts: Record<string, number>;
+}) {
+  const { brandName } = useApp();
   return (
     <div className="flex h-full flex-col">
       <div className={cn("flex items-center gap-3 px-5 py-5", collapsed && "justify-center px-0")}>
@@ -116,31 +135,31 @@ function SidebarInner({ collapsed, onNavigate }: { collapsed: boolean; onNavigat
         {!collapsed && (
           <div className="leading-tight">
             <p className="font-display text-base font-extrabold text-sidebar-accent-foreground">
-              RepuVala<span className="align-super text-[9px]">™</span>
+              {BRAND.name}
             </p>
-            <p className="text-[10px] font-medium tracking-wide text-sidebar-muted">Reputation Command Center</p>
+            <p className="text-[10px] font-medium tracking-wide text-sidebar-muted">
+              Reputation Command Center
+            </p>
           </div>
         )}
       </div>
       {!collapsed && (
         <div className="mx-3 mb-3 rounded-lg border border-sidebar-border bg-sidebar-accent/50 px-3 py-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-sidebar-muted">Viewing as</p>
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-sidebar-accent-foreground">
-            <ShieldCheck className="size-3.5 text-sidebar-primary" /> {role.name}
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-sidebar-muted">
+            Workspace
           </p>
+          <p className="truncate text-xs font-semibold text-sidebar-accent-foreground">{brandName}</p>
         </div>
       )}
       <div className="scrollbar-thin flex-1 overflow-y-auto py-1">
-        <NavList collapsed={collapsed} onNavigate={onNavigate} />
+        <NavList collapsed={collapsed} onNavigate={onNavigate} counts={counts} />
       </div>
       <div className={cn("border-t border-sidebar-border px-5 py-4", collapsed && "px-2 text-center")}>
         {collapsed ? (
-          <span className="text-[10px] font-bold text-sidebar-muted">SV™</span>
+          <span className="text-[10px] font-bold text-sidebar-muted">SV</span>
         ) : (
           <p className="text-[10px] leading-relaxed text-sidebar-muted">
-            Powered by <span className="font-semibold text-sidebar-foreground">Software Vala™</span>
-            <br />
-            The Name of Trust
+            {BRAND.name} — {BRAND.tagline}
           </p>
         )}
       </div>
@@ -148,67 +167,89 @@ function SidebarInner({ collapsed, onNavigate }: { collapsed: boolean; onNavigat
   );
 }
 
-function TopBar({ onMenu, collapsed, onToggle }: { onMenu: () => void; collapsed: boolean; onToggle: () => void }) {
-  const { location, setLocation, role, setRole } = useApp();
-  const open = alerts.filter((a) => !a.resolved);
+function TopBar({
+  onMenu,
+  collapsed,
+  onToggle,
+}: {
+  onMenu: () => void;
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
+  const { location, setLocation, locationNames, brandName } = useApp();
+  const { data: alerts } = useLiveAlerts();
+  const { data: profile } = useProfile();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const open = (alerts ?? []).filter((a) => !a.resolved);
+
+  const name = profile?.full_name || profile?.email || "Your account";
+  const initials = name
+    .split(/[\s@.]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]!.toUpperCase())
+    .join("");
+
+  async function signOut() {
+    await queryClient.cancelQueries();
+    queryClient.clear();
+    await supabase.auth.signOut();
+    void navigate({ to: "/auth", replace: true });
+  }
+
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur-md md:px-6">
       <Button variant="ghost" size="icon" className="lg:hidden" onClick={onMenu} aria-label="Open navigation">
         <Menu />
       </Button>
-      <Button variant="ghost" size="icon" className="hidden lg:inline-flex" onClick={onToggle} aria-label="Toggle sidebar">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="hidden lg:inline-flex"
+        onClick={onToggle}
+        aria-label="Toggle sidebar"
+      >
         {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
       </Button>
 
-      {/* Business / location selector */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button className="flex max-w-[220px] items-center gap-2 rounded-lg border bg-card px-3 py-1.5 text-left text-sm shadow-xs transition-colors hover:bg-accent md:max-w-xs">
-            <span className="grid size-6 shrink-0 place-items-center rounded-md bg-gradient-brand text-[10px] font-bold text-primary-foreground">AV</span>
+            <span className="grid size-6 shrink-0 place-items-center rounded-md bg-gradient-brand text-[10px] font-bold text-primary-foreground">
+              {brandName.slice(0, 2).toUpperCase()}
+            </span>
             <span className="min-w-0 flex-1 leading-tight">
-              <span className="block truncate text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Aroma Ventures</span>
-              <span className="block truncate font-semibold">{location.name}</span>
+              <span className="block truncate text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {brandName}
+              </span>
+              <span className="block truncate font-semibold">{location}</span>
             </span>
             <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-72">
           <DropdownMenuLabel className="text-xs text-muted-foreground">Switch location</DropdownMenuLabel>
-          <DropdownMenuRadioGroup value={location.id} onValueChange={setLocation}>
-            {locations.map((l) => (
-              <DropdownMenuRadioItem key={l.id} value={l.id} className="gap-2">
-                <span className="flex-1">{l.name}</span>
-                <span className="text-xs font-semibold tabular-nums text-muted-foreground">{l.score}</span>
+          <DropdownMenuRadioGroup value={location} onValueChange={setLocation}>
+            {locationNames.map((l) => (
+              <DropdownMenuRadioItem key={l} value={l} className="gap-2">
+                <span className="flex-1">{l}</span>
               </DropdownMenuRadioItem>
             ))}
           </DropdownMenuRadioGroup>
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Search */}
-      <div className="relative ml-auto hidden w-full max-w-sm md:block">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          placeholder="Search reviews, locations, customers…"
-          className="h-9 w-full rounded-lg border bg-card pl-9 pr-14 text-sm outline-none transition-shadow placeholder:text-muted-foreground focus:ring-2 focus:ring-ring/40"
-        />
-        <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">⌘K</kbd>
-      </div>
+      <SearchBox />
 
       <div className="flex items-center gap-1 md:ml-2">
-        <Button variant="ghost" size="icon" className="md:hidden" aria-label="Search"><Search /></Button>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="Help"><HelpCircle /></Button>
-          </TooltipTrigger>
-          <TooltipContent>Help & guides</TooltipContent>
-        </Tooltip>
-
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
               <Bell />
-              <span className="absolute right-2 top-2 size-2 rounded-full bg-negative animate-pulse-dot" />
+              {open.length > 0 && (
+                <span className="absolute right-2 top-2 size-2 rounded-full bg-negative animate-pulse-dot" />
+              )}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-80 p-0">
@@ -218,50 +259,72 @@ function TopBar({ onMenu, collapsed, onToggle }: { onMenu: () => void; collapsed
             </div>
             <div className="max-h-80 overflow-y-auto">
               {open.slice(0, 4).map((a) => (
-                <Link key={a.id} to="/alerts" className="flex gap-3 border-b px-4 py-3 text-left transition-colors last:border-0 hover:bg-accent/60">
-                  <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", a.severity === "critical" || a.severity === "high" ? "bg-negative" : a.severity === "medium" ? "bg-warning" : "bg-info")} />
+                <Link
+                  key={a.id}
+                  to="/alerts"
+                  className="flex gap-3 border-b px-4 py-3 text-left transition-colors last:border-0 hover:bg-accent/60"
+                >
+                  <span
+                    className={cn(
+                      "mt-1.5 size-2 shrink-0 rounded-full",
+                      a.severity === "critical" || a.severity === "high"
+                        ? "bg-negative"
+                        : a.severity === "medium"
+                          ? "bg-warning"
+                          : "bg-info",
+                    )}
+                  />
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-semibold">{a.title}</span>
-                    <span className="block text-xs text-muted-foreground">{a.location} · {a.time}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {a.location} · {a.time}
+                    </span>
                   </span>
                 </Link>
               ))}
+              {open.length === 0 && (
+                <p className="px-4 py-6 text-center text-xs text-muted-foreground">
+                  Nothing needs attention right now.
+                </p>
+              )}
             </div>
-            <Link to="/alerts" className="block border-t px-4 py-2.5 text-center text-xs font-semibold text-primary hover:bg-accent/60">Open Alert Center</Link>
+            <Link
+              to="/alerts"
+              className="block border-t px-4 py-2.5 text-center text-xs font-semibold text-primary hover:bg-accent/60"
+            >
+              Open Alert Center
+            </Link>
           </DropdownMenuContent>
         </DropdownMenu>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="ml-1 flex items-center gap-2 rounded-full border bg-card p-1 pr-1 transition-colors hover:bg-accent md:pr-3">
-              <span className="grid size-7 place-items-center rounded-full bg-gradient-brand text-xs font-bold text-primary-foreground">RM</span>
+              <span className="grid size-7 place-items-center rounded-full bg-gradient-brand text-xs font-bold text-primary-foreground">
+                {initials || "?"}
+              </span>
               <span className="hidden text-left leading-tight md:block">
-                <span className="block text-xs font-semibold">Rohan Mehta</span>
-                <span className="block text-[10px] text-muted-foreground">{role.name}</span>
+                <span className="block max-w-[140px] truncate text-xs font-semibold">{name}</span>
+                <span className="block text-[10px] text-muted-foreground">
+                  {profile?.job_title || "Team member"}
+                </span>
               </span>
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-72">
             <DropdownMenuLabel>
-              <p className="text-sm font-semibold">Rohan Mehta</p>
-              <p className="text-xs font-normal text-muted-foreground">rohan@repuvala.example</p>
+              <p className="text-sm font-semibold">{profile?.full_name || "Your account"}</p>
+              <p className="text-xs font-normal text-muted-foreground">{profile?.email}</p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Preview as role</DropdownMenuLabel>
-            <div className="max-h-64 overflow-y-auto">
-              {roles.map((r) => (
-                <DropdownMenuItem key={r.id} onClick={() => setRole(r.id)} className="flex items-center gap-2">
-                  <span className={cn("grid size-4 place-items-center", role.id !== r.id && "opacity-0")}><Check className="size-3.5 text-primary" /></span>
-                  <span className="flex-1 text-sm">{r.name}</span>
-                  <span className="text-[10px] text-muted-foreground">{r.scope}</span>
-                </DropdownMenuItem>
-              ))}
-            </div>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild><Link to="/settings"><UserRound /> Account settings</Link></DropdownMenuItem>
-            <DropdownMenuItem asChild><Link to="/login"><LogOut /> Sign out</Link></DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <p className="px-2 py-1.5 text-[10px] text-muted-foreground">RepuVala™ · Powered by Software Vala™</p>
+            <DropdownMenuItem asChild>
+              <Link to="/settings">
+                <UserRound /> Account settings
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => void signOut()}>
+              <LogOut /> Sign out
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -269,11 +332,62 @@ function TopBar({ onMenu, collapsed, onToggle }: { onMenu: () => void; collapsed
   );
 }
 
+function SearchBox() {
+  const [q, setQ] = useState("");
+  const { data: reviews } = useLiveReviews();
+  const results =
+    q.trim().length < 2
+      ? []
+      : (reviews ?? [])
+          .filter((r) =>
+            `${r.author} ${r.body} ${r.location} ${r.tags.join(" ")}`
+              .toLowerCase()
+              .includes(q.trim().toLowerCase()),
+          )
+          .slice(0, 6);
+
+  return (
+    <div className="relative ml-auto hidden w-full max-w-sm md:block">
+      <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="Search reviews, locations, customers…"
+        className="h-9 w-full rounded-lg border bg-card pl-9 pr-4 text-sm outline-none transition-shadow placeholder:text-muted-foreground focus:ring-2 focus:ring-ring/40"
+      />
+      {results.length > 0 && (
+        <div className="absolute left-0 right-0 top-11 z-40 overflow-hidden rounded-lg border bg-popover shadow-lg">
+          {results.map((r) => (
+            <Link
+              key={r.id}
+              to="/reviews"
+              onClick={() => setQ("")}
+              className="block border-b px-3 py-2 last:border-0 hover:bg-accent/60"
+            >
+              <p className="truncate text-sm font-semibold">
+                {r.author} · {r.rating}★
+              </p>
+              <p className="truncate text-xs text-muted-foreground">{r.body}</p>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { role } = useApp();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { data: reviews } = useLiveReviews();
+  const { data: alerts } = useLiveAlerts();
+
+  const counts: Record<string, number> = {
+    reviews: (reviews ?? []).filter((r) => r.unread).length,
+    responses: (reviews ?? []).filter((r) => r.status === "pending" || r.status === "escalated").length,
+    alerts: (alerts ?? []).filter((a) => !a.resolved).length,
+  };
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -284,13 +398,16 @@ export function AppShell({ children }: { children: ReactNode }) {
             collapsed ? "w-[76px]" : "w-[264px]",
           )}
         >
-          <SidebarInner collapsed={collapsed} />
+          <SidebarInner collapsed={collapsed} counts={counts} />
         </aside>
 
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-          <SheetContent side="left" className="w-[280px] border-sidebar-border bg-sidebar p-0 text-sidebar-foreground [&>button]:text-sidebar-foreground">
+          <SheetContent
+            side="left"
+            className="w-[280px] border-sidebar-border bg-sidebar p-0 text-sidebar-foreground [&>button]:text-sidebar-foreground"
+          >
             <SheetTitle className="sr-only">Navigation</SheetTitle>
-            <SidebarInner collapsed={false} onNavigate={() => setMobileOpen(false)} />
+            <SidebarInner collapsed={false} counts={counts} onNavigate={() => setMobileOpen(false)} />
           </SheetContent>
         </Sheet>
 
@@ -301,16 +418,13 @@ export function AppShell({ children }: { children: ReactNode }) {
           </main>
           <footer className="flex flex-col gap-2 border-t px-4 py-4 text-xs text-muted-foreground md:flex-row md:items-center md:justify-between md:px-8">
             <p>
-              <span className="font-semibold text-foreground">RepuVala™</span> — Your Reputation. One Powerful Command Center.
+              <span className="font-semibold text-foreground">{BRAND.name}</span> — Your reputation, one
+              command center.
             </p>
-            <p className="flex items-center gap-2">
-              <StatusBadge status="Prototype" className="bg-accent text-primary" />
-              Powered by <span className="font-semibold text-foreground">Software Vala™</span> · The Name of Trust
-            </p>
+            <p>All figures are calculated from your connected review data.</p>
           </footer>
         </div>
       </div>
-      <span className="sr-only">{role.name}</span>
     </TooltipProvider>
   );
 }
