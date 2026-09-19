@@ -25,3 +25,4 @@
 ## Open tasks
 - [x] Fixed signup 'Database error saving new user' (dropped global connected_platforms platform unique, added per-workspace unique)
 - [x] Created account for theseovala@gmail.com (owner of new Seovale workspace; email confirmation pending)
+- [ ] Connect custom domain seovale.com (Cloudflare zone 89f41772cded2c532ac2cd52deed8c63) after publish
