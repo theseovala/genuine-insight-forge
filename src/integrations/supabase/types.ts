@@ -14,7 +14,365 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      alerts: {
+        Row: {
+          created_at: string
+          detail: string
+          id: string
+          kind: string
+          location_name: string
+          resolved: boolean
+          review_id: string | null
+          severity: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          detail: string
+          id?: string
+          kind: string
+          location_name?: string
+          resolved?: boolean
+          review_id?: string | null
+          severity?: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          detail?: string
+          id?: string
+          kind?: string
+          location_name?: string
+          resolved?: boolean
+          review_id?: string | null
+          severity?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alerts_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brand_settings: {
+        Row: {
+          alert_email: string | null
+          brand_name: string
+          created_at: string
+          id: string
+          industry: string
+          negative_review_alerts: boolean
+          reply_signature: string
+          reply_tone: string
+          updated_at: string
+          website: string | null
+          weekly_digest: boolean
+        }
+        Insert: {
+          alert_email?: string | null
+          brand_name?: string
+          created_at?: string
+          id?: string
+          industry?: string
+          negative_review_alerts?: boolean
+          reply_signature?: string
+          reply_tone?: string
+          updated_at?: string
+          website?: string | null
+          weekly_digest?: boolean
+        }
+        Update: {
+          alert_email?: string | null
+          brand_name?: string
+          created_at?: string
+          id?: string
+          industry?: string
+          negative_review_alerts?: boolean
+          reply_signature?: string
+          reply_tone?: string
+          updated_at?: string
+          website?: string | null
+          weekly_digest?: boolean
+        }
+        Relationships: []
+      }
+      competitors: {
+        Row: {
+          created_at: string
+          id: string
+          is_you: boolean
+          name: string
+          notes: string | null
+          rating: number
+          response_rate: number
+          review_count: number
+          sentiment_score: number
+          trend: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_you?: boolean
+          name: string
+          notes?: string | null
+          rating?: number
+          response_rate?: number
+          review_count?: number
+          sentiment_score?: number
+          trend?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_you?: boolean
+          name?: string
+          notes?: string | null
+          rating?: number
+          response_rate?: number
+          review_count?: number
+          sentiment_score?: number
+          trend?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      connected_platforms: {
+        Row: {
+          account_ref: string | null
+          created_at: string
+          display_name: string
+          id: string
+          last_sync_error: string | null
+          last_synced_at: string | null
+          platform: string
+          status: string
+          supports_oauth: boolean
+          updated_at: string
+        }
+        Insert: {
+          account_ref?: string | null
+          created_at?: string
+          display_name: string
+          id?: string
+          last_sync_error?: string | null
+          last_synced_at?: string | null
+          platform: string
+          status?: string
+          supports_oauth?: boolean
+          updated_at?: string
+        }
+        Update: {
+          account_ref?: string | null
+          created_at?: string
+          display_name?: string
+          id?: string
+          last_sync_error?: string | null
+          last_synced_at?: string | null
+          platform?: string
+          status?: string
+          supports_oauth?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      locations: {
+        Row: {
+          city: string
+          country: string
+          created_at: string
+          external_ref: string | null
+          id: string
+          manager: string | null
+          name: string
+        }
+        Insert: {
+          city: string
+          country: string
+          created_at?: string
+          external_ref?: string | null
+          id?: string
+          manager?: string | null
+          name: string
+        }
+        Update: {
+          city?: string
+          country?: string
+          created_at?: string
+          external_ref?: string | null
+          id?: string
+          manager?: string | null
+          name?: string
+        }
+        Relationships: []
+      }
+      platform_credentials: {
+        Row: {
+          access_token: string
+          account_name: string | null
+          created_at: string
+          platform: string
+          refresh_token: string | null
+          scope: string | null
+          token_expires_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token: string
+          account_name?: string | null
+          created_at?: string
+          platform: string
+          refresh_token?: string | null
+          scope?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          account_name?: string | null
+          created_at?: string
+          platform?: string
+          refresh_token?: string | null
+          scope?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          job_title: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+          job_title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          job_title?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      reports: {
+        Row: {
+          created_at: string
+          generated_by: string | null
+          id: string
+          period: string
+          scope: string
+          status: string
+          summary: string | null
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          generated_by?: string | null
+          id?: string
+          period: string
+          scope?: string
+          status?: string
+          summary?: string | null
+          title: string
+        }
+        Update: {
+          created_at?: string
+          generated_by?: string | null
+          id?: string
+          period?: string
+          scope?: string
+          status?: string
+          summary?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
+      reviews: {
+        Row: {
+          author: string
+          body: string
+          created_at: string
+          external_created_at: string
+          external_id: string | null
+          id: string
+          location_name: string
+          platform: string
+          priority: string
+          rating: number
+          replied_at: string | null
+          replied_by: string | null
+          reply: string | null
+          sentiment: string
+          source: string
+          status: string
+          tags: string[]
+          title: string | null
+          unread: boolean
+          updated_at: string
+        }
+        Insert: {
+          author: string
+          body: string
+          created_at?: string
+          external_created_at?: string
+          external_id?: string | null
+          id?: string
+          location_name?: string
+          platform: string
+          priority?: string
+          rating?: number
+          replied_at?: string | null
+          replied_by?: string | null
+          reply?: string | null
+          sentiment?: string
+          source?: string
+          status?: string
+          tags?: string[]
+          title?: string | null
+          unread?: boolean
+          updated_at?: string
+        }
+        Update: {
+          author?: string
+          body?: string
+          created_at?: string
+          external_created_at?: string
+          external_id?: string | null
+          id?: string
+          location_name?: string
+          platform?: string
+          priority?: string
+          rating?: number
+          replied_at?: string | null
+          replied_by?: string | null
+          reply?: string | null
+          sentiment?: string
+          source?: string
+          status?: string
+          tags?: string[]
+          title?: string | null
+          unread?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
