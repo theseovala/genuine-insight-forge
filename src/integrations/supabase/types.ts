@@ -794,10 +794,6 @@ export type Database = {
           isSetofReturn: true
         }
       }
-      is_workspace_member: {
-        Args: { _user_id?: string; _workspace_id: string }
-        Returns: boolean
-      }
     }
     Enums: {
       workspace_role: "owner" | "admin" | "member"
