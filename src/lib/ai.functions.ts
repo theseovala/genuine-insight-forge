@@ -85,10 +85,12 @@ export const draftReply = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => DraftInput.parse(input))
   .handler(async ({ data, context }) => {
+    const scopeId = await workspaceIdFor(context);
     const { data: review, error } = await context.supabase
       .from("reviews")
       .select("author, rating, sentiment, platform, location_name, title, body, tags")
       .eq("id", data.reviewId)
+      .eq("workspace_id", scopeId)
       .maybeSingle();
     if (error) throw error;
     if (!review) throw new Error("That review no longer exists.");
@@ -96,6 +98,7 @@ export const draftReply = createServerFn({ method: "POST" })
     const { data: brand } = await context.supabase
       .from("brand_settings")
       .select("brand_name, industry, reply_tone, reply_signature")
+      .eq("workspace_id", scopeId)
       .limit(1)
       .maybeSingle();
 
@@ -133,9 +136,11 @@ export const analyseFeedback = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => AnalyzeInput.parse(input))
   .handler(async ({ data, context }) => {
+    const scopeId = await workspaceIdFor(context);
     let query = context.supabase
       .from("reviews")
       .select("rating, sentiment, platform, location_name, body, tags, external_created_at")
+      .eq("workspace_id", scopeId)
       .order("external_created_at", { ascending: false })
       .limit(120);
     if (data.location && data.location !== "All locations") {
@@ -173,9 +178,11 @@ export const generateReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => ReportInput.parse(input))
   .handler(async ({ data, context }) => {
+    const workspaceId = await workspaceIdFor(context);
     let query = context.supabase
       .from("reviews")
       .select("rating, sentiment, status, platform, location_name, body, external_created_at")
+      .eq("workspace_id", workspaceId)
       .order("external_created_at", { ascending: false })
       .limit(300);
     if (data.scope !== "All locations") query = query.eq("location_name", data.scope);
@@ -206,7 +213,6 @@ export const generateReport = createServerFn({ method: "POST" })
       ...reviews.slice(0, 40).map((r) => `${r.rating}★ ${r.location_name} (${r.platform}): ${r.body}`),
     ].join("\n");
 
-    const workspaceId = await workspaceIdFor(context);
     const started = Date.now();
     const summary = await runGateway(system, prompt);
 
