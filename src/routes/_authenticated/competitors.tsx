@@ -64,7 +64,7 @@ function CompetitorsPage() {
         <>
           <div className="stagger mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard label="Category rank" value={you ? `#${rank} of ${competitors.length}` : "—"} sub="By reputation score" icon={Swords} tone="primary" />
-            <StatCard label="Your score" value={you?.score ?? "—"} sub={`Category average ${category}`} trend={you?.trend} tone="positive" />
+            <StatCard label="Your score" value={you?.score ?? "—"} sub={`Category average ${category}`} {...(you ? { trend: you.trend } : {})} tone="positive" />
             <StatCard
               label="Rating gap vs leader"
               value={you && leader ? `${(you.rating - leader.rating).toFixed(1)}★` : "—"}
