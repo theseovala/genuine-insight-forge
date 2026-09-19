@@ -414,12 +414,34 @@ function SearchBox() {
   );
 }
 
+const SIDEBAR_KEY = "seovale:sidebar-collapsed";
+
 export function AppShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { data: reviews } = useLiveReviews();
   const { data: alerts } = useLiveAlerts();
+
+  // Restore the user's choice, and auto-collapse on narrow/half-screen laptops.
+  useEffect(() => {
+    const stored = window.localStorage.getItem(SIDEBAR_KEY);
+    const narrow = window.matchMedia("(max-width: 1279px)");
+    if (stored !== null) setCollapsed(stored === "1");
+    else setCollapsed(narrow.matches);
+    const onChange = (e: MediaQueryListEvent) => {
+      if (window.localStorage.getItem(SIDEBAR_KEY) === null) setCollapsed(e.matches);
+    };
+    narrow.addEventListener("change", onChange);
+    return () => narrow.removeEventListener("change", onChange);
+  }, []);
+
+  function toggleSidebar() {
+    setCollapsed((c) => {
+      window.localStorage.setItem(SIDEBAR_KEY, c ? "0" : "1");
+      return !c;
+    });
+  }
 
   const counts: Record<string, number> = {
     reviews: (reviews ?? []).filter((r) => r.unread).length,
@@ -429,11 +451,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="flex min-h-screen bg-background">
+      <div className="flex min-h-screen w-full overflow-x-clip bg-background">
         <aside
           className={cn(
             "sticky top-0 hidden h-screen shrink-0 bg-sidebar text-sidebar-foreground transition-[width] duration-300 ease-out lg:block",
-            collapsed ? "w-[76px]" : "w-[264px]",
+            collapsed ? "w-[68px]" : "w-[248px] xl:w-[264px]",
           )}
         >
           <SidebarInner collapsed={collapsed} counts={counts} />
@@ -442,7 +464,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetContent
             side="left"
-            className="w-[280px] border-sidebar-border bg-sidebar p-0 text-sidebar-foreground [&>button]:text-sidebar-foreground"
+            className="w-[276px] border-sidebar-border bg-sidebar p-0 text-sidebar-foreground [&>button]:text-sidebar-foreground"
           >
             <SheetTitle className="sr-only">Navigation</SheetTitle>
             <SidebarInner collapsed={false} counts={counts} onNavigate={() => setMobileOpen(false)} />
@@ -450,11 +472,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         </Sheet>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <TopBar onMenu={() => setMobileOpen(true)} collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} />
-          <main key={pathname} className="flex-1 px-4 py-6 md:px-6 lg:px-8 animate-fade">
-            <div className="mx-auto w-full max-w-[1440px]">{children}</div>
+          <TopBar onMenu={() => setMobileOpen(true)} collapsed={collapsed} onToggle={toggleSidebar} />
+          <main
+            key={pathname}
+            className="animate-fade flex-1 px-3 py-4 sm:px-4 md:px-5 md:py-5 lg:px-6 2xl:px-8"
+          >
+            <div className="mx-auto w-full min-w-0 max-w-[1440px] 2xl:max-w-[1720px]">{children}</div>
           </main>
-          <footer className="flex flex-col gap-2 border-t px-4 py-4 text-xs text-muted-foreground md:flex-row md:items-center md:justify-between md:px-8">
+          <footer className="flex flex-col gap-1.5 border-t px-4 py-3 text-[11px] text-muted-foreground md:flex-row md:items-center md:justify-between md:px-6">
             <p>
               <span className="font-semibold text-foreground">{BRAND.name}</span> — Your reputation, one
               command center.
