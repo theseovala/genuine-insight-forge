@@ -66,7 +66,15 @@ export const evaluateAlertRules = createServerFn({ method: "POST" })
     const hasRecent = (kind: string) =>
       openAlerts.some((a) => a.kind === kind && Date.now() - Date.parse(a.created_at) < DAY);
 
-    const pending: Array<Record<string, unknown>> = [];
+    const pending: Array<{
+      workspace_id: string;
+      review_id?: string;
+      kind: string;
+      severity: string;
+      title: string;
+      detail: string;
+      location_name: string;
+    }> = [];
 
     // 1. Negative reviews left unanswered beyond the configured window.
     const cutoff = Date.now() - unansweredHours * 3_600_000;

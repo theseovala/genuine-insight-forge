@@ -374,11 +374,13 @@ export function usePublishReply() {
   return useMutation({
     mutationFn: async ({ id, reply }: { id: string; reply: string }) => {
       const workspaceId = await currentWorkspaceId();
+      const { data: auth } = await supabase.auth.getUser();
       const { error } = await supabase
         .from("reviews")
         .update({
           reply,
           replied_at: new Date().toISOString(),
+          replied_by: auth.user?.id ?? null,
           status: "replied",
           unread: false,
         })
