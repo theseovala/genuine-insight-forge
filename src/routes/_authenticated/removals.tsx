@@ -191,7 +191,7 @@ function RemovalsPage() {
           label="Last scan"
           value={lastScan ? `${lastScan.reviews_checked} checked` : "—"}
           icon={ScanEye}
-          hint={lastScan ? `${lastScan.reviews_flagged} flagged` : "No scan yet"}
+          sub={lastScan ? `${lastScan.reviews_flagged} flagged` : "No scan yet"}
         />
       </div>
 
