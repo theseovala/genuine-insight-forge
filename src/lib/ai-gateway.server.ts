@@ -46,3 +46,16 @@ export const REASONING_OPTIONS = {
   store: false,
   include: ["reasoning.encrypted_content"],
 } as const;
+
+/** Model used when falling back to the account's own OpenAI key. */
+export const FALLBACK_MODEL = "gpt-4.1";
+
+/**
+ * Direct OpenAI provider built from the project's own OPENAI_API_KEY.
+ * Used only as a backup when the Lovable AI Gateway call fails.
+ */
+export function createDirectOpenAI() {
+  const key = process.env["OPENAI_API_KEY"];
+  if (!key) return null;
+  return createOpenAI({ apiKey: key });
+}
