@@ -22,3 +22,6 @@
 - [x] Password recovery and secure password update
 - [x] Configurable alert thresholds and real response-time analytics
 - [ ] Live Google authorization verification (blocked: needs approved OAuth client ID and secret)
+## Open tasks
+- [ ] Fix signup 'Database error saving new user' (handle_new_user trigger)
+- [ ] Create account for theseovala@gmail.com with user-provided password
