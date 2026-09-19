@@ -11,7 +11,6 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { AppProvider } from "../lib/app-context";
 import { Toaster } from "../components/ui/sonner";
 
 function NotFoundComponent() {
@@ -79,13 +78,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "RepuVala™ — Online Reputation Command Center" },
+      { title: "Seovale — Online Reputation Command Center" },
       {
         name: "description",
         content:
-          "RepuVala™ centralizes reviews, ratings, sentiment, alerts and reports for multi-location brands. Powered by Software Vala™.",
+          "Seovale brings every review, rating, alert and report for your locations into one live command center.",
       },
-      { name: "author", content: "Software Vala™" },
+      { name: "author", content: "Seovale" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -125,11 +124,9 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AppProvider>
-        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-        <Outlet />
-        <Toaster position="top-right" />
-      </AppProvider>
+      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+      <Outlet />
+      <Toaster position="top-right" />
     </QueryClientProvider>
   );
 }
