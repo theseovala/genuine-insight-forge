@@ -19,6 +19,7 @@ import { Route as AuthenticatedCompetitorsRouteImport } from './routes/_authenti
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedFeedbackRouteImport } from './routes/_authenticated/feedback'
 import { Route as AuthenticatedLocationsRouteImport } from './routes/_authenticated/locations'
+import { Route as AuthenticatedRemovalsRouteImport } from './routes/_authenticated/removals'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedResponsesRouteImport } from './routes/_authenticated/responses'
 import { Route as AuthenticatedReviewsRouteImport } from './routes/_authenticated/reviews'
@@ -75,6 +76,11 @@ const AuthenticatedLocationsRoute = AuthenticatedLocationsRouteImport.update({
   path: '/locations',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedRemovalsRoute = AuthenticatedRemovalsRouteImport.update({
+  id: '/removals',
+  path: '/removals',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -112,6 +118,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/feedback': typeof AuthenticatedFeedbackRoute
   '/locations': typeof AuthenticatedLocationsRoute
+  '/removals': typeof AuthenticatedRemovalsRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/responses': typeof AuthenticatedResponsesRoute
   '/reviews': typeof AuthenticatedReviewsRoute
@@ -128,6 +135,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/feedback': typeof AuthenticatedFeedbackRoute
   '/locations': typeof AuthenticatedLocationsRoute
+  '/removals': typeof AuthenticatedRemovalsRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/responses': typeof AuthenticatedResponsesRoute
   '/reviews': typeof AuthenticatedReviewsRoute
@@ -146,6 +154,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/feedback': typeof AuthenticatedFeedbackRoute
   '/_authenticated/locations': typeof AuthenticatedLocationsRoute
+  '/_authenticated/removals': typeof AuthenticatedRemovalsRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/responses': typeof AuthenticatedResponsesRoute
   '/_authenticated/reviews': typeof AuthenticatedReviewsRoute
@@ -164,6 +173,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/feedback'
     | '/locations'
+    | '/removals'
     | '/reports'
     | '/responses'
     | '/reviews'
@@ -180,6 +190,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/feedback'
     | '/locations'
+    | '/removals'
     | '/reports'
     | '/responses'
     | '/reviews'
@@ -197,6 +208,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/feedback'
     | '/_authenticated/locations'
+    | '/_authenticated/removals'
     | '/_authenticated/reports'
     | '/_authenticated/responses'
     | '/_authenticated/reviews'
@@ -284,6 +296,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLocationsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/removals': {
+      id: '/_authenticated/removals'
+      path: '/removals'
+      fullPath: '/removals'
+      preLoaderRoute: typeof AuthenticatedRemovalsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/reports': {
       id: '/_authenticated/reports'
       path: '/reports'
@@ -329,6 +348,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFeedbackRoute: typeof AuthenticatedFeedbackRoute
   AuthenticatedLocationsRoute: typeof AuthenticatedLocationsRoute
+  AuthenticatedRemovalsRoute: typeof AuthenticatedRemovalsRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedResponsesRoute: typeof AuthenticatedResponsesRoute
   AuthenticatedReviewsRoute: typeof AuthenticatedReviewsRoute
@@ -342,6 +362,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFeedbackRoute: AuthenticatedFeedbackRoute,
   AuthenticatedLocationsRoute: AuthenticatedLocationsRoute,
+  AuthenticatedRemovalsRoute: AuthenticatedRemovalsRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedResponsesRoute: AuthenticatedResponsesRoute,
   AuthenticatedReviewsRoute: AuthenticatedReviewsRoute,
