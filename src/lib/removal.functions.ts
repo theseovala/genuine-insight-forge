@@ -153,14 +153,12 @@ export const updateRemovalCase = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const workspaceId = await workspaceIdFor(context);
-    const patch: Record<string, unknown> = { status: data.status };
-    if (data.status === "submitted") {
-      patch["submitted_at"] = new Date().toISOString();
-      patch["submitted_by"] = context.userId;
-    }
-    if (["approved", "rejected", "dismissed"].includes(data.status)) {
-      patch["resolved_at"] = new Date().toISOString();
-    }
+    const now = new Date().toISOString();
+    const patch = {
+      status: data.status,
+      ...(data.status === "submitted" ? { submitted_at: now, submitted_by: context.userId } : {}),
+      ...(["approved", "rejected", "dismissed"].includes(data.status) ? { resolved_at: now } : {}),
+    };
     const { error } = await context.supabase
       .from("removal_cases")
       .update(patch)
