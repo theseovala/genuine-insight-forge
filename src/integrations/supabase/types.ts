@@ -533,6 +533,119 @@ export type Database = {
         }
         Relationships: []
       }
+      removal_cases: {
+        Row: {
+          appeal_text: string | null
+          confidence: number
+          created_at: string
+          id: string
+          model: string | null
+          rationale: string
+          resolved_at: string | null
+          review_id: string
+          status: string
+          submitted_at: string | null
+          submitted_by: string | null
+          updated_at: string
+          violation_type: string
+          workspace_id: string
+        }
+        Insert: {
+          appeal_text?: string | null
+          confidence?: number
+          created_at?: string
+          id?: string
+          model?: string | null
+          rationale: string
+          resolved_at?: string | null
+          review_id: string
+          status?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+          updated_at?: string
+          violation_type: string
+          workspace_id: string
+        }
+        Update: {
+          appeal_text?: string | null
+          confidence?: number
+          created_at?: string
+          id?: string
+          model?: string | null
+          rationale?: string
+          resolved_at?: string | null
+          review_id?: string
+          status?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+          updated_at?: string
+          violation_type?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "removal_cases_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "reviews"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "removal_cases_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      removal_scans: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          error_message: string | null
+          id: string
+          model: string | null
+          reviews_checked: number
+          reviews_flagged: number
+          started_by: string | null
+          status: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          model?: string | null
+          reviews_checked?: number
+          reviews_flagged?: number
+          started_by?: string | null
+          status?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          model?: string | null
+          reviews_checked?: number
+          reviews_flagged?: number
+          started_by?: string | null
+          status?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "removal_scans_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reports: {
         Row: {
           created_at: string
