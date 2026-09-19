@@ -1,7 +1,16 @@
-// Live data layer for RepuVala™ — connected platforms, reviews and alerts.
+// Live data layer for Seovale — reviews, alerts, platforms, locations,
+// competitors, reports and brand settings. All data is stored in the backend.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { Alert, PlatformId, Review, Sentiment, ReviewStatus } from "@/lib/mock-data";
+import type {
+  Alert,
+  Competitor,
+  LocationRecord,
+  PlatformId,
+  Review,
+  ReviewStatus,
+  Sentiment,
+} from "@/lib/domain";
 
 export interface ConnectedPlatformRow {
   id: string;
@@ -9,7 +18,9 @@ export interface ConnectedPlatformRow {
   display_name: string;
   account_ref: string | null;
   status: string;
+  supports_oauth: boolean;
   last_synced_at: string | null;
+  last_sync_error: string | null;
 }
 
 function initialsOf(name: string) {
@@ -29,7 +40,9 @@ export function relativeTime(iso: string) {
   if (hours < 24) return `${hours} hr ago`;
   const days = Math.round(hours / 24);
   if (days === 1) return "Yesterday";
-  return `${days} days ago`;
+  if (days < 30) return `${days} days ago`;
+  const months = Math.round(days / 30);
+  return months === 1 ? "1 month ago" : `${months} months ago`;
 }
 
 export interface ReviewRow {
@@ -50,12 +63,16 @@ export interface ReviewRow {
   external_created_at: string;
 }
 
-export type LiveReview = Review & { external_created_at: string };
+export type LiveReview = Review & {
+  external_created_at: string;
+  replied_at: string | null;
+};
 
 function toReview(row: ReviewRow): LiveReview {
   return {
     id: row.id,
     external_created_at: row.external_created_at,
+    replied_at: row.replied_at,
     platform: row.platform as PlatformId,
     author: row.author,
     initials: initialsOf(row.author),
@@ -112,7 +129,9 @@ export function useLiveReviews() {
     queryFn: async (): Promise<LiveReview[]> => {
       const { data, error } = await supabase
         .from("reviews")
-        .select("*")
+        .select(
+          "id, platform, author, rating, sentiment, status, priority, location_name, title, body, tags, unread, reply, replied_at, external_created_at",
+        )
         .order("external_created_at", { ascending: false });
       if (error) throw error;
       return (data as ReviewRow[]).map(toReview);
@@ -148,6 +167,154 @@ export function useConnectedPlatforms() {
   });
 }
 
+export function useLocations() {
+  return useQuery({
+    queryKey: ["locations"],
+    queryFn: async (): Promise<LocationRecord[]> => {
+      const { data, error } = await supabase
+        .from("locations")
+        .select("id, name, city, country, manager")
+        .order("name");
+      if (error) throw error;
+      return data as LocationRecord[];
+    },
+  });
+}
+
+export interface CompetitorRow {
+  id: string;
+  name: string;
+  is_you: boolean;
+  rating: number;
+  review_count: number;
+  sentiment_score: number;
+  response_rate: number;
+  trend: number;
+  notes: string | null;
+}
+
+export function useCompetitors() {
+  return useQuery({
+    queryKey: ["competitors"],
+    queryFn: async (): Promise<Competitor[]> => {
+      const { data, error } = await supabase
+        .from("competitors")
+        .select("*")
+        .order("is_you", { ascending: false });
+      if (error) throw error;
+      return (data as CompetitorRow[]).map((c) => ({
+        id: c.id,
+        name: c.name,
+        rating: Number(c.rating),
+        reviews: c.review_count,
+        sentiment: c.sentiment_score,
+        responseRate: c.response_rate,
+        trend: Number(c.trend),
+        score: Math.round(
+          ((Number(c.rating) - 1) / 4) * 50 + c.sentiment_score * 0.3 + c.response_rate * 0.2,
+        ),
+        ...(c.notes ? { notes: c.notes } : {}),
+        ...(c.is_you ? { you: true } : {}),
+      }));
+    },
+  });
+}
+
+export interface BrandSettings {
+  id: string;
+  brand_name: string;
+  industry: string;
+  website: string | null;
+  reply_tone: string;
+  reply_signature: string;
+  alert_email: string | null;
+  negative_review_alerts: boolean;
+  weekly_digest: boolean;
+}
+
+export function useBrandSettings() {
+  return useQuery({
+    queryKey: ["brand_settings"],
+    queryFn: async (): Promise<BrandSettings | null> => {
+      const { data, error } = await supabase.from("brand_settings").select("*").limit(1).maybeSingle();
+      if (error) throw error;
+      return data as BrandSettings | null;
+    },
+  });
+}
+
+export function useUpdateBrandSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: Partial<BrandSettings> }) => {
+      const { error } = await supabase.from("brand_settings").update(patch).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["brand_settings"] }),
+  });
+}
+
+export interface ReportRow {
+  id: string;
+  title: string;
+  period: string;
+  scope: string;
+  summary: string | null;
+  status: string;
+  created_at: string;
+}
+
+export function useReports() {
+  return useQuery({
+    queryKey: ["reports"],
+    queryFn: async (): Promise<ReportRow[]> => {
+      const { data, error } = await supabase
+        .from("reports")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as ReportRow[];
+    },
+  });
+}
+
+export function useProfile() {
+  return useQuery({
+    queryKey: ["profile"],
+    queryFn: async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return null;
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", auth.user.id)
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? { id: auth.user.id, email: auth.user.email, full_name: null, job_title: null }) as {
+        id: string;
+        email: string | null;
+        full_name: string | null;
+        job_title: string | null;
+      };
+    },
+  });
+}
+
+export function useUpdateProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (patch: { full_name?: string; job_title?: string }) => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) throw new Error("Not signed in");
+      const { error } = await supabase
+        .from("profiles")
+        .upsert({ id: auth.user.id, email: auth.user.email, ...patch });
+      if (error) throw error;
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["profile"] }),
+  });
+}
+
 export function usePublishReply() {
   const qc = useQueryClient();
   return useMutation({
@@ -170,6 +337,23 @@ export function usePublishReply() {
   });
 }
 
+export function useUpdateReview() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      patch,
+    }: {
+      id: string;
+      patch: Partial<{ status: string; priority: string; unread: boolean }>;
+    }) => {
+      const { error } = await supabase.from("reviews").update(patch).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["reviews"] }),
+  });
+}
+
 export function useResolveAlert() {
   const qc = useQueryClient();
   return useMutation({
@@ -181,16 +365,13 @@ export function useResolveAlert() {
   });
 }
 
-export function useTogglePlatform() {
+export function useDisconnectPlatform() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, connect }: { id: string; connect: boolean }) => {
+    mutationFn: async (id: string) => {
       const { error } = await supabase
         .from("connected_platforms")
-        .update({
-          status: connect ? "connected" : "disconnected",
-          last_synced_at: connect ? new Date().toISOString() : null,
-        })
+        .update({ status: "disconnected", last_synced_at: null, account_ref: null })
         .eq("id", id);
       if (error) throw error;
     },
