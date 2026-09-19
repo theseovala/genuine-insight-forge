@@ -237,7 +237,7 @@ function TopBar({
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur-md md:px-6">
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-1.5 border-b bg-background/85 px-3 shadow-[0_1px_0_0_color-mix(in_oklab,var(--border)_60%,transparent)] backdrop-blur-xl md:gap-2 md:px-5">
       <Button variant="ghost" size="icon" className="lg:hidden" onClick={onMenu} aria-label="Open navigation">
         <Menu />
       </Button>
