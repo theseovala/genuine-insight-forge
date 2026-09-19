@@ -69,7 +69,7 @@ function FeedbackPage() {
           label="Top praise"
           value={topPraise ? topPraise.theme : "—"}
           sub={topPraise ? `${topPraise.mentions} mentions · ${topPraise.sentiment}% positive` : "No data yet"}
-          {...(topPraise ? { trend: topPraise.change } : {})}
+          {...(topPraise && topPraise.change !== null ? { trend: topPraise.change } : {})}
           icon={ThumbsUp}
           tone="positive"
         />
@@ -77,7 +77,7 @@ function FeedbackPage() {
           label="Top complaint"
           value={topComplaint ? topComplaint.theme : "—"}
           sub={topComplaint ? `${topComplaint.mentions} mentions · ${topComplaint.sentiment}% positive` : "No data yet"}
-          {...(topComplaint ? { trend: topComplaint.change } : {})}
+          {...(topComplaint && topComplaint.change !== null ? { trend: topComplaint.change } : {})}
           icon={ThumbsDown}
           tone="negative"
         />
@@ -139,7 +139,7 @@ function FeedbackPage() {
                       "rounded-full px-2.5 py-0.5 text-[11px] font-bold",
                       t.sentiment >= 70 ? "bg-positive-soft text-positive" : t.sentiment >= 45 ? "bg-warning-soft text-rating-foreground" : "bg-negative-soft text-negative",
                     )}>{t.sentiment}% positive</span>
-                    <Trend value={t.change} suffix="pts" />
+                    {t.change === null ? null : <Trend value={t.change} suffix="pts" />}
                   </div>
                   <SentimentBar className="mt-2 h-1.5" positive={t.sentiment} neutral={Math.round((100 - t.sentiment) * 0.4)} negative={100 - t.sentiment - Math.round((100 - t.sentiment) * 0.4)} />
                 </li>
@@ -175,7 +175,7 @@ function FeedbackPage() {
                     <div className="flex items-center gap-2">
                       <span className="grid size-6 place-items-center rounded-md bg-negative text-[11px] font-bold text-destructive-foreground">{i + 1}</span>
                       <span className="flex-1 text-sm font-semibold">{t.theme}</span>
-                      <Trend value={t.change} suffix="pts" />
+                      {t.change === null ? null : <Trend value={t.change} suffix="pts" />}
                     </div>
                     <p className="mt-1.5 pl-8 text-xs text-muted-foreground">
                       {t.mentions} mentions · sentiment {t.sentiment}%.

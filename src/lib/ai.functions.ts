@@ -90,6 +90,7 @@ export const analyseFeedback = createServerFn({ method: "POST" })
       "You are a reputation analyst. You are given recent customer reviews for a multi-location business.",
       "Write a briefing of at most 180 words with three short labelled sections: What is working, What is hurting us, Do this next.",
       "Cite concrete patterns and counts from the data. No bullet symbols other than '-'. No preamble.",
+      "Plain text only: never use markdown headings (#), bold (**) or any other markdown syntax. Write each section label on its own line followed by a colon.",
     ].join("\n");
 
     const prompt = reviews
@@ -131,6 +132,7 @@ export const generateReport = createServerFn({ method: "POST" })
       "You write executive reputation reports. Maximum 220 words.",
       "Structure: one headline sentence, then 'Highlights', 'Risks' and 'Recommended actions', each with 2-3 '-' lines.",
       "Use only the figures supplied. Never invent numbers.",
+      "Plain text only: never use markdown headings (#), bold (**) or any other markdown syntax. Write each section label on its own line followed by a colon.",
     ].join("\n");
 
     const prompt = [
