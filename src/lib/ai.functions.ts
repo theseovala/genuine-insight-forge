@@ -11,16 +11,31 @@ const DraftInput = z.object({
 });
 
 async function runGateway(system: string, prompt: string) {
-  const { createGateway, AI_MODEL, REASONING_OPTIONS } = await import("@/lib/ai-gateway.server");
-  const { provider } = createGateway();
-  const result = streamText({
-    model: provider.responses(AI_MODEL),
-    system,
-    prompt,
-    providerOptions: { openai: { ...REASONING_OPTIONS } },
-  });
-  const text = await result.text;
-  return text.trim();
+  const { createGateway, createDirectOpenAI, AI_MODEL, FALLBACK_MODEL, REASONING_OPTIONS } =
+    await import("@/lib/ai-gateway.server");
+  try {
+    const { provider } = createGateway();
+    const result = streamText({
+      model: provider.responses(AI_MODEL),
+      system,
+      prompt,
+      providerOptions: { openai: { ...REASONING_OPTIONS } },
+    });
+    const text = await result.text;
+    return { output: text.trim(), model: AI_MODEL };
+  } catch (gatewayError) {
+    const direct = createDirectOpenAI();
+    if (!direct) throw gatewayError;
+    console.warn("Lovable AI unavailable, using the project's OpenAI key instead.", gatewayError);
+    const result = streamText({
+      model: direct.responses(FALLBACK_MODEL),
+      system,
+      prompt,
+      providerOptions: { openai: { store: false } },
+    });
+    const text = await result.text;
+    return { output: text.trim(), model: FALLBACK_MODEL };
+  }
 }
 
 async function workspaceIdFor(context: { supabase: any; userId: string }) {
@@ -47,12 +62,12 @@ async function runAudited(
   const workspaceId = await workspaceIdFor(context);
   const inputHash = createHash("sha256").update(`${system}\n${prompt}`).digest("hex");
   try {
-    const output = await runGateway(system, prompt);
+    const { output, model } = await runGateway(system, prompt);
     const { error } = await context.supabase.from("ai_runs").insert({
       workspace_id: workspaceId,
       user_id: context.userId,
       purpose,
-      model: "openai/gpt-6-astra",
+      model,
       input_hash: inputHash,
       output,
       duration_ms: Date.now() - started,
@@ -214,7 +229,7 @@ export const generateReport = createServerFn({ method: "POST" })
     ].join("\n");
 
     const started = Date.now();
-    const summary = await runGateway(system, prompt);
+    const { output: summary, model: usedModel } = await runGateway(system, prompt);
 
     const { data: inserted, error: insertError } = await context.supabase
       .from("reports")
@@ -236,7 +251,7 @@ export const generateReport = createServerFn({ method: "POST" })
       user_id: context.userId,
       report_id: inserted.id,
       purpose: "reputation_report",
-      model: "openai/gpt-6-astra",
+      model: usedModel,
       input_hash: createHash("sha256").update(`${system}\n${prompt}`).digest("hex"),
       output: summary,
       duration_ms: Date.now() - started,
