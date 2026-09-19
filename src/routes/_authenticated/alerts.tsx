@@ -1,5 +1,8 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { evaluateAlertRules } from "@/lib/alerts.functions";
 import {
   ShieldAlert,
   TrendingDown,
@@ -63,6 +66,20 @@ function AlertsPage() {
   const updateRules = useUpdateAlertRules();
   const [rulesOpen, setRulesOpen] = useState(false);
   const [ruleForm, setRuleForm] = useState({ negative: 2, unanswered: 24, drop: 0.3, spike: 100 });
+  const qc = useQueryClient();
+  const evaluate = useServerFn(evaluateAlertRules);
+  const evaluated = useRef(false);
+
+  // Run the stored alert rules against live review data whenever the page opens.
+  useEffect(() => {
+    if (evaluated.current) return;
+    evaluated.current = true;
+    void evaluate({ data: undefined })
+      .then((result) => {
+        if (result?.created) void qc.invalidateQueries({ queryKey: ["alerts"] });
+      })
+      .catch(() => undefined);
+  }, [evaluate, qc]);
 
   const list = alerts.filter((a) => {
     if (tab === "Resolved" && !a.resolved) return false;
