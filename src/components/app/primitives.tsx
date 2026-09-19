@@ -229,9 +229,9 @@ export function Section({
   bodyClassName?: string;
 }) {
   return (
-    <section className={cn("card-elevated overflow-hidden", className)}>
+    <section className={cn("card-elevated surface-sheen overflow-hidden", className)}>
       {title && (
-        <header className="flex items-start justify-between gap-3 border-b px-5 py-4">
+        <header className="flex items-start justify-between gap-3 border-b px-4 py-3 sm:px-5">
           <div>
             <h3 className="font-display text-sm font-bold text-foreground">{title}</h3>
             {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}
@@ -239,7 +239,7 @@ export function Section({
           {action}
         </header>
       )}
-      <div className={cn("p-5", bodyClassName)}>{children}</div>
+      <div className={cn("p-4 sm:p-5", bodyClassName)}>{children}</div>
     </section>
   );
 }
@@ -247,7 +247,7 @@ export function Section({
 /* ---------- Empty state ---------- */
 export function EmptyState({ icon: Icon, title, description, action }: { icon: LucideIcon; title: string; description: string; action?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed px-6 py-14 text-center">
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed px-6 py-10 text-center">
       <span className="grid size-12 place-items-center rounded-2xl bg-accent text-primary">
         <Icon className="size-6" />
       </span>
