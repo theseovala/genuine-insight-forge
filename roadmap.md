@@ -23,5 +23,5 @@
 - [x] Configurable alert thresholds and real response-time analytics
 - [ ] Live Google authorization verification (blocked: needs approved OAuth client ID and secret)
 ## Open tasks
-- [ ] Fix signup 'Database error saving new user' (handle_new_user trigger)
-- [ ] Create account for theseovala@gmail.com with user-provided password
+- [x] Fixed signup 'Database error saving new user' (dropped global connected_platforms platform unique, added per-workspace unique)
+- [x] Created account for theseovala@gmail.com (owner of new Seovale workspace; email confirmation pending)
