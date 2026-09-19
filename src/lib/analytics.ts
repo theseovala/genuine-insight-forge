@@ -153,7 +153,7 @@ export interface Theme {
   theme: string;
   mentions: number;
   sentiment: number;
-  change: number;
+  change: number | null;
   kind: Sentiment;
 }
 
@@ -177,8 +177,12 @@ export function feedbackThemes(reviews: LiveReview[], limit = 10): Theme[] {
   return [...map.entries()]
     .map(([theme, e]) => {
       const sentiment = Math.round(posPct(e.all));
+      // Only report a trend when both comparison windows carry enough mentions
+      // to be meaningful; otherwise leave it blank instead of showing a fake 0%.
       const change =
-        e.recent.length && e.prior.length ? Math.round(posPct(e.recent) - posPct(e.prior)) : 0;
+        e.recent.length >= 3 && e.prior.length >= 3
+          ? Math.round(posPct(e.recent) - posPct(e.prior))
+          : null;
       return {
         theme,
         mentions: e.all.length,
