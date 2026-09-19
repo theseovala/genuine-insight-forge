@@ -12,8 +12,8 @@ import {
   SentimentDot,
 } from "@/components/app/primitives";
 import { Button } from "@/components/ui/button";
-import { platforms, locations, type PlatformId } from "@/lib/mock-data";
-import { useConnectedPlatforms, useLiveReviews } from "@/lib/repuvala-db";
+import { platforms, locations, type PlatformId } from "@/lib/domain";
+import { useConnectedPlatforms, useLiveReviews } from "@/lib/seovale-db";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/reviews")({

@@ -27,7 +27,7 @@ import {
   platformPerformance,
   platforms,
   locations,
-} from "@/lib/mock-data";
+} from "@/lib/domain";
 
 export const Route = createFileRoute("/analytics")({
   head: () => ({

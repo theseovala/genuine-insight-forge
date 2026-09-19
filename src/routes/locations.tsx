@@ -5,7 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Toolti
 import { AppShell } from "@/components/app/AppShell";
 import { PageHeader, Section, Stars, StatCard, Trend, StatusBadge } from "@/components/app/primitives";
 import { Button } from "@/components/ui/button";
-import { locations } from "@/lib/mock-data";
+import { locations } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/locations")({

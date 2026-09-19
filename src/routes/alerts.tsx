@@ -13,8 +13,8 @@ import {
 import { AppShell } from "@/components/app/AppShell";
 import { PageHeader, Section, StatCard, StatusBadge, EmptyState } from "@/components/app/primitives";
 import { Button } from "@/components/ui/button";
-import { type Alert } from "@/lib/mock-data";
-import { useLiveAlerts, useResolveAlert } from "@/lib/repuvala-db";
+import { type Alert } from "@/lib/domain";
+import { useLiveAlerts, useResolveAlert } from "@/lib/seovale-db";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 

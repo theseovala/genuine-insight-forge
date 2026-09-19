@@ -1,7 +1,7 @@
 import { type ReactNode } from "react";
 import { Star, TrendingUp, TrendingDown, Minus, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { platforms, type PlatformId, type Sentiment, type ReviewStatus } from "@/lib/mock-data";
+import { platforms, type PlatformId, type Sentiment, type ReviewStatus } from "@/lib/domain";
 
 /* ---------- Page header ---------- */
 export function PageHeader({

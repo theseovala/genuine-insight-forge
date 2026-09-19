@@ -12,7 +12,7 @@ import {
   EmptyState,
 } from "@/components/app/primitives";
 import { Button } from "@/components/ui/button";
-import { useLiveReviews, usePublishReply } from "@/lib/repuvala-db";
+import { useLiveReviews, usePublishReply } from "@/lib/seovale-db";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 

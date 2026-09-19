@@ -4,7 +4,7 @@ import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tool
 import { AppShell } from "@/components/app/AppShell";
 import { PageHeader, Section, Stars, Trend, ScoreRing, PlatformIcon, SentimentBar } from "@/components/app/primitives";
 import { Button } from "@/components/ui/button";
-import { ratingTrend, platformPerformance, platforms, locations } from "@/lib/mock-data";
+import { ratingTrend, platformPerformance, platforms, locations } from "@/lib/domain";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/reports")({

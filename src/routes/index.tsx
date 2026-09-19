@@ -42,7 +42,7 @@ import {
   activity,
   locations,
   ratingDistribution,
-} from "@/lib/mock-data";
+} from "@/lib/domain";
 import { useApp } from "@/lib/app-context";
 
 export const Route = createFileRoute("/")({

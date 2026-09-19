@@ -4,7 +4,7 @@ import { Swords, Info, Plus } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { PageHeader, Section, Stars, Trend, StatCard } from "@/components/app/primitives";
 import { Button } from "@/components/ui/button";
-import { competitors, competitorTrend } from "@/lib/mock-data";
+import { competitors, competitorTrend } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/competitors")({

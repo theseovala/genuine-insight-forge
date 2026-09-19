@@ -16,7 +16,7 @@ import { AppShell } from "@/components/app/AppShell";
 import { PageHeader, Section, PlatformIcon, StatusBadge, BrandMark } from "@/components/app/primitives";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { platforms, teamMembers, roles, locations, type PlatformId } from "@/lib/mock-data";
+import { platforms, teamMembers, roles, locations, type PlatformId } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/settings")({

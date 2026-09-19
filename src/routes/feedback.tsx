@@ -3,7 +3,7 @@ import { ThumbsUp, ThumbsDown, Lightbulb, MessageCircleHeart, ArrowUpRight } fro
 import { AppShell } from "@/components/app/AppShell";
 import { PageHeader, Section, StatCard, Trend, SentimentBar } from "@/components/app/primitives";
 import { Button } from "@/components/ui/button";
-import { feedbackThemes } from "@/lib/mock-data";
+import { feedbackThemes } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/feedback")({

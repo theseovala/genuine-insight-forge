@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/lib/app-context";
-import { alerts, locations, roles } from "@/lib/mock-data";
+import { alerts, locations, roles } from "@/lib/domain";
 import { BrandMark, StatusBadge } from "./primitives";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";

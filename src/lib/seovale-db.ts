@@ -308,7 +308,7 @@ export function useUpdateProfile() {
       if (!auth.user) throw new Error("Not signed in");
       const { error } = await supabase
         .from("profiles")
-        .upsert({ id: auth.user.id, email: auth.user.email, ...patch });
+        .upsert({ id: auth.user.id, email: auth.user.email ?? null, ...patch });
       if (error) throw error;
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["profile"] }),
