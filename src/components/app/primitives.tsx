@@ -16,14 +16,14 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between animate-fade">
+    <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between animate-fade">
       <div>
         {eyebrow && (
           <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-primary">
             {eyebrow}
           </p>
         )}
-        <h1 className="text-2xl font-bold text-foreground md:text-3xl">{title}</h1>
+        <h1 className="font-display text-[22px] font-bold tracking-tight text-foreground md:text-[28px]">{title}</h1>
         {description && (
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{description}</p>
         )}
@@ -92,18 +92,18 @@ export function StatCard({
     negative: "bg-negative-soft text-negative",
   }[tone];
   return (
-    <div className="card-elevated card-interactive p-5">
+    <div className="card-elevated card-interactive surface-sheen p-4">
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-medium text-muted-foreground">{label}</p>
         {Icon && (
-          <span className={cn("grid size-9 place-items-center rounded-lg", iconTone)}>
-            <Icon className="size-4.5" />
+          <span className={cn("icon-tile grid size-8 shrink-0 place-items-center rounded-lg", iconTone)}>
+            <Icon className="size-4" />
           </span>
         )}
       </div>
-      <div className="mt-3 flex items-end gap-3">
-        <span className="font-display text-3xl font-bold tracking-tight text-foreground">{value}</span>
-        {trend !== undefined && <Trend value={trend} className="mb-1.5" />}
+      <div className="mt-2 flex items-end gap-2.5">
+        <span className="num font-display text-[28px] font-bold leading-none tracking-tight text-foreground">{value}</span>
+        {trend !== undefined && <Trend value={trend} className="mb-0.5" />}
       </div>
       {sub && <p className="mt-1 text-xs text-muted-foreground">{sub}</p>}
       {children}
@@ -119,7 +119,7 @@ export function ScoreRing({ score, size = 132, stroke = 10, label = "Reputation 
   return (
     <div className="relative grid place-items-center" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--muted)" strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="currentColor" strokeOpacity={0.15} strokeWidth={stroke} />
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -134,8 +134,8 @@ export function ScoreRing({ score, size = 132, stroke = 10, label = "Reputation 
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-display text-3xl font-bold leading-none text-foreground">{score}</span>
-        <span className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
+        <span className="num font-display text-3xl font-bold leading-none text-current">{score}</span>
+        <span className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-current opacity-70">{label}</span>
       </div>
     </div>
   );
