@@ -44,7 +44,7 @@ type CaseRow = {
   model: string | null;
   created_at: string;
   reviews: {
-    author_name: string;
+    author: string;
     rating: number;
     body: string;
     platform: string;
@@ -80,7 +80,7 @@ function useRemovalCases() {
       const { data, error } = await supabase
         .from("removal_cases")
         .select(
-          "id, review_id, violation_type, confidence, rationale, appeal_text, status, model, created_at, reviews(author_name, rating, body, platform, location_name)",
+          "id, review_id, violation_type, confidence, rationale, appeal_text, status, model, created_at, reviews(author, rating, body, platform, location_name)",
         )
         .eq("workspace_id", workspaceId)
         .order("created_at", { ascending: false });
@@ -256,7 +256,7 @@ function RemovalsPage() {
 
                 {c.reviews && (
                   <div className="mt-2 flex items-center gap-2">
-                    <span className="text-sm font-semibold">{c.reviews.author_name}</span>
+                    <span className="text-sm font-semibold">{c.reviews.author}</span>
                     <Stars value={c.reviews.rating} />
                   </div>
                 )}

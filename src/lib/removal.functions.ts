@@ -70,7 +70,7 @@ export const scanReviewsForRemoval = createServerFn({ method: "POST" })
 
     const { data: reviews, error } = await context.supabase
       .from("reviews")
-      .select("id, author_name, rating, body, platform, location_name, external_created_at")
+      .select("id, author, rating, body, platform, location_name, external_created_at")
       .eq("workspace_id", workspaceId)
       .order("external_created_at", { ascending: false })
       .limit(400);
@@ -87,7 +87,7 @@ export const scanReviewsForRemoval = createServerFn({ method: "POST" })
     const prompt = pending
       .map(
         (r) =>
-          `id: ${r.id}\nplatform: ${r.platform}\nrating: ${r.rating}\nauthor: ${r.author_name}\nreview: ${String(r.body).slice(0, 700)}`,
+          `id: ${r.id}\nplatform: ${r.platform}\nrating: ${r.rating}\nauthor: ${r.author}\nreview: ${String(r.body).slice(0, 700)}`,
       )
       .join("\n---\n");
 
