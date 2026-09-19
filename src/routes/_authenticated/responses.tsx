@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Clock, CheckCircle2, AlertOctagon, Send, Save, Sparkles, Inbox } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { useMutation } from "@tanstack/react-query";
+import { Clock, CheckCircle2, AlertOctagon, Send, Sparkles, Inbox, Timer } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import {
   PageHeader,
@@ -13,20 +15,24 @@ import {
 } from "@/components/app/primitives";
 import { Button } from "@/components/ui/button";
 import { useLiveReviews, usePublishReply } from "@/lib/seovale-db";
+import { responseTimeHours } from "@/lib/analytics";
+import { draftReply } from "@/lib/ai.functions";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/responses")({
   head: () => ({
     meta: [
-      { title: "Response Center — RepuVala™" },
+      { title: "Response Center — Seovale" },
       {
         name: "description",
         content:
-          "Triage pending, high-priority and responded reviews, draft replies with templates and keep response SLAs on track.",
+          "Work the reply queue, draft with AI, publish responses and track live response-rate and response-time metrics.",
       },
-      { property: "og:title", content: "Response Center — RepuVala™" },
+      { property: "og:title", content: "Response Center — Seovale" },
       { property: "og:description", content: "A professional workflow for replying to every review." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: ResponseCenter,
@@ -38,14 +44,6 @@ const queues = [
   { id: "responded", label: "Responded", icon: CheckCircle2, tone: "text-positive" },
 ] as const;
 
-const templates = [
-  "Service recovery — apology + contact",
-  "Billing issue — refund follow-up",
-  "Thank you — 5★ delighted customer",
-  "Wait time — process improvement",
-  "Policy review — suspicious content",
-];
-
 function ResponseCenter() {
   const [queue, setQueue] = useState<(typeof queues)[number]["id"]>("priority");
   const [selected, setSelected] = useState<string | null>(null);
@@ -53,6 +51,12 @@ function ResponseCenter() {
 
   const { data: reviews = [], isLoading } = useLiveReviews();
   const publish = usePublishReply();
+  const draftAi = useServerFn(draftReply);
+  const aiMutation = useMutation({
+    mutationFn: (id: string) => draftAi({ data: { reviewId: id } }),
+    onSuccess: (res) => setDraft(res.reply),
+    onError: (e) => toast.error("Could not draft reply", { description: (e as Error).message }),
+  });
 
   const filtered = reviews.filter((r) =>
     queue === "priority"
@@ -67,6 +71,7 @@ function ResponseCenter() {
   const highPriority = reviews.filter((r) => r.priority === "high" && r.status !== "replied").length;
   const responded = reviews.filter((r) => r.status === "replied").length;
   const responseRate = reviews.length ? Math.round((responded / reviews.length) * 100) : 0;
+  const medianHours = responseTimeHours(reviews);
 
   return (
     <AppShell>
@@ -79,10 +84,15 @@ function ResponseCenter() {
       <div className="stagger mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Awaiting response" value={awaiting} sub="Across every connected platform" icon={Clock} tone="rating" />
         <StatCard label="High priority" value={highPriority} sub="1★–2★ or escalated" icon={AlertOctagon} tone="negative" />
-        <StatCard label="Responded" value={responded} sub={`${responseRate}% of all reviews`} icon={CheckCircle2} tone="positive" />
-        <StatCard label="Total reviews" value={reviews.length} sub="Stored in your workspace" icon={Send} tone="primary" />
+        <StatCard label="Response rate" value={`${responseRate}%`} sub={`${responded} of ${reviews.length} reviews replied`} icon={CheckCircle2} tone="positive" />
+        <StatCard
+          label="Median response time"
+          value={medianHours === null ? "—" : `${medianHours}h`}
+          sub="From review posted to reply published"
+          icon={Timer}
+          tone="primary"
+        />
       </div>
-
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
         <Section bodyClassName="p-0">
@@ -118,7 +128,7 @@ function ResponseCenter() {
               {filtered.map((r) => (
                 <li key={r.id}>
                   <button
-                    onClick={() => { setSelected(r.id); setDraft(""); }}
+                    onClick={() => { setSelected(r.id); setDraft(r.reply ?? ""); }}
                     className={cn(
                       "flex w-full gap-3 px-4 py-3.5 text-left transition-colors hover:bg-accent/40",
                       review?.id === r.id && "bg-accent/60",
@@ -168,17 +178,16 @@ function ResponseCenter() {
             </div>
 
             <div className="mt-4">
-              <div className="mb-2 flex flex-wrap items-center gap-2">
-                <span className="text-xs font-semibold text-muted-foreground">Suggested templates:</span>
-                {templates.slice(0, 3).map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setDraft(`Hi ${review.author.split(" ")[0]}, thank you for taking the time to share this. ${t.split("—")[1]?.trim() ?? ""} — we're looking into it right away and a manager will contact you personally.`)}
-                    className="rounded-full border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent"
-                  >
-                    {t}
-                  </button>
-                ))}
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-semibold text-muted-foreground">Response draft</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={aiMutation.isPending}
+                  onClick={() => aiMutation.mutate(review.id)}
+                >
+                  <Sparkles /> {aiMutation.isPending ? "Drafting…" : "Write with AI"}
+                </Button>
               </div>
               <textarea
                 value={draft}
@@ -189,7 +198,7 @@ function ResponseCenter() {
               />
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <Sparkles className="size-3.5 text-primary" />
-                Tone check: empathetic, specific, no boilerplate. {draft.length} characters.
+                {draft.length} characters.
               </div>
             </div>
 
@@ -201,7 +210,6 @@ function ResponseCenter() {
                     { id: review.id, reply: draft.trim() },
                     {
                       onSuccess: () => {
-                        setDraft("");
                         toast.success("Response published", { description: `Reply saved for ${review.author}.` });
                       },
                       onError: (e) => toast.error("Could not publish", { description: (e as Error).message }),
@@ -211,12 +219,9 @@ function ResponseCenter() {
               >
                 <Send /> {publish.isPending ? "Publishing…" : "Publish response"}
               </Button>
-              <Button variant="outline" onClick={() => toast("Draft saved")}><Save /> Save draft</Button>
-              <Button variant="outline">Assign</Button>
-              <Button variant="ghost">Escalate to manager</Button>
             </div>
             <p className="mt-3 text-xs text-muted-foreground">
-              RepuVala never removes genuine feedback. Content that appears to breach platform policy can be
+              Seovale never removes genuine feedback. Content that appears to breach platform policy can be
               submitted for review through the reporting workflow.
             </p>
           </Section>
