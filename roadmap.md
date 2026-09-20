@@ -63,3 +63,4 @@
 - [ ] Sync jobs / API usage / rate-limit / health tables sourced only from real provider responses ("Not provided by API" otherwise)
 - [ ] Integration overview dashboard: health, sync, webhook, usage, errors, audit log
 - [ ] Agency/client/business role isolation beyond the current workspace RLS
+- [x] Secure provider configuration panel: encrypted per-provider credential vault (integration_provider_credentials, service-role only), masked display, rotate, revoke, real server-side validation + live provider test, audit events (2026-09-20)
