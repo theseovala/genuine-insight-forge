@@ -90,7 +90,6 @@ export const Route = createFileRoute("/api/public/integrations/webhook")({
           return Response.json({ error: "Invalid JSON payload" }, { status: 400 });
         }
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { enqueueJob } = await import("@/lib/jobs.server");
 
         let workspaceId: string | null = null;
         let providerEventId: string | null = null;
