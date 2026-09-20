@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { INTEGRATIONS, integrationById } from "@/lib/integrations/registry";
+import type { TestResult } from "@/lib/integrations/providers.server";
 
 type Ctx = { supabase: any; userId: string };
 
@@ -219,7 +220,7 @@ export const testIntegration = createServerFn({ method: "POST" })
       .eq("provider", data.provider)
       .maybeSingle();
 
-    let result: providers.TestResult;
+    let result: TestResult;
 
     if (definition.kind === "api_key") {
       result =
