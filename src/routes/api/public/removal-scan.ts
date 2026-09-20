@@ -9,11 +9,23 @@ export const Route = createFileRoute("/api/public/removal-scan")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const { authenticateCronRequest } = await import("@/integrations/supabase/cron-auth");
-        const denied = await authenticateCronRequest(request);
-        if (denied) return denied;
-
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+        // The scheduler authenticates with a private token stored in the
+        // database; the platform cron secret is also accepted.
+        const bearer = /^Bearer ([^\s,]+)$/.exec(request.headers.get("authorization") ?? "")?.[1];
+        const { data: tokenRow } = await supabaseAdmin
+          .from("scheduler_tokens")
+          .select("token")
+          .eq("name", "removal-scan")
+          .maybeSingle();
+        if (!bearer || bearer !== tokenRow?.token) {
+          const { authenticateCronRequest } = await import("@/integrations/supabase/cron-auth");
+          const denied = await authenticateCronRequest(request);
+          if (denied) return denied;
+        }
+
+
         const { runRemovalScan } = await import("@/lib/removal-scan.server");
         const now = new Date();
 
