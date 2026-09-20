@@ -34,3 +34,5 @@
 - Done: Review Removal (auto AI policy scan, removal_cases/removal_scans, page + nav). Claude + OpenAI keys wired as AI fallbacks.
 - [ ] Move all Lovable Cloud (Supabase) data + schema to user's self-hosted Supabase on Hostinger VPS (187.53.134.164), keep app working (evaluate: code env vars, auth, RLS, migrations). Blocked on: VPS Supabase URL + keys (service role), and decision whether to keep Lovable Cloud or fully switch.
 - [ ] Fix Google 403: stored GOOGLE_BUSINESS_CLIENT_ID contains the placeholder "@secret:GOOGLE_OAUTH_CLIENT_ID" instead of the real client ID — user must re-enter real Client ID + Secret via secure form, then Connect → Allow → Sync now.
+
+- [ ] Review Removal priority: flagged cases ke saath auto-appeal reply + Google reply send (in progress)
