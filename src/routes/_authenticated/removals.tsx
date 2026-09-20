@@ -2,15 +2,85 @@ import { useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ShieldX, ScanEye, RefreshCw, Send, CheckCircle2, XCircle, Ban } from "lucide-react";
+import { ShieldX, ScanEye, RefreshCw, Send, CheckCircle2, XCircle, Ban, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
 import { PageHeader, Section, StatCard, EmptyState, Stars } from "@/components/app/primitives";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { currentWorkspaceId } from "@/lib/seovale-db";
-import { scanReviewsForRemoval, updateRemovalCase } from "@/lib/removal.functions";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  draftRemovalReply,
+  publishRemovalReply,
+  scanReviewsForRemoval,
+  updateRemovalCase,
+} from "@/lib/removal.functions";
 import { cn } from "@/lib/utils";
+
+function AppealReply({ caseId, onPublished }: { caseId: string; onPublished: () => void }) {
+  const [reply, setReply] = useState("");
+  const draft = useServerFn(draftRemovalReply);
+  const publish = useServerFn(publishRemovalReply);
+
+  const write = useMutation({
+    mutationFn: async () => draft({ data: { caseId } }),
+    onSuccess: (result: { reply: string }) => {
+      setReply(result.reply);
+      toast.success("Reply drafted");
+    },
+    onError: (error: unknown) =>
+      toast.error(error instanceof Error ? error.message : "Could not write the reply."),
+  });
+
+  const send = useMutation({
+    mutationFn: async () => publish({ data: { caseId, reply } }),
+    onSuccess: (result: { postedToGoogle: boolean }) => {
+      onPublished();
+      toast.success(
+        result.postedToGoogle ? "Reply published on Google" : "Reply saved — publish it on the platform",
+      );
+    },
+    onError: (error: unknown) =>
+      toast.error(error instanceof Error ? error.message : "Could not send the reply."),
+  });
+
+  return (
+    <div className="mt-3 rounded-lg border bg-muted/30 p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold">Public reply while the appeal is pending</span>
+        <Button size="sm" variant="outline" onClick={() => write.mutate()} disabled={write.isPending}>
+          {write.isPending ? <RefreshCw className="animate-spin" /> : <Sparkles />}
+          {write.isPending ? "Writing…" : reply ? "Rewrite" : "Draft reply"}
+        </Button>
+      </div>
+      {reply && (
+        <>
+          <Textarea
+            className="mt-2 min-h-24 text-sm"
+            value={reply}
+            onChange={(event) => setReply(event.target.value)}
+          />
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => send.mutate()} disabled={send.isPending || reply.trim().length < 5}>
+              <Send /> {send.isPending ? "Sending…" : "Send reply"}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                void navigator.clipboard.writeText(reply);
+                toast.success("Reply copied");
+              }}
+            >
+              Copy reply
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export const Route = createFileRoute("/_authenticated/removals")({
   head: () => ({
@@ -326,6 +396,13 @@ function RemovalsPage() {
                     </Button>
                   )}
                 </div>
+
+                {["flagged", "submitted"].includes(c.status) && (
+                  <AppealReply
+                    caseId={c.id}
+                    onPublished={() => void qc.invalidateQueries({ queryKey: ["removal_cases"] })}
+                  />
+                )}
               </li>
             ))}
           </ul>
