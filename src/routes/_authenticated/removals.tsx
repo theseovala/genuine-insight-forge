@@ -10,13 +10,24 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { currentWorkspaceId } from "@/lib/seovale-db";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   draftRemovalReply,
+  getScanSchedule,
   publishRemovalReply,
   scanReviewsForRemoval,
   updateRemovalCase,
+  updateScanSchedule,
 } from "@/lib/removal.functions";
 import { cn } from "@/lib/utils";
+
 
 function AppealReply({ caseId, onPublished }: { caseId: string; onPublished: () => void }) {
   const [reply, setReply] = useState("");
