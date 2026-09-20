@@ -20,6 +20,7 @@ import {
   Bar,
 } from "recharts";
 import { AppShell } from "@/components/app/AppShell";
+import { IntegrationStatusStrip } from "@/components/app/IntegrationStatusStrip";
 import {
   PageHeader,
   StatCard,
@@ -220,6 +221,8 @@ function Dashboard() {
           </Section>
         </div>
       )}
+
+      <IntegrationStatusStrip />
 
       {/* KPI row */}
       <div className="stagger mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
