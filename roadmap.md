@@ -53,3 +53,13 @@
 - [x] Indeed & Glassdoor marked Unavailable (partner-only APIs) — no fake connection
 - [ ] Waiting on credentials: GOOGLE_OAUTH_CLIENT_SECRET, FACEBOOK_APP_ID/SECRET, REDDIT_CLIENT_ID/SECRET, TWITTER_CLIENT_ID/SECRET, TRUSTPILOT_API_KEY, TRIPADVISOR_API_KEY
 - [ ] Rotate previously exposed credentials (Google client secret, Hostinger password)
+
+## Master Integration Center (requested 2026-09-20)
+- [x] Test Connection runs a real provider request for every configured platform; dashboard shows Connected / Disconnected / Error / Expired / Unavailable
+- [ ] Expand provider registry to the full requested catalogue (Google suite, Meta/WhatsApp, reputation, SEO, website intelligence, AI, communication, payments) with per-provider adapters
+- [ ] Richer test result codes (AUTHENTICATION_FAILED, INSUFFICIENT_SCOPE, RATE_LIMITED, APPROVAL_REQUIRED, NOT_CONFIGURED, UNAVAILABLE ...)
+- [ ] Provider-specific credential fields (account/business/page/project IDs, webhook secrets) stored encrypted server-side
+- [ ] Webhook endpoints with signature verification, idempotency and replay protection
+- [ ] Sync jobs / API usage / rate-limit / health tables sourced only from real provider responses ("Not provided by API" otherwise)
+- [ ] Integration overview dashboard: health, sync, webhook, usage, errors, audit log
+- [ ] Agency/client/business role isolation beyond the current workspace RLS
