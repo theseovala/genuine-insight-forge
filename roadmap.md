@@ -44,3 +44,12 @@
 - [x] Zero-review dashboard shows real data unavailable, without derived percentages or misleading actions
 - [x] Create immediate in-app alerts for every newly synced or updated real negative review, without duplicates
 - [x] Automatically draft a response when a real review is opened and provide one-click copy for Google
+
+## Third-party integration infrastructure (2026-09-20)
+- [x] Encrypted, service-role-only connection storage (`integration_connections`), OAuth state table, and activity log (`integration_events`)
+- [x] Shared OAuth callback `/api/public/integrations/callback` with PKCE (Google, X), Meta long-lived token exchange, Reddit basic auth
+- [x] Server functions: list, start OAuth, save business reference, live Test connection, token refresh, disconnect
+- [x] Integration Manager UI (Settings → Integration manager) with Connected / Disconnected / Error / Expired / Unavailable status and activity log
+- [x] Indeed & Glassdoor marked Unavailable (partner-only APIs) — no fake connection
+- [ ] Waiting on credentials: GOOGLE_OAUTH_CLIENT_SECRET, FACEBOOK_APP_ID/SECRET, REDDIT_CLIENT_ID/SECRET, TWITTER_CLIENT_ID/SECRET, TRUSTPILOT_API_KEY, TRIPADVISOR_API_KEY
+- [ ] Rotate previously exposed credentials (Google client secret, Hostinger password)
