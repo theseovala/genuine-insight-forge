@@ -39,7 +39,7 @@ export interface IntegrationDefinition {
 const GOOGLE_OAUTH_FIELDS: CredentialField[] = [
   { key: "GOOGLE_OAUTH_CLIENT_ID", label: "Client ID", secret: false, placeholder: "1234567890-abc.apps.googleusercontent.com" },
   { key: "GOOGLE_OAUTH_CLIENT_SECRET", label: "Client secret", secret: true, placeholder: "GOCSPX-..." },
-  { key: "GOOGLE_API_KEY", label: "API key (optional)", secret: true, hint: "Only needed for API-key Google endpoints." },
+  { key: "GOOGLE_API_KEY", label: "API key (optional)", secret: true, hint: "Only required for Google API-key endpoints." },
 ];
 
 const META_FIELDS: CredentialField[] = [
@@ -57,6 +57,11 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     requiredSecrets: ["GOOGLE_BUSINESS_CLIENT_ID", "GOOGLE_BUSINESS_CLIENT_SECRET"],
     scopes: ["https://www.googleapis.com/auth/business.manage"],
     docsUrl: "https://developers.google.com/my-business/content/review-data",
+    credentialGroup: "google_business",
+    credentialFields: [
+      { key: "GOOGLE_BUSINESS_CLIENT_ID", label: "Client ID", secret: false, placeholder: "...apps.googleusercontent.com" },
+      { key: "GOOGLE_BUSINESS_CLIENT_SECRET", label: "Client secret", secret: true, placeholder: "GOCSPX-..." },
+    ],
   },
   {
     id: "google_gmail",
@@ -67,6 +72,8 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     requiredSecrets: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET"],
     scopes: ["https://www.googleapis.com/auth/gmail.readonly", "openid", "email"],
     docsUrl: "https://developers.google.com/gmail/api/auth/scopes",
+    credentialGroup: "google_oauth",
+    credentialFields: GOOGLE_OAUTH_FIELDS,
   },
   {
     id: "youtube",
@@ -77,6 +84,8 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     requiredSecrets: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET"],
     scopes: ["https://www.googleapis.com/auth/youtube.force-ssl", "openid", "email"],
     docsUrl: "https://developers.google.com/youtube/v3/guides/authentication",
+    credentialGroup: "google_oauth",
+    credentialFields: GOOGLE_OAUTH_FIELDS,
   },
   {
     id: "facebook",
@@ -87,6 +96,8 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     requiredSecrets: ["FACEBOOK_APP_ID", "FACEBOOK_APP_SECRET"],
     scopes: ["pages_show_list", "pages_read_engagement", "pages_read_user_content", "business_management"],
     docsUrl: "https://developers.facebook.com/docs/graph-api/reference/page/ratings/",
+    credentialGroup: "meta",
+    credentialFields: META_FIELDS,
   },
   {
     id: "instagram",
@@ -97,6 +108,8 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     requiredSecrets: ["FACEBOOK_APP_ID", "FACEBOOK_APP_SECRET"],
     scopes: ["instagram_basic", "instagram_manage_comments", "pages_show_list", "business_management"],
     docsUrl: "https://developers.facebook.com/docs/instagram-api/",
+    credentialGroup: "meta",
+    credentialFields: META_FIELDS,
   },
   {
     id: "reddit",
@@ -107,6 +120,11 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     requiredSecrets: ["REDDIT_CLIENT_ID", "REDDIT_CLIENT_SECRET"],
     scopes: ["identity", "read", "submit"],
     docsUrl: "https://github.com/reddit-archive/reddit/wiki/OAuth2",
+    credentialGroup: "reddit",
+    credentialFields: [
+      { key: "REDDIT_CLIENT_ID", label: "Client ID", secret: false },
+      { key: "REDDIT_CLIENT_SECRET", label: "Client secret", secret: true },
+    ],
   },
   {
     id: "twitter",
@@ -117,6 +135,11 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     requiredSecrets: ["TWITTER_CLIENT_ID", "TWITTER_CLIENT_SECRET"],
     scopes: ["tweet.read", "users.read", "offline.access"],
     docsUrl: "https://developer.x.com/en/docs/authentication/oauth-2-0",
+    credentialGroup: "twitter",
+    credentialFields: [
+      { key: "TWITTER_CLIENT_ID", label: "OAuth 2.0 Client ID", secret: false },
+      { key: "TWITTER_CLIENT_SECRET", label: "OAuth 2.0 Client secret", secret: true },
+    ],
   },
   {
     id: "trustpilot",
@@ -128,6 +151,8 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     scopes: [],
     docsUrl: "https://documentation-apidocumentation.trustpilot.com/",
     accountField: { label: "Business domain", hint: "e.g. seovale.com — used to resolve your Trustpilot business unit." },
+    credentialGroup: "trustpilot",
+    credentialFields: [{ key: "TRUSTPILOT_API_KEY", label: "API key", secret: true }],
   },
   {
     id: "tripadvisor",
@@ -139,6 +164,8 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     scopes: [],
     docsUrl: "https://tripadvisor-content-api.readme.io/reference/overview",
     accountField: { label: "Listing name or location ID", hint: "Exact business name or numeric Tripadvisor location ID." },
+    credentialGroup: "tripadvisor",
+    credentialFields: [{ key: "TRIPADVISOR_API_KEY", label: "Content API key", secret: true }],
   },
   {
     id: "indeed",
@@ -167,5 +194,7 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
 ];
 
 export const integrationById = (id: string) => INTEGRATIONS.find((i) => i.id === id);
+
+export const credentialGroupOf = (id: string) => integrationById(id)?.credentialGroup ?? id;
 
 export type IntegrationStatus = "connected" | "disconnected" | "error" | "expired" | "unavailable";
