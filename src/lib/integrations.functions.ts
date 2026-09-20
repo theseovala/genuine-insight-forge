@@ -317,7 +317,30 @@ export const testIntegration = createServerFn({ method: "POST" })
       result.status || null,
       result.rateLimited ? "rate_limited" : "connection_test",
     );
-    return { ok: result.ok, status: result.status, message: result.message };
+    // Observability: latest real outcome per provider (workspace-scoped).
+    await supabaseAdmin.from("integration_health").upsert(
+      {
+        workspace_id: member.workspace_id,
+        provider: data.provider,
+        status: result.ok ? "healthy" : "unhealthy",
+        latency_ms: null,
+        outcome_code: result.code ?? (result.ok ? "CONNECTED" : "PROVIDER_ERROR"),
+        last_error: result.ok ? null : result.message,
+        last_checked_at: new Date().toISOString(),
+        ...(result.ok ? { last_ok_at: new Date().toISOString() } : {}),
+      },
+      { onConflict: "workspace_id,provider" },
+    );
+    await supabaseAdmin.from("integration_api_logs").insert({
+      workspace_id: member.workspace_id,
+      provider: data.provider,
+      operation: "connection_test",
+      endpoint: "connection_test",
+      http_status: result.status || null,
+      outcome_code: result.code ?? (result.ok ? "CONNECTED" : "PROVIDER_ERROR"),
+      error_message: result.ok ? null : result.message,
+    });
+    return { ok: result.ok, status: result.status, message: result.message, code: result.code ?? (result.ok ? "CONNECTED" : "PROVIDER_ERROR") };
   });
 
 export const disconnectIntegration = createServerFn({ method: "POST" })
