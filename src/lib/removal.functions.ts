@@ -6,16 +6,6 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 type Ctx = { supabase: any; userId: string };
 
-const VIOLATIONS = [
-  "fake_or_incentivised",
-  "spam_or_advertising",
-  "hate_or_harassment",
-  "profanity_or_obscenity",
-  "off_topic",
-  "conflict_of_interest",
-  "personal_information",
-] as const;
-
 async function workspaceIdFor(context: Ctx) {
   const { data, error } = await context.supabase
     .from("workspace_members")
@@ -29,28 +19,17 @@ async function workspaceIdFor(context: Ctx) {
   return data.workspace_id as string;
 }
 
-const SYSTEM = `You assess customer reviews against Google Business Profile and Trustpilot content policies.
-Flag a review ONLY when it plainly breaks a policy: fake or incentivised, spam or advertising, hate or harassment,
-profanity or obscenity, off-topic (not about the business experience), conflict of interest (competitor or ex-staff),
-or exposure of personal information. A genuinely negative but honest review is NOT a violation — never flag it.
-Reply with JSON only, no prose and no code fences, in this exact shape:
-{"results":[{"id":"<review id>","violation":"<one of ${VIOLATIONS.join("|")}>","confidence":0.0,"rationale":"one or two sentences","appeal":"short factual removal request addressed to the platform"}]}
-Return an empty results array when nothing breaks policy.`;
-
-function parseResults(text: string) {
-  const cleaned = text.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
-  const start = cleaned.indexOf("{");
-  const end = cleaned.lastIndexOf("}");
-  if (start === -1 || end === -1) return [];
-  try {
-    const parsed = JSON.parse(cleaned.slice(start, end + 1));
-    const results = Array.isArray(parsed?.results) ? parsed.results : [];
-    return results.filter(
-      (r: any) => typeof r?.id === "string" && VIOLATIONS.includes(r?.violation),
-    ) as Array<{ id: string; violation: string; confidence: number; rationale: string; appeal?: string }>;
-  } catch {
-    return [];
-  }
+async function memberFor(context: Ctx) {
+  const { data, error } = await context.supabase
+    .from("workspace_members")
+    .select("workspace_id, role")
+    .eq("user_id", context.userId)
+    .order("created_at")
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("No workspace is assigned to this account.");
+  return data as { workspace_id: string; role: "owner" | "admin" | "member" };
 }
 
 /** Scans reviews that have not been assessed yet and records removal cases. */
@@ -58,88 +37,92 @@ export const scanReviewsForRemoval = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ limit: z.number().min(1).max(120).optional() }).parse(input ?? {}))
   .handler(async ({ data, context }) => {
-    const started = Date.now();
     const workspaceId = await workspaceIdFor(context);
+    const { runRemovalScan } = await import("@/lib/removal-scan.server");
 
-    const { data: existing, error: existingError } = await context.supabase
-      .from("removal_cases")
-      .select("review_id")
+    let limit = data.limit;
+    if (!limit) {
+      const { data: settings } = await context.supabase
+        .from("removal_scan_settings")
+        .select("batch_size")
+        .eq("workspace_id", workspaceId)
+        .maybeSingle();
+      limit = settings?.batch_size ?? 40;
+    }
+
+    const outcome = await runRemovalScan(context.supabase, workspaceId, limit!, context.userId);
+    await context.supabase
+      .from("removal_scan_settings")
+      .update({ last_run_at: new Date().toISOString() })
       .eq("workspace_id", workspaceId);
-    if (existingError) throw existingError;
-    const assessed = new Set((existing ?? []).map((r: any) => r.review_id as string));
-
-    const { data: reviews, error } = await context.supabase
-      .from("reviews")
-      .select("id, author, rating, body, platform, location_name, external_created_at")
-      .eq("workspace_id", workspaceId)
-      .neq("source", "seed")
-      .order("external_created_at", { ascending: false })
-      .limit(400);
-    if (error) throw error;
-
-    const pending = ((reviews ?? []) as any[])
-      .filter((r) => !assessed.has(r.id) && typeof r.body === "string" && r.body.trim().length > 0)
-      .slice(0, data.limit ?? 40);
-
-    if (pending.length === 0) {
-      return { checked: 0, flagged: 0 };
-    }
-
-    const prompt = pending
-      .map(
-        (r) =>
-          `id: ${r.id}\nplatform: ${r.platform}\nrating: ${r.rating}\nauthor: ${r.author}\nreview: ${String(r.body).slice(0, 700)}`,
-      )
-      .join("\n---\n");
-
-    try {
-      const { runAiText } = await import("@/lib/ai-gateway.server");
-      const { output, model } = await runAiText(SYSTEM, prompt);
-      const results = parseResults(output).filter((r) => pending.some((p) => p.id === r.id));
-
-      const rows = results.map((r) => ({
-        workspace_id: workspaceId,
-        review_id: r.id,
-        violation_type: r.violation,
-        confidence: Math.max(0, Math.min(1, Number(r.confidence) || 0)),
-        rationale: String(r.rationale ?? "").slice(0, 1000) || "Flagged by automatic policy scan.",
-        appeal_text: r.appeal ? String(r.appeal).slice(0, 2000) : null,
-        status: "flagged",
-        model,
-      }));
-
-      if (rows.length > 0) {
-        const { error: insertError } = await context.supabase
-          .from("removal_cases")
-          .upsert(rows, { onConflict: "workspace_id,review_id", ignoreDuplicates: true });
-        if (insertError) throw insertError;
-      }
-
-      await context.supabase.from("removal_scans").insert({
-        workspace_id: workspaceId,
-        started_by: context.userId,
-        reviews_checked: pending.length,
-        reviews_flagged: rows.length,
-        model,
-        duration_ms: Date.now() - started,
-        status: "completed",
-      });
-
-      return { checked: pending.length, flagged: rows.length };
-    } catch (scanError) {
-      const message = scanError instanceof Error ? scanError.message : "Scan failed";
-      await context.supabase.from("removal_scans").insert({
-        workspace_id: workspaceId,
-        started_by: context.userId,
-        reviews_checked: pending.length,
-        reviews_flagged: 0,
-        duration_ms: Date.now() - started,
-        status: "failed",
-        error_message: message,
-      });
-      throw scanError;
-    }
+    return outcome;
   });
+
+/** Reads the automatic scan schedule for the signed-in workspace. */
+export const getScanSchedule = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const member = await memberFor(context);
+    const { data, error } = await context.supabase
+      .from("removal_scan_settings")
+      .select("enabled, interval_minutes, batch_size, last_run_at, next_run_at, paused_reason")
+      .eq("workspace_id", member.workspace_id)
+      .maybeSingle();
+    if (error) throw error;
+    return {
+      canEdit: member.role !== "member",
+      enabled: data?.enabled ?? true,
+      intervalMinutes: data?.interval_minutes ?? 360,
+      batchSize: data?.batch_size ?? 40,
+      lastRunAt: data?.last_run_at ?? null,
+      nextRunAt: data?.next_run_at ?? null,
+      pausedReason: data?.paused_reason ?? null,
+    };
+  });
+
+/** Updates how often the automatic scan runs and how many reviews it checks. */
+export const updateScanSchedule = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        enabled: z.boolean().optional(),
+        intervalMinutes: z.number().int().min(15).max(10080).optional(),
+        batchSize: z.number().int().min(5).max(120).optional(),
+        resume: z.boolean().optional(),
+      })
+      .parse(input ?? {}),
+  )
+  .handler(async ({ data, context }) => {
+    const member = await memberFor(context);
+    if (member.role === "member") throw new Error("Only a workspace owner or admin can change the scan schedule.");
+
+    const patch: Record<string, unknown> = {};
+    if (data.enabled !== undefined) patch["enabled"] = data.enabled;
+    if (data.intervalMinutes !== undefined) {
+      patch["intervalMinutes"] = undefined;
+      patch["interval_minutes"] = data.intervalMinutes;
+      patch["next_run_at"] = new Date(Date.now() + data.intervalMinutes * 60_000).toISOString();
+      delete patch["intervalMinutes"];
+    }
+    if (data.batchSize !== undefined) patch["batch_size"] = data.batchSize;
+    if (data.resume) patch["paused_reason"] = null;
+
+    const { data: updated, error } = await context.supabase
+      .from("removal_scan_settings")
+      .upsert({ workspace_id: member.workspace_id, ...patch }, { onConflict: "workspace_id" })
+      .select("enabled, interval_minutes, batch_size, next_run_at, paused_reason")
+      .single();
+    if (error) throw error;
+    return {
+      enabled: updated.enabled as boolean,
+      intervalMinutes: updated.interval_minutes as number,
+      batchSize: updated.batch_size as number,
+      nextRunAt: updated.next_run_at as string | null,
+      pausedReason: updated.paused_reason as string | null,
+    };
+  });
+
 
 /** Moves a removal case through its lifecycle. */
 export const updateRemovalCase = createServerFn({ method: "POST" })

@@ -24,6 +24,7 @@ import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedResponsesRouteImport } from './routes/_authenticated/responses'
 import { Route as AuthenticatedReviewsRouteImport } from './routes/_authenticated/reviews'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as ApiPublicRemovalScanRouteImport } from './routes/api/public/removal-scan'
 import { Route as ApiPublicGoogleBusinessCallbackRouteImport } from './routes/api/public/google-business/callback'
 
 const IndexRoute = IndexRouteImport.update({
@@ -101,6 +102,11 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPublicRemovalScanRoute = ApiPublicRemovalScanRouteImport.update({
+  id: '/api/public/removal-scan',
+  path: '/api/public/removal-scan',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicGoogleBusinessCallbackRoute =
   ApiPublicGoogleBusinessCallbackRouteImport.update({
     id: '/api/public/google-business/callback',
@@ -123,6 +129,7 @@ export interface FileRoutesByFullPath {
   '/responses': typeof AuthenticatedResponsesRoute
   '/reviews': typeof AuthenticatedReviewsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/api/public/removal-scan': typeof ApiPublicRemovalScanRoute
   '/api/public/google-business/callback': typeof ApiPublicGoogleBusinessCallbackRoute
 }
 export interface FileRoutesByTo {
@@ -140,6 +147,7 @@ export interface FileRoutesByTo {
   '/responses': typeof AuthenticatedResponsesRoute
   '/reviews': typeof AuthenticatedReviewsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/api/public/removal-scan': typeof ApiPublicRemovalScanRoute
   '/api/public/google-business/callback': typeof ApiPublicGoogleBusinessCallbackRoute
 }
 export interface FileRoutesById {
@@ -159,6 +167,7 @@ export interface FileRoutesById {
   '/_authenticated/responses': typeof AuthenticatedResponsesRoute
   '/_authenticated/reviews': typeof AuthenticatedReviewsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/api/public/removal-scan': typeof ApiPublicRemovalScanRoute
   '/api/public/google-business/callback': typeof ApiPublicGoogleBusinessCallbackRoute
 }
 export interface FileRouteTypes {
@@ -178,6 +187,7 @@ export interface FileRouteTypes {
     | '/responses'
     | '/reviews'
     | '/settings'
+    | '/api/public/removal-scan'
     | '/api/public/google-business/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -195,6 +205,7 @@ export interface FileRouteTypes {
     | '/responses'
     | '/reviews'
     | '/settings'
+    | '/api/public/removal-scan'
     | '/api/public/google-business/callback'
   id:
     | '__root__'
@@ -213,6 +224,7 @@ export interface FileRouteTypes {
     | '/_authenticated/responses'
     | '/_authenticated/reviews'
     | '/_authenticated/settings'
+    | '/api/public/removal-scan'
     | '/api/public/google-business/callback'
   fileRoutesById: FileRoutesById
 }
@@ -221,6 +233,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  ApiPublicRemovalScanRoute: typeof ApiPublicRemovalScanRoute
   ApiPublicGoogleBusinessCallbackRoute: typeof ApiPublicGoogleBusinessCallbackRoute
 }
 
@@ -331,6 +344,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/removal-scan': {
+      id: '/api/public/removal-scan'
+      path: '/api/public/removal-scan'
+      fullPath: '/api/public/removal-scan'
+      preLoaderRoute: typeof ApiPublicRemovalScanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/google-business/callback': {
       id: '/api/public/google-business/callback'
       path: '/api/public/google-business/callback'
@@ -377,6 +397,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  ApiPublicRemovalScanRoute: ApiPublicRemovalScanRoute,
   ApiPublicGoogleBusinessCallbackRoute: ApiPublicGoogleBusinessCallbackRoute,
 }
 export const routeTree = rootRouteImport
