@@ -210,20 +210,40 @@ function PlatformsTab() {
     mutationFn: ({ authWindow }: { authWindow: Window | null }) =>
       startFn({ data: { origin: window.location.origin } }).then((result) => ({ ...result, authWindow })),
     onSuccess: ({ authorizationUrl, authWindow }) => {
-      // Preferred: navigate the pre-opened popup (keeps popup blockers happy).
-      // Sandboxed preview iframes cannot navigate another window — fall back to
-      // opening the URL directly, then to a full-tab redirect.
+      // Sandboxed preview iframes may silently block navigating a pre-opened
+      // popup (no exception — the popup just stays on about:blank). Try the
+      // popup first, then verify it actually left about:blank; if not, fall
+      // back to a fresh popup and finally to a full-tab redirect.
+      const assignFallback = () => {
+        const popup = window.open(authorizationUrl, "_blank", "noopener,noreferrer");
+        if (!popup) window.location.assign(authorizationUrl);
+      };
       if (authWindow && !authWindow.closed) {
         try {
           authWindow.opener = null;
           authWindow.location.href = authorizationUrl;
-          return;
         } catch {
           authWindow.close();
+          assignFallback();
+          return;
         }
+        window.setTimeout(() => {
+          let stuck = true;
+          try {
+            // Reading cross-origin location throws once the popup has
+            // actually navigated to Google — that means success.
+            stuck = authWindow.closed ? false : authWindow.location.href === "about:blank";
+          } catch {
+            stuck = false;
+          }
+          if (stuck) {
+            try { authWindow.close(); } catch { /* ignore */ }
+            assignFallback();
+          }
+        }, 1500);
+        return;
       }
-      const popup = window.open(authorizationUrl, "_blank", "noopener,noreferrer");
-      if (!popup) window.location.assign(authorizationUrl);
+      assignFallback();
     },
     onError: (error: Error, { authWindow }) => {
       authWindow?.close();
