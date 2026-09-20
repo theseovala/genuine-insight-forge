@@ -112,11 +112,19 @@ function Dashboard() {
             <Button variant="outline" asChild>
               <Link to="/reports">View reports</Link>
             </Button>
-            <Button asChild>
-              <Link to="/responses">
-                Respond to {pending.length} pending <ArrowRight />
-              </Link>
-            </Button>
+            {summary.total > 0 ? (
+              <Button asChild>
+                <Link to="/responses">
+                  Respond to {pending.length} pending <ArrowRight />
+                </Link>
+              </Button>
+            ) : (
+              <Button asChild>
+                <Link to="/settings">
+                  Connect live reviews <ArrowRight />
+                </Link>
+              </Button>
+            )}
           </>
         }
       />
@@ -132,7 +140,7 @@ function Dashboard() {
             {summary.total === 0 ? (
               <div className="flex min-h-48 flex-col justify-center">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-foreground/70">Verified data only</p>
-                <h2 className="mt-2 font-display text-2xl font-bold md:text-3xl">No live reviews synced yet</h2>
+                <h2 className="mt-2 font-display text-2xl font-bold md:text-3xl">Real data unavailable</h2>
                 <p className="mt-2 max-w-lg text-sm text-primary-foreground/80">
                   Connect and sync a review platform to calculate your real reputation score, alerts and trends.
                 </p>
@@ -220,7 +228,7 @@ function Dashboard() {
         </StatCard>
         <StatCard label="Total reviews" value={summary.total.toLocaleString()} sub={summary.total ? `${summary.sentiment.positive}% positive` : "No verified reviews"} icon={MessagesSquare} tone="primary" />
         <StatCard label="Response rate" value={summary.total ? `${summary.responseRate}%` : "—"} sub={summary.total ? `${summary.unanswered} unanswered` : "No verified reviews"} icon={Timer} tone="positive" />
-        <StatCard label="Open alerts" value={openAlerts.length} sub={`${connectedCount} platforms connected`} icon={ShieldAlert} tone="negative" />
+        <StatCard label="Open alerts" value={summary.total ? openAlerts.length : "—"} sub={summary.total ? `${connectedCount} platforms connected` : "No verified reviews"} icon={ShieldAlert} tone="negative" />
       </div>
 
       {/* Charts */}
