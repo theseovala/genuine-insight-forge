@@ -1,7 +1,7 @@
 // Real provider wiring: authorization URLs, token exchange/refresh and live
 // connection tests. Every call below hits the provider's documented API — no
 // simulated responses and no success status without a real HTTP 2xx.
-import { integrationById } from "./registry";
+import { integrationById, type TestOutcomeCode } from "./registry";
 
 export interface TestResult {
   ok: boolean;
@@ -10,6 +10,7 @@ export interface TestResult {
   label?: string | null;
   accountRef?: string | null;
   rateLimited?: boolean;
+  code?: TestOutcomeCode;
 }
 
 export interface OAuthProviderConfig {
@@ -37,6 +38,28 @@ export function envValue(names: string[], creds: CredentialBag = {}) {
   return undefined;
 }
 
+/** Standard outcome code from an HTTP status — never invents success. */
+export function outcomeFor(ok: boolean, status: number, message: string): TestOutcomeCode {
+  if (ok) return "CONNECTED";
+  if (status === 0) {
+    const lower = message.toLowerCase();
+    return lower.includes("not configured") || lower.includes("missing") || lower.includes("required") || lower.includes("add your")
+      ? "NOT_CONFIGURED"
+      : "PROVIDER_ERROR";
+  }
+  if (status === 401) return "AUTHENTICATION_FAILED";
+  if (status === 403) return /scope/i.test(message) ? "INSUFFICIENT_SCOPE" : "INVALID_CREDENTIALS";
+  if (status === 429) return "RATE_LIMITED";
+  return "PROVIDER_ERROR";
+}
+
+export const notConfigured = (message: string): TestResult => ({
+  ok: false,
+  status: 0,
+  message,
+  code: "NOT_CONFIGURED",
+});
+
 async function readJson(response: Response) {
   const text = await response.text();
   try {
@@ -53,11 +76,13 @@ function failure(response: Response, payload: Record<string, any>): TestResult {
     payload?.["message"] ??
     payload?.["detail"] ??
     `Provider returned HTTP ${response.status}`;
+  const text = String(message);
   return {
     ok: false,
     status: response.status,
-    message: String(message).slice(0, 300),
+    message: text.slice(0, 300),
     rateLimited: response.status === 429,
+    code: outcomeFor(false, response.status, text),
   };
 }
 
