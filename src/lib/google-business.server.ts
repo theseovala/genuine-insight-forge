@@ -61,12 +61,19 @@ export function googleCallbackOrigin(returnOrigin: string) {
   return url.hostname.endsWith(".lovableproject.com") ? STABLE_PREVIEW_ORIGIN : url.origin;
 }
 
-export function createGoogleAuthorization(redirectUri: string) {
+type Creds = Record<string, string>;
+const credOrEnv = (creds: Creds, name: string) => {
+  const value = creds[name] ?? process.env[name];
+  if (!value) throw new Error(`${name} is not configured.`);
+  return value;
+};
+
+export function createGoogleAuthorization(redirectUri: string, creds: Creds = {}) {
   const state = base64Url(randomBytes(32));
   const verifier = base64Url(randomBytes(48));
   const challenge = createHash("sha256").update(verifier).digest("base64url");
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
-  url.searchParams.set("client_id", requiredEnv("GOOGLE_BUSINESS_CLIENT_ID"));
+  url.searchParams.set("client_id", credOrEnv(creds, "GOOGLE_BUSINESS_CLIENT_ID"));
   url.searchParams.set("redirect_uri", redirectUri);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("scope", `${BUSINESS_SCOPE} openid email`);
@@ -79,15 +86,15 @@ export function createGoogleAuthorization(redirectUri: string) {
   return { state, verifier, url: url.toString() };
 }
 
-export async function exchangeGoogleCode(code: string, verifier: string, redirectUri: string) {
+export async function exchangeGoogleCode(code: string, verifier: string, redirectUri: string, creds: Creds = {}) {
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       code,
       code_verifier: verifier,
-      client_id: requiredEnv("GOOGLE_BUSINESS_CLIENT_ID"),
-      client_secret: requiredEnv("GOOGLE_BUSINESS_CLIENT_SECRET"),
+      client_id: credOrEnv(creds, "GOOGLE_BUSINESS_CLIENT_ID"),
+      client_secret: credOrEnv(creds, "GOOGLE_BUSINESS_CLIENT_SECRET"),
       redirect_uri: redirectUri,
       grant_type: "authorization_code",
     }),

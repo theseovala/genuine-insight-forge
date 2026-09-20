@@ -26,13 +26,15 @@ export async function usableAccessToken(admin: any, workspaceId: string, connect
   if (Date.parse(connection.token_expires_at) - Date.now() > 120_000) {
     return decryptSecret(connection.access_token_ciphertext);
   }
+  const { loadProviderCredentials } = await import("./integrations/credentials.server");
+  const creds = await loadProviderCredentials(admin, workspaceId, "google_business");
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       refresh_token: await decryptSecret(connection.refresh_token_ciphertext),
-      client_id: requiredEnv("GOOGLE_BUSINESS_CLIENT_ID"),
-      client_secret: requiredEnv("GOOGLE_BUSINESS_CLIENT_SECRET"),
+      client_id: creds["GOOGLE_BUSINESS_CLIENT_ID"] ?? requiredEnv("GOOGLE_BUSINESS_CLIENT_ID"),
+      client_secret: creds["GOOGLE_BUSINESS_CLIENT_SECRET"] ?? requiredEnv("GOOGLE_BUSINESS_CLIENT_SECRET"),
       grant_type: "refresh_token",
     }),
   });
