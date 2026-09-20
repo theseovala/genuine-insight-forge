@@ -76,3 +76,6 @@
 - [x] Architecture documentation at docs/ARCHITECTURE.md (ERD, security, OAuth, webhook, queue, AI, failure handling, testing)
 - [ ] Integration overview dashboard panel reading health/usage/rate limits/errors from the new tables
 - [ ] Provider-specific usage/rate-limit extraction from real provider response headers during sync
+
+## In progress (added 20:11 UTC)
+- [ ] Ultra Premium UI enhancement — keep palette/fonts/layout/spacing; add depth layers, glow, card sheen, premium buttons, sidebar active glow, density, micro-animations, reduced-motion support. Inspect every major screen after.
