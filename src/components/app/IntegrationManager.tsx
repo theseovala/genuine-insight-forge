@@ -33,6 +33,7 @@ export function IntegrationManager() {
   const disconnectFn = useServerFn(disconnectIntegration);
   const [busy, setBusy] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [testingAll, setTestingAll] = useState(false);
 
   const integrations = useQuery({ queryKey: ["integrations"], queryFn: () => listFn() });
   const events = useQuery({ queryKey: ["integration_events"], queryFn: () => eventsFn() });
@@ -120,6 +121,34 @@ export function IntegrationManager() {
       <Section
         title="Integration manager"
         description="Every credential is stored encrypted on the server. Status is only shown after a live API call succeeds."
+        action={
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={testingAll}
+            onClick={async () => {
+              setTestingAll(true);
+              const targets = INTEGRATIONS.filter((i) => i.kind !== "manual");
+              let ok = 0;
+              const failures: string[] = [];
+              for (const definition of targets) {
+                try {
+                  const result = await testFn({ data: { provider: definition.id } });
+                  if (result.ok) ok += 1;
+                  else failures.push(definition.label);
+                } catch {
+                  failures.push(definition.label);
+                }
+              }
+              setTestingAll(false);
+              refresh();
+              if (failures.length === 0) toast.success(`All ${ok} integrations verified`);
+              else toast.error(`${ok} connected · ${failures.length} not connected: ${failures.join(", ")}`);
+            }}
+          >
+            {testingAll ? <Loader2 className="animate-spin" /> : <Activity />} Test all connections
+          </Button>
+        }
       >
         <div className="flex items-start gap-2.5 rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
           <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" />
