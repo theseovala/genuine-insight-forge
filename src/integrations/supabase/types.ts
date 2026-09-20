@@ -597,6 +597,50 @@ export type Database = {
           },
         ]
       }
+      integration_provider_credentials: {
+        Row: {
+          created_at: string
+          field_key: string
+          id: string
+          masked_hint: string
+          provider: string
+          updated_at: string
+          updated_by: string | null
+          value_ciphertext: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          field_key: string
+          id?: string
+          masked_hint?: string
+          provider: string
+          updated_at?: string
+          updated_by?: string | null
+          value_ciphertext: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          field_key?: string
+          id?: string
+          masked_hint?: string
+          provider?: string
+          updated_at?: string
+          updated_by?: string | null
+          value_ciphertext?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_provider_credentials_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       locations: {
         Row: {
           city: string
