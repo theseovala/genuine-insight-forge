@@ -12,7 +12,9 @@ import {
   Loader2,
   ExternalLink,
   RefreshCw,
+  Boxes,
 } from "lucide-react";
+import { IntegrationManager } from "@/components/app/IntegrationManager";
 import { AppShell } from "@/components/app/AppShell";
 import { PageHeader, Section, PlatformIcon, StatusBadge, EmptyState } from "@/components/app/primitives";
 import { Button } from "@/components/ui/button";
@@ -53,6 +55,7 @@ export const Route = createFileRoute("/_authenticated/settings")({
 const tabs = [
   { id: "business", label: "Business profile", icon: Building2 },
   { id: "platforms", label: "Connected platforms", icon: Plug },
+  { id: "integrations", label: "Integration manager", icon: Boxes },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "locations", label: "Locations", icon: MapPin },
   { id: "account", label: "Account", icon: CreditCard },
@@ -107,6 +110,11 @@ function Toggle({
 function SettingsPage() {
   const [tab, setTab] = useState<(typeof tabs)[number]["id"]>("business");
 
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    if (requested && tabs.some((t) => t.id === requested)) setTab(requested as (typeof tabs)[number]["id"]);
+  }, []);
+
   return (
     <AppShell>
       <PageHeader eyebrow="Configure" title="Settings" description="Set up the business, platforms and rules that power Seovale." />
@@ -130,6 +138,7 @@ function SettingsPage() {
         <div className="min-w-0 space-y-4">
           {tab === "business" && <BusinessProfileTab />}
           {tab === "platforms" && <PlatformsTab />}
+          {tab === "integrations" && <IntegrationManager />}
           {tab === "notifications" && <NotificationsTab />}
           {tab === "locations" && <LocationsTab />}
           {tab === "account" && <AccountTab />}

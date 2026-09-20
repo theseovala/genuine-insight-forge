@@ -26,6 +26,7 @@ import { Route as AuthenticatedReviewsRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as ApiPublicRemovalScanRouteImport } from './routes/api/public/removal-scan'
 import { Route as ApiPublicGoogleBusinessCallbackRouteImport } from './routes/api/public/google-business/callback'
+import { Route as ApiPublicIntegrationsCallbackRouteImport } from './routes/api/public/integrations/callback'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -113,6 +114,12 @@ const ApiPublicGoogleBusinessCallbackRoute =
     path: '/api/public/google-business/callback',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicIntegrationsCallbackRoute =
+  ApiPublicIntegrationsCallbackRouteImport.update({
+    id: '/api/public/integrations/callback',
+    path: '/api/public/integrations/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -131,6 +138,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/api/public/removal-scan': typeof ApiPublicRemovalScanRoute
   '/api/public/google-business/callback': typeof ApiPublicGoogleBusinessCallbackRoute
+  '/api/public/integrations/callback': typeof ApiPublicIntegrationsCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -149,6 +157,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/api/public/removal-scan': typeof ApiPublicRemovalScanRoute
   '/api/public/google-business/callback': typeof ApiPublicGoogleBusinessCallbackRoute
+  '/api/public/integrations/callback': typeof ApiPublicIntegrationsCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -169,6 +178,7 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/api/public/removal-scan': typeof ApiPublicRemovalScanRoute
   '/api/public/google-business/callback': typeof ApiPublicGoogleBusinessCallbackRoute
+  '/api/public/integrations/callback': typeof ApiPublicIntegrationsCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -189,6 +199,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/api/public/removal-scan'
     | '/api/public/google-business/callback'
+    | '/api/public/integrations/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -207,6 +218,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/api/public/removal-scan'
     | '/api/public/google-business/callback'
+    | '/api/public/integrations/callback'
   id:
     | '__root__'
     | '/'
@@ -226,6 +238,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/api/public/removal-scan'
     | '/api/public/google-business/callback'
+    | '/api/public/integrations/callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -235,6 +248,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   ApiPublicRemovalScanRoute: typeof ApiPublicRemovalScanRoute
   ApiPublicGoogleBusinessCallbackRoute: typeof ApiPublicGoogleBusinessCallbackRoute
+  ApiPublicIntegrationsCallbackRoute: typeof ApiPublicIntegrationsCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -358,6 +372,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicGoogleBusinessCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/integrations/callback': {
+      id: '/api/public/integrations/callback'
+      path: '/api/public/integrations/callback'
+      fullPath: '/api/public/integrations/callback'
+      preLoaderRoute: typeof ApiPublicIntegrationsCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -399,6 +420,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   ApiPublicRemovalScanRoute: ApiPublicRemovalScanRoute,
   ApiPublicGoogleBusinessCallbackRoute: ApiPublicGoogleBusinessCallbackRoute,
+  ApiPublicIntegrationsCallbackRoute: ApiPublicIntegrationsCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
