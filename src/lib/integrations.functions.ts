@@ -33,6 +33,25 @@ export const listIntegrations = createServerFn({ method: "GET" })
     const member = await workspace(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { providerConfigured } = await import("@/lib/integrations/providers.server");
+    const { loadProviderCredentials, credentialHints } = await import("@/lib/integrations/credentials.server");
+    const groups = Array.from(new Set(INTEGRATIONS.map((d) => d.credentialGroup ?? d.id)));
+    const bags: Record<string, Record<string, string>> = {};
+    for (const group of groups) bags[group] = await loadProviderCredentials(supabaseAdmin, member.workspace_id, group);
+    const hints = await credentialHints(supabaseAdmin, member.workspace_id);
+    const maskedFor = (definition: (typeof INTEGRATIONS)[number]) =>
+      (definition.credentialFields ?? []).map((field) => {
+        const stored = hints.find((h) => h.provider === (definition.credentialGroup ?? definition.id) && h.field_key === field.key);
+        return {
+          key: field.key,
+          label: field.label,
+          secret: field.secret,
+          placeholder: field.placeholder ?? null,
+          hint: field.hint ?? null,
+          masked: stored?.masked_hint ?? null,
+          updatedAt: stored?.updated_at ?? null,
+          fromEnvironment: !stored && Boolean(process.env[field.key]),
+        };
+      });
     const { data, error } = await supabaseAdmin
       .from("integration_connections")
       .select(SAFE_COLUMNS)
@@ -53,7 +72,8 @@ export const listIntegrations = createServerFn({ method: "GET" })
           const row = google.data;
           return {
             provider: definition.id,
-            configured: providerConfigured(definition.id),
+            configured: providerConfigured(definition.id, bags[definition.credentialGroup ?? definition.id]),
+            credentials: maskedFor(definition),
             status: row?.status === "connected" ? "connected" : row?.last_error ? "error" : "disconnected",
             accountLabel: row?.google_account_email ?? null,
             accountRef: null,
@@ -66,7 +86,7 @@ export const listIntegrations = createServerFn({ method: "GET" })
           };
         }
         const row = rows.get(definition.id) as any;
-        const configured = providerConfigured(definition.id);
+        const configured = providerConfigured(definition.id, bags[definition.credentialGroup ?? definition.id]);
         const status =
           definition.kind === "manual"
             ? "unavailable"
@@ -76,6 +96,7 @@ export const listIntegrations = createServerFn({ method: "GET" })
         return {
           provider: definition.id,
           configured,
+          credentials: maskedFor(definition),
           status,
           accountLabel: row?.account_label ?? null,
           accountRef: row?.account_ref ?? null,
@@ -114,7 +135,10 @@ export const startIntegrationOAuth = createServerFn({ method: "POST" })
     if (!definition || definition.kind !== "oauth2") throw new Error("This integration does not use sign-in authorization.");
     const { assertAllowedOrigin, googleCallbackOrigin } = await import("@/lib/google-business.server");
     const { buildAuthorizationUrl, providerConfigured } = await import("@/lib/integrations/providers.server");
-    if (!providerConfigured(data.provider)) {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { loadProviderCredentials } = await import("@/lib/integrations/credentials.server");
+    const creds = await loadProviderCredentials(supabaseAdmin, member.workspace_id, data.provider);
+    if (!providerConfigured(data.provider, creds)) {
       throw new Error(`${definition.label} is missing its application credentials (${definition.requiredSecrets.join(", ")}).`);
     }
     const { encryptValue, hashState, pkce, randomToken } = await import("@/lib/integrations/crypto.server");
@@ -124,7 +148,6 @@ export const startIntegrationOAuth = createServerFn({ method: "POST" })
     const state = randomToken();
     const challenge = definition.id in { google_gmail: 1, youtube: 1, twitter: 1 } ? pkce() : null;
     const codes = challenge ?? { verifier: null, challenge: null };
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("integration_oauth_states").insert({
       workspace_id: member.workspace_id,
       user_id: context.userId,
@@ -142,7 +165,7 @@ export const startIntegrationOAuth = createServerFn({ method: "POST" })
       level: "info",
       message: `Authorization requested for ${definition.label}.`,
     });
-    return { authorizationUrl: buildAuthorizationUrl(data.provider, redirectUri, state, codes.challenge) };
+    return { authorizationUrl: buildAuthorizationUrl(data.provider, redirectUri, state, codes.challenge, creds) };
   });
 
 export const saveIntegrationAccount = createServerFn({ method: "POST" })
@@ -179,6 +202,8 @@ export const testIntegration = createServerFn({ method: "POST" })
     if (definition.kind === "manual") throw new Error(definition.manualReason ?? "This integration has no public API.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const providers = await import("@/lib/integrations/providers.server");
+    const { loadProviderCredentials } = await import("@/lib/integrations/credentials.server");
+    const creds = await loadProviderCredentials(supabaseAdmin, member.workspace_id, data.provider);
 
     const log = (level: string, message: string, httpStatus: number | null, eventType = "connection_test") =>
       supabaseAdmin.from("integration_events").insert({
@@ -225,8 +250,8 @@ export const testIntegration = createServerFn({ method: "POST" })
     if (definition.kind === "api_key") {
       result =
         definition.id === "trustpilot"
-          ? await providers.testTrustpilot(row?.account_ref ?? null)
-          : await providers.testTripadvisor(row?.account_ref ?? null);
+          ? await providers.testTrustpilot(row?.account_ref ?? null, creds)
+          : await providers.testTripadvisor(row?.account_ref ?? null, creds);
     } else {
       if (!row?.access_token_ciphertext) throw new Error(`${definition.label} is not connected yet.`);
       const { decryptValue, encryptValue } = await import("@/lib/integrations/crypto.server");
@@ -245,6 +270,7 @@ export const testIntegration = createServerFn({ method: "POST" })
           const refreshed = await providers.refreshAccessToken(
             data.provider,
             await decryptValue(row.refresh_token_ciphertext),
+            creds,
           );
           accessToken = refreshed.accessToken;
           await supabaseAdmin
@@ -318,4 +344,121 @@ export const disconnectIntegration = createServerFn({ method: "POST" })
       message: "Connection removed and stored credentials deleted.",
     });
     return { disconnected: true };
+  });
+
+/**
+ * Provider configuration panel: stores application credentials encrypted,
+ * validates them server-side and returns only masked values.
+ */
+export const saveProviderCredentials = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        provider: z.string(),
+        values: z.record(z.string(), z.string().max(4000)),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const member = await workspace(context);
+    requireAdmin(member);
+    const definition = integrationById(data.provider);
+    if (!definition?.credentialFields?.length) throw new Error("This integration has no configurable credentials.");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const credentials = await import("@/lib/integrations/credentials.server");
+    const providers = await import("@/lib/integrations/providers.server");
+
+    const saved = await credentials.saveProviderCredentials(
+      supabaseAdmin,
+      member.workspace_id,
+      data.provider,
+      context.userId,
+      data.values,
+    );
+    if (saved.length === 0) throw new Error("Enter at least one credential value.");
+
+    const bag = await credentials.loadProviderCredentials(supabaseAdmin, member.workspace_id, data.provider);
+    const missing = definition.requiredSecrets.filter((key) => !bag[key] && !process.env[key]);
+
+    const log = (level: string, message: string, eventType: string, httpStatus: number | null = null) =>
+      supabaseAdmin.from("integration_events").insert({
+        workspace_id: member.workspace_id,
+        provider: data.provider,
+        event_type: eventType,
+        level,
+        message: message.slice(0, 500),
+        http_status: httpStatus,
+      });
+
+    await log("info", `Credentials updated (${saved.join(", ")}) by workspace ${member.role}.`, "credentials_saved");
+
+    if (missing.length > 0) {
+      return { saved: saved.length, verified: false, message: `Still missing: ${missing.join(", ")}.` };
+    }
+
+    // API-key providers can be verified immediately with a real provider call.
+    if (definition.kind === "api_key") {
+      const { data: row } = await supabaseAdmin
+        .from("integration_connections")
+        .select("account_ref,connected_at")
+        .eq("workspace_id", member.workspace_id)
+        .eq("provider", data.provider)
+        .maybeSingle();
+      const result =
+        definition.id === "trustpilot"
+          ? await providers.testTrustpilot(row?.account_ref ?? null, bag)
+          : await providers.testTripadvisor(row?.account_ref ?? null, bag);
+      await supabaseAdmin.from("integration_connections").upsert(
+        {
+          workspace_id: member.workspace_id,
+          provider: data.provider,
+          kind: definition.kind,
+          status: result.ok ? "connected" : "error",
+          last_tested_at: new Date().toISOString(),
+          last_test_ok: result.ok,
+          last_error: result.ok ? null : result.message,
+          ...(result.label ? { account_label: result.label } : {}),
+          ...(result.accountRef ? { account_ref: result.accountRef } : {}),
+          ...(result.ok ? { connected_at: row?.connected_at ?? new Date().toISOString() } : {}),
+        },
+        { onConflict: "workspace_id,provider" },
+      );
+      await log(result.ok ? "info" : "error", result.message, "connection_test", result.status || null);
+      return { saved: saved.length, verified: result.ok, message: result.message };
+    }
+
+    return {
+      saved: saved.length,
+      verified: false,
+      message: "Credentials stored. Authorize the account to establish a live connection.",
+    };
+  });
+
+/** Removes stored application credentials (and any live connection using them). */
+export const revokeProviderCredentials = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ provider: z.string() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const member = await workspace(context);
+    requireAdmin(member);
+    const definition = integrationById(data.provider);
+    if (!definition) throw new Error("Unknown integration.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { deleteProviderCredentials } = await import("@/lib/integrations/credentials.server");
+    await deleteProviderCredentials(supabaseAdmin, member.workspace_id, data.provider);
+    await supabaseAdmin
+      .from("integration_connections")
+      .delete()
+      .eq("workspace_id", member.workspace_id)
+      .eq("provider", data.provider);
+    await supabaseAdmin.from("integration_events").insert({
+      workspace_id: member.workspace_id,
+      provider: data.provider,
+      event_type: "credentials_revoked",
+      level: "warning",
+      message: "Stored application credentials and tokens were deleted.",
+    });
+    return { revoked: true };
   });
