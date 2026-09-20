@@ -167,3 +167,100 @@ export const updateRemovalCase = createServerFn({ method: "POST" })
     if (error) throw error;
     return { ok: true };
   });
+
+async function caseWithReview(context: Ctx, workspaceId: string, caseId: string) {
+  const { data, error } = await context.supabase
+    .from("removal_cases")
+    .select(
+      "id, review_id, violation_type, rationale, appeal_text, reviews(author, rating, body, platform, location_name, external_id)",
+    )
+    .eq("id", caseId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data?.reviews) throw new Error("That removal case no longer exists.");
+  return data as any;
+}
+
+/** Writes the public holding reply that goes out while the removal appeal is pending. */
+export const draftRemovalReply = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ caseId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const workspaceId = await workspaceIdFor(context);
+    const row = await caseWithReview(context, workspaceId, data.caseId);
+    const review = row.reviews;
+
+    const { data: brand } = await context.supabase
+      .from("brand_settings")
+      .select("brand_name, industry, reply_tone, reply_signature")
+      .eq("workspace_id", workspaceId)
+      .limit(1)
+      .maybeSingle();
+
+    const system = [
+      `You write public replies to reviews on behalf of ${brand?.brand_name ?? "the business"}, a ${brand?.industry ?? "multi-location business"}.`,
+      `Tone: ${brand?.reply_tone ?? "calm-professional"}. Sign off as: ${brand?.reply_signature ?? "the customer care team"}.`,
+      "This review appears to break platform content policy and a removal request has been raised with the platform.",
+      "Rules: 35-70 words. Stay calm and factual. State politely that the business has no record matching this experience and that the review has been reported to the platform for review.",
+      "Never insult the reviewer, never accuse them of lying in harsh terms, never mention internal tools, AI, confidence scores or legal action. Never invent facts.",
+      "Return only the reply text, with no quotes or commentary.",
+    ].join("\n");
+
+    const prompt = [
+      `Platform: ${review.platform}`,
+      `Location: ${review.location_name}`,
+      `Reviewer: ${review.author}`,
+      `Rating: ${review.rating}/5`,
+      `Review: ${review.body}`,
+      `Policy issue: ${row.violation_type}`,
+      `Why: ${row.rationale}`,
+    ].join("\n");
+
+    const { runAiText } = await import("@/lib/ai-gateway.server");
+    const { output } = await runAiText(system, prompt);
+    return { reply: output.trim() };
+  });
+
+/**
+ * Publishes the reply publicly. When the review came from a connected Google
+ * Business Profile the reply is posted to Google; otherwise it is recorded only.
+ */
+export const publishRemovalReply = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ caseId: z.string().uuid(), reply: z.string().min(5).max(4000) }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const workspaceId = await workspaceIdFor(context);
+    const row = await caseWithReview(context, workspaceId, data.caseId);
+    const review = row.reviews;
+    let postedToGoogle = false;
+
+    if (review.platform === "google" && typeof review.external_id === "string" && review.external_id.startsWith("gbp:")) {
+      const { data: connection, error: connectionError } = await context.supabase
+        .from("google_business_connections")
+        .select("access_token_ciphertext,refresh_token_ciphertext,token_expires_at,status")
+        .eq("workspace_id", workspaceId)
+        .maybeSingle();
+      if (connectionError) throw connectionError;
+      if (!connection || connection.status !== "connected") {
+        throw new Error("Connect Google Business Profile before sending a reply to Google.");
+      }
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { usableAccessToken, postGoogleReviewReply } = await import("./google-business-sync.server");
+      const token = await usableAccessToken(supabaseAdmin, workspaceId, connection);
+      await postGoogleReviewReply(token, review.external_id, data.reply);
+      postedToGoogle = true;
+    }
+
+    const now = new Date().toISOString();
+    const { error: reviewError } = await context.supabase
+      .from("reviews")
+      .update({ reply: data.reply, status: "replied", replied_at: now, replied_by: context.userId })
+      .eq("id", row.review_id)
+      .eq("workspace_id", workspaceId);
+    if (reviewError) throw reviewError;
+
+    return { postedToGoogle };
+  });
