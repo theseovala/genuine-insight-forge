@@ -129,6 +129,15 @@ function Dashboard() {
       ) : (
         <div className="mb-6 grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
           <div className="card-elevated bg-gradient-hero p-6 text-primary-foreground md:p-8">
+            {summary.total === 0 ? (
+              <div className="flex min-h-48 flex-col justify-center">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-foreground/70">Verified data only</p>
+                <h2 className="mt-2 font-display text-2xl font-bold md:text-3xl">No live reviews synced yet</h2>
+                <p className="mt-2 max-w-lg text-sm text-primary-foreground/80">
+                  Connect and sync a review platform to calculate your real reputation score, alerts and trends.
+                </p>
+              </div>
+            ) : (
             <div className="flex flex-col items-center gap-7 md:flex-row md:items-center">
               <div className="rounded-full bg-white/5 p-2 backdrop-blur">
                 <ScoreRing score={summary.score} />
@@ -155,6 +164,7 @@ function Dashboard() {
                 </div>
               </div>
             </div>
+            )}
           </div>
 
           <Section
@@ -169,7 +179,11 @@ function Dashboard() {
             }
             bodyClassName="p-0"
           >
-            {openAlerts.length === 0 ? (
+            {summary.total === 0 ? (
+              <div className="p-5">
+                <EmptyState icon={ShieldAlert} title="No verified review data" description="Alerts begin after real reviews are synced." />
+              </div>
+            ) : openAlerts.length === 0 ? (
               <div className="p-5">
                 <EmptyState icon={ShieldAlert} title="No open alerts" description="Everything looks under control right now." />
               </div>

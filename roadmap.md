@@ -1,13 +1,13 @@
 # Seovale — build roadmap
 
-- [ ] STRICT DATA INTEGRITY: remove all seeded/demo/fake records and reports; show only verified live-source data and honest empty states
-- [ ] Audit every screen and metric so no placeholder, synthetic, or unverified claim is presented as real
+- [x] STRICT DATA INTEGRITY: remove all seeded/demo/fake records and reports; show only verified live-source data and honest empty states
+- [x] Audit every screen and metric so no placeholder, synthetic, or unverified claim is presented as real
 
 - [x] Locked rule: preserve the original Seovale UI/UX for every future file; import useful functionality only
 - [x] Review `orbitrep_1.zip` for feature-only reuse (no application source or reusable features were included)
 - [x] Copy the RepuVala command center app into this project
 - [x] Real backend schema (reviews, alerts, locations, platforms, competitors, reports, brand settings, profiles)
-- [ ] Remove the previously seeded review history, locations, platforms, alerts, competitors, and reports
+- [x] Remove the previously seeded review history, locations, alerts, competitors, reports, and derived scans/audits
 - [x] Email sign-up / sign-in enabled
 - [x] Rebrand everything to Seovale (titles, shell, footer, copy)
 - [x] Remove mock data; every page reads stored data
@@ -36,6 +36,6 @@
 - User shared a Hostinger VPS (187.53.134.164) and asked to deploy there. SSH password was pasted in chat — advise rotation. Lovable hosting already serves the app; evaluate safe use.
 - Done: Review Removal (auto AI policy scan, removal_cases/removal_scans, page + nav). Claude + OpenAI keys wired as AI fallbacks.
 - [ ] Move all Lovable Cloud (Supabase) data + schema to user's self-hosted Supabase on Hostinger VPS (187.53.134.164), keep app working (evaluate: code env vars, auth, RLS, migrations). Blocked on: VPS Supabase URL + keys (service role), and decision whether to keep Lovable Cloud or fully switch.
-- [ ] Fix Google 403: stored GOOGLE_BUSINESS_CLIENT_ID contains the placeholder "@secret:GOOGLE_OAUTH_CLIENT_ID" instead of the real client ID — user must re-enter real Client ID + Secret via secure form, then Connect → Allow → Sync now.
+- [ ] Complete Google authorization: real credentials are saved; Google-side Business Profile API/account approval still blocks the connection.
 
-- [ ] Review Removal priority: flagged cases ke saath auto-appeal reply + Google reply send (in progress)
+- [x] Review Removal priority: flagged cases include AI appeal replies; Google-origin replies post to Google when connected, otherwise remain saved on the review

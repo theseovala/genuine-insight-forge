@@ -72,6 +72,7 @@ export const scanReviewsForRemoval = createServerFn({ method: "POST" })
       .from("reviews")
       .select("id, author, rating, body, platform, location_name, external_created_at")
       .eq("workspace_id", workspaceId)
+      .neq("source", "seed")
       .order("external_created_at", { ascending: false })
       .limit(400);
     if (error) throw error;

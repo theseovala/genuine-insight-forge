@@ -41,6 +41,7 @@ export const evaluateAlertRules = createServerFn({ method: "POST" })
       .from("reviews")
       .select("id, rating, status, reply, location_name, body, external_created_at")
       .eq("workspace_id", workspaceId)
+      .neq("source", "seed")
       .gte("external_created_at", since)
       .order("external_created_at", { ascending: false });
     if (error) throw error;
