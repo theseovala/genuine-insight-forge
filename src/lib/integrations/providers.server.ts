@@ -393,5 +393,181 @@ export async function testTripadvisor(query: string | null, creds: CredentialBag
     message: "Tripadvisor listing resolved.",
     label: match["name"] ?? query,
     accountRef: String(match["location_id"] ?? query),
+    code: "CONNECTED",
   };
+}
+
+/* ---------- API-key providers: one live test per provider ---------- */
+
+async function simpleFetchTest(
+  url: string,
+  headers: Record<string, string>,
+  pick: (payload: Record<string, any>) => { ok: boolean; message?: string; label?: string | null; ref?: string | null },
+): Promise<TestResult> {
+  const response = await fetch(url, { headers: { accept: "application/json", ...headers } });
+  const payload = await readJson(response);
+  if (!response.ok) return failure(response, payload);
+  const picked = pick(payload);
+  if (!picked.ok) {
+    return { ok: false, status: response.status, message: picked.message ?? "Provider returned no usable record.", code: "PROVIDER_ERROR" };
+  }
+  return {
+    ok: true,
+    status: response.status,
+    message: "Live API call succeeded.",
+    label: picked.label ?? null,
+    accountRef: picked.ref ?? null,
+    code: "CONNECTED",
+  };
+}
+
+/** Routes every api_key provider to its real documented test endpoint. */
+export async function testApiKeyProvider(
+  providerId: string,
+  accountRef: string | null,
+  creds: CredentialBag = {},
+): Promise<TestResult> {
+  switch (providerId) {
+    case "trustpilot":
+      return testTrustpilot(accountRef, creds);
+    case "tripadvisor":
+      return testTripadvisor(accountRef, creds);
+    case "google_maps": {
+      const key = envValue(["GOOGLE_MAPS_API_KEY"], creds);
+      if (!key) return notConfigured("No Google Maps API key is configured.");
+      return simpleFetchTest(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent("1600 Amphitheatre Parkway, Mountain View, CA")}&key=${encodeURIComponent(key)}`,
+        {},
+        (p) => ({ ok: p["status"] === "OK", message: p["error_message"] ?? String(p["status"]), label: "Geocoding API", ref: null }),
+      );
+    }
+    case "whatsapp": {
+      const token = envValue(["WHATSAPP_ACCESS_TOKEN"], creds);
+      const phoneId = envValue(["WHATSAPP_PHONE_NUMBER_ID"], creds);
+      if (!token || !phoneId) return notConfigured("WhatsApp access token and phone number ID are required.");
+      return simpleFetchTest(
+        `https://graph.facebook.com/v21.0/${encodeURIComponent(phoneId)}?access_token=${encodeURIComponent(token)}`,
+        {},
+        (p) => ({ ok: Boolean(p["id"]), message: "Phone number not found for this token.", label: p["display_phone_number"] ?? null, ref: p["id"] ?? null }),
+      );
+    }
+    case "yelp": {
+      const key = envValue(["YELP_FUSION_API_KEY"], creds);
+      if (!key) return notConfigured("No Yelp Fusion API key is configured.");
+      if (!accountRef) return { ok: false, status: 0, message: "Add your Yelp business alias first.", code: "NOT_CONFIGURED" };
+      return simpleFetchTest(
+        `https://api.yelp.com/v3/businesses/${encodeURIComponent(accountRef)}`,
+        { Authorization: `Bearer ${key}` },
+        (p) => ({ ok: Boolean(p["id"]), message: "Yelp returned no business for that alias.", label: p["name"] ?? null, ref: p["id"] ?? null }),
+      );
+    }
+    case "semrush": {
+      const key = envValue(["SEMRUSH_API_KEY"], creds);
+      if (!key) return notConfigured("No Semrush API key is configured.");
+      return simpleFetchTest(
+        `https://api.semrush.com/?type=domain_ranks&key=${encodeURIComponent(key)}&export_columns=Dn,Rk&domain=google.com`,
+        {},
+        (p) => {
+          const row = (p["data"] ?? [])[0];
+          return { ok: Boolean(row), message: "Semrush returned no data — check the key and remaining units.", label: "Semrush Units API", ref: null };
+        },
+      );
+    }
+    case "ahrefs": {
+      const token = envValue(["AHREFS_API_TOKEN"], creds);
+      if (!token) return notConfigured("No Ahrefs API token is configured.");
+      return simpleFetchTest(
+        "https://api.ahrefs.com/v3/available-datasets",
+        { Authorization: `Bearer ${token}` },
+        (p) => ({ ok: Array.isArray(p["datasets"]), message: "Ahrefs rejected the token — API access needs an enabled plan add-on.", label: "Ahrefs API v3", ref: null }),
+      );
+    }
+    case "moz": {
+      const id = envValue(["MOZ_ACCESS_ID"], creds);
+      const secret = envValue(["MOZ_SECRET_KEY"], creds);
+      if (!id || !secret) return notConfigured("Moz access ID and secret key are required.");
+      const basic = Buffer.from(`${id}:${secret}`).toString("base64");
+      const response = await fetch("https://lsapi.seomoz.com/v2/url_metrics", {
+        method: "POST",
+        headers: { Authorization: `Basic ${basic}`, "content-type": "application/json" },
+        body: JSON.stringify({ targets: ["moz.com"] }),
+      });
+      const payload = await readJson(response);
+      if (!response.ok) return failure(response, payload);
+      const result = (payload["results"] ?? [])[0];
+      if (!result) return { ok: false, status: response.status, message: "Moz returned no metrics.", code: "PROVIDER_ERROR" };
+      return { ok: true, status: response.status, message: "Live Moz API call succeeded.", label: "Moz Links API", accountRef: null, code: "CONNECTED" };
+    }
+    case "dataforseo": {
+      const login = envValue(["DATAFORSEO_LOGIN"], creds);
+      const password = envValue(["DATAFORSEO_PASSWORD"], creds);
+      if (!login || !password) return notConfigured("DataForSEO login and password are required.");
+      const basic = Buffer.from(`${login}:${password}`).toString("base64");
+      const response = await fetch("https://api.dataforseo.com/v3/appendix/user_data", {
+        headers: { Authorization: `Basic ${basic}` },
+      });
+      const payload = await readJson(response);
+      if (!response.ok) return failure(response, payload);
+      if (payload["status_code"] !== 20000) {
+        return { ok: false, status: response.status, message: String(payload["status_message"] ?? "DataForSEO rejected the credentials.").slice(0, 300), code: "AUTHENTICATION_FAILED" };
+      }
+      return { ok: true, status: response.status, message: "Live DataForSEO API call succeeded.", label: "DataForSEO", accountRef: null, code: "CONNECTED" };
+    }
+    case "openai": {
+      const key = envValue(["OPENAI_API_KEY"], creds);
+      if (!key) return notConfigured("No OpenAI API key is configured.");
+      return simpleFetchTest("https://api.openai.com/v1/models?limit=1", { Authorization: `Bearer ${key}` }, (p) => ({
+        ok: Array.isArray(p["data"]),
+        message: "OpenAI rejected the API key.",
+        label: "OpenAI API",
+        ref: null,
+      }));
+    }
+    case "resend_email": {
+      const key = envValue(["RESEND_API_KEY"], creds);
+      if (!key) return notConfigured("No Resend API key is configured.");
+      return simpleFetchTest("https://api.resend.com/domains", { Authorization: `Bearer ${key}` }, (p) => ({
+        ok: p["object"] === "list" || Array.isArray(p["data"]),
+        message: "Resend rejected the API key.",
+        label: "Resend email API",
+        ref: null,
+      }));
+    }
+    case "twilio_sms": {
+      const sid = envValue(["TWILIO_ACCOUNT_SID"], creds);
+      const token = envValue(["TWILIO_AUTH_TOKEN"], creds);
+      if (!sid || !token) return notConfigured("Twilio account SID and auth token are required.");
+      const basic = Buffer.from(`${sid}:${token}`).toString("base64");
+      return simpleFetchTest(`https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(sid)}.json`, { Authorization: `Basic ${basic}` }, (p) => ({
+        ok: p["sid"] === sid,
+        message: "Twilio rejected the credentials.",
+        label: p["friendly_name"] ?? null,
+        ref: p["sid"] ?? null,
+      }));
+    }
+    case "stripe": {
+      const key = envValue(["STRIPE_SECRET_KEY"], creds);
+      if (!key) return notConfigured("No Stripe secret key is configured.");
+      return simpleFetchTest("https://api.stripe.com/v1/balance", { Authorization: `Bearer ${key}` }, (p) => ({
+        ok: p["object"] === "balance",
+        message: "Stripe rejected the secret key.",
+        label: "Stripe API",
+        ref: null,
+      }));
+    }
+    case "razorpay": {
+      const id = envValue(["RAZORPAY_KEY_ID"], creds);
+      const secret = envValue(["RAZORPAY_KEY_SECRET"], creds);
+      if (!id || !secret) return notConfigured("Razorpay key ID and secret are required.");
+      const basic = Buffer.from(`${id}:${secret}`).toString("base64");
+      return simpleFetchTest("https://api.razorpay.com/v1/payments?count=1", { Authorization: `Basic ${basic}` }, (p) => ({
+        ok: Array.isArray(p["items"]) || p["object"] === "collection",
+        message: "Razorpay rejected the credentials.",
+        label: "Razorpay API",
+        ref: null,
+      }));
+    }
+    default:
+      return { ok: false, status: 0, message: `No live test is defined for ${providerId}.`, code: "UNAVAILABLE" };
+  }
 }
