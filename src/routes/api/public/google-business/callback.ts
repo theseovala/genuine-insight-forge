@@ -14,7 +14,17 @@ export const Route = createFileRoute("/api/public/google-business/callback")({
         const saved = states?.[0];
         if (error || !saved) return new Response("This Google authorization link expired. Start again from Settings.", { status: 400 });
         try {
-          const tokens = await exchangeGoogleCode(code, await decryptSecret(saved.code_verifier_ciphertext), `${saved.redirect_origin}/api/public/google-business/callback`);
+          const storedVerifier = await decryptSecret(saved.code_verifier_ciphertext);
+          let verifier = storedVerifier;
+          let callbackOrigin = saved.redirect_origin;
+          try {
+            const stored = JSON.parse(storedVerifier) as { verifier?: unknown; callbackOrigin?: unknown };
+            if (typeof stored.verifier === "string") verifier = stored.verifier;
+            if (typeof stored.callbackOrigin === "string") callbackOrigin = stored.callbackOrigin;
+          } catch {
+            // Supports authorization attempts created before stable callbacks were introduced.
+          }
+          const tokens = await exchangeGoogleCode(code, verifier, `${callbackOrigin}/api/public/google-business/callback`);
           const { data: existing } = await supabaseAdmin.from("google_business_connections").select("refresh_token_ciphertext").eq("workspace_id", saved.workspace_id).maybeSingle();
           const refreshToken = tokens.refreshToken ? await encryptSecret(tokens.refreshToken) : existing?.refresh_token_ciphertext;
           if (!refreshToken) throw new Error("Google did not return offline access.");
