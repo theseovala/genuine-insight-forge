@@ -451,7 +451,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="flex min-h-screen w-full overflow-x-clip bg-background">
+      <div className="bg-ambient flex min-h-screen w-full overflow-x-clip bg-background">
         <aside
           className={cn(
             "sticky top-0 hidden h-screen shrink-0 bg-sidebar text-sidebar-foreground transition-[width] duration-300 ease-out lg:block",

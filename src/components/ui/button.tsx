@@ -10,11 +10,11 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow-[inset_0_1px_0_oklch(1_0_0_/_0.16),0_1px_2px_oklch(0_0_0_/_0.16)] hover:bg-primary/92 hover:shadow-[inset_0_1px_0_oklch(1_0_0_/_0.2),0_6px_16px_-8px_color-mix(in_oklab,var(--primary)_75%,transparent)]",
+          "bg-gradient-brand bg-primary text-primary-foreground shadow-[inset_0_1px_0_oklch(1_0_0_/_0.22),0_1px_2px_oklch(0_0_0_/_0.18),0_6px_18px_-10px_color-mix(in_oklab,var(--primary)_55%,transparent)] hover:bg-primary/92 hover:shadow-[inset_0_1px_0_oklch(1_0_0_/_0.26),0_0_0_1px_color-mix(in_oklab,var(--primary-glow)_35%,transparent),0_0_14px_-4px_color-mix(in_oklab,var(--primary-glow)_50%,transparent),0_8px_22px_-10px_color-mix(in_oklab,var(--primary)_65%,transparent)]",
         destructive:
-          "bg-destructive text-destructive-foreground shadow-[inset_0_1px_0_oklch(1_0_0_/_0.16),0_1px_2px_oklch(0_0_0_/_0.16)] hover:bg-destructive/92",
+          "bg-destructive text-destructive-foreground shadow-[inset_0_1px_0_oklch(1_0_0_/_0.18),0_1px_2px_oklch(0_0_0_/_0.18)] hover:bg-destructive/92 hover:shadow-[inset_0_1px_0_oklch(1_0_0_/_0.22),0_0_12px_-4px_color-mix(in_oklab,var(--destructive)_45%,transparent)]",
         outline:
-          "border border-input bg-card shadow-xs hover:bg-accent hover:text-accent-foreground hover:border-primary/35",
+          "border border-input bg-card shadow-xs hover:bg-accent hover:text-accent-foreground hover:border-primary/35 hover:shadow-[0_0_0_1px_color-mix(in_oklab,var(--primary)_14%,transparent),0_4px_14px_-8px_color-mix(in_oklab,var(--primary)_35%,transparent)]",
         secondary: "bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",

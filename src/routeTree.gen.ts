@@ -27,6 +27,8 @@ import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticat
 import { Route as ApiPublicRemovalScanRouteImport } from './routes/api/public/removal-scan'
 import { Route as ApiPublicGoogleBusinessCallbackRouteImport } from './routes/api/public/google-business/callback'
 import { Route as ApiPublicIntegrationsCallbackRouteImport } from './routes/api/public/integrations/callback'
+import { Route as ApiPublicIntegrationsJobsRunRouteImport } from './routes/api/public/integrations/jobs-run'
+import { Route as ApiPublicIntegrationsWebhookRouteImport } from './routes/api/public/integrations/webhook'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -120,6 +122,18 @@ const ApiPublicIntegrationsCallbackRoute =
     path: '/api/public/integrations/callback',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicIntegrationsJobsRunRoute =
+  ApiPublicIntegrationsJobsRunRouteImport.update({
+    id: '/api/public/integrations/jobs-run',
+    path: '/api/public/integrations/jobs-run',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicIntegrationsWebhookRoute =
+  ApiPublicIntegrationsWebhookRouteImport.update({
+    id: '/api/public/integrations/webhook',
+    path: '/api/public/integrations/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -139,6 +153,8 @@ export interface FileRoutesByFullPath {
   '/api/public/removal-scan': typeof ApiPublicRemovalScanRoute
   '/api/public/google-business/callback': typeof ApiPublicGoogleBusinessCallbackRoute
   '/api/public/integrations/callback': typeof ApiPublicIntegrationsCallbackRoute
+  '/api/public/integrations/jobs-run': typeof ApiPublicIntegrationsJobsRunRoute
+  '/api/public/integrations/webhook': typeof ApiPublicIntegrationsWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -158,6 +174,8 @@ export interface FileRoutesByTo {
   '/api/public/removal-scan': typeof ApiPublicRemovalScanRoute
   '/api/public/google-business/callback': typeof ApiPublicGoogleBusinessCallbackRoute
   '/api/public/integrations/callback': typeof ApiPublicIntegrationsCallbackRoute
+  '/api/public/integrations/jobs-run': typeof ApiPublicIntegrationsJobsRunRoute
+  '/api/public/integrations/webhook': typeof ApiPublicIntegrationsWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -179,6 +197,8 @@ export interface FileRoutesById {
   '/api/public/removal-scan': typeof ApiPublicRemovalScanRoute
   '/api/public/google-business/callback': typeof ApiPublicGoogleBusinessCallbackRoute
   '/api/public/integrations/callback': typeof ApiPublicIntegrationsCallbackRoute
+  '/api/public/integrations/jobs-run': typeof ApiPublicIntegrationsJobsRunRoute
+  '/api/public/integrations/webhook': typeof ApiPublicIntegrationsWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -200,6 +220,8 @@ export interface FileRouteTypes {
     | '/api/public/removal-scan'
     | '/api/public/google-business/callback'
     | '/api/public/integrations/callback'
+    | '/api/public/integrations/jobs-run'
+    | '/api/public/integrations/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -219,6 +241,8 @@ export interface FileRouteTypes {
     | '/api/public/removal-scan'
     | '/api/public/google-business/callback'
     | '/api/public/integrations/callback'
+    | '/api/public/integrations/jobs-run'
+    | '/api/public/integrations/webhook'
   id:
     | '__root__'
     | '/'
@@ -239,6 +263,8 @@ export interface FileRouteTypes {
     | '/api/public/removal-scan'
     | '/api/public/google-business/callback'
     | '/api/public/integrations/callback'
+    | '/api/public/integrations/jobs-run'
+    | '/api/public/integrations/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -249,6 +275,8 @@ export interface RootRouteChildren {
   ApiPublicRemovalScanRoute: typeof ApiPublicRemovalScanRoute
   ApiPublicGoogleBusinessCallbackRoute: typeof ApiPublicGoogleBusinessCallbackRoute
   ApiPublicIntegrationsCallbackRoute: typeof ApiPublicIntegrationsCallbackRoute
+  ApiPublicIntegrationsJobsRunRoute: typeof ApiPublicIntegrationsJobsRunRoute
+  ApiPublicIntegrationsWebhookRoute: typeof ApiPublicIntegrationsWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -379,6 +407,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicIntegrationsCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/integrations/jobs-run': {
+      id: '/api/public/integrations/jobs-run'
+      path: '/api/public/integrations/jobs-run'
+      fullPath: '/api/public/integrations/jobs-run'
+      preLoaderRoute: typeof ApiPublicIntegrationsJobsRunRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/integrations/webhook': {
+      id: '/api/public/integrations/webhook'
+      path: '/api/public/integrations/webhook'
+      fullPath: '/api/public/integrations/webhook'
+      preLoaderRoute: typeof ApiPublicIntegrationsWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -421,6 +463,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicRemovalScanRoute: ApiPublicRemovalScanRoute,
   ApiPublicGoogleBusinessCallbackRoute: ApiPublicGoogleBusinessCallbackRoute,
   ApiPublicIntegrationsCallbackRoute: ApiPublicIntegrationsCallbackRoute,
+  ApiPublicIntegrationsJobsRunRoute: ApiPublicIntegrationsJobsRunRoute,
+  ApiPublicIntegrationsWebhookRoute: ApiPublicIntegrationsWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -64,3 +64,18 @@
 - [ ] Integration overview dashboard: health, sync, webhook, usage, errors, audit log
 - [ ] Agency/client/business role isolation beyond the current workspace RLS
 - [x] Secure provider configuration panel: encrypted per-provider credential vault (integration_provider_credentials, service-role only), masked display, rotate, revoke, real server-side validation + live provider test, audit events (2026-09-20)
+
+## Enterprise backend foundation (requested 2026-09-21)
+- [x] Full provider catalogue (26 providers: Google suite, Meta/WhatsApp, reputation, SEO, AI, communication, payments) with per-provider credential schemas and honest approval/partner-only states
+- [x] Standardized outcome codes (CONNECTED, NOT_CONFIGURED, INVALID_CREDENTIALS, AUTHENTICATION_FAILED, INSUFFICIENT_SCOPE, RATE_LIMITED, PROVIDER_ERROR, APPROVAL_REQUIRED, TOKEN_EXPIRED, UNAVAILABLE) returned by every live test
+- [x] Real live-test endpoint per new api_key provider (Maps, WhatsApp, Yelp, Semrush, Ahrefs, Moz, DataForSEO, OpenAI, Resend, Twilio, Stripe, Razorpay) + OAuth entries for Pinterest, Search Console, GA4, Google Ads
+- [x] Production tables: integration_sync_jobs, integration_webhook_events, integration_api_logs, integration_usage, integration_rate_limits, integration_health, audit_logs (RLS + grants + workspace isolation)
+- [x] Durable job queue with lease, exponential backoff, dead-letter and idempotency; hourly retry backstop cron (fresh webhooks processed inline on arrival)
+- [x] Webhook receiver /api/public/integrations/webhook with signature verification (Meta/X/Trustpilot), subscription handshake, replay protection and workspace resolution
+- [x] Health + API log recording on every connection test (integration_health, integration_api_logs)
+- [x] Architecture documentation at docs/ARCHITECTURE.md (ERD, security, OAuth, webhook, queue, AI, failure handling, testing)
+- [ ] Integration overview dashboard panel reading health/usage/rate limits/errors from the new tables
+- [ ] Provider-specific usage/rate-limit extraction from real provider response headers during sync
+
+## In progress (added 20:11 UTC)
+- [x] Ultra Premium UI enhancement (done 20:2x UTC — depth tokens, bg-ambient, edge illumination, sidebar active glow, premium gradient buttons, dark-mode depth; verified desktop, 0 overflow, 0 console errors) — keep palette/fonts/layout/spacing; add depth layers, glow, card sheen, premium buttons, sidebar active glow, density, micro-animations, reduced-motion support. Inspect every major screen after.
