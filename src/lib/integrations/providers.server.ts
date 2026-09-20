@@ -354,8 +354,8 @@ export async function exchangeMetaLongLivedToken(shortLivedToken: string, creds:
 
 export async function testTrustpilot(domain: string | null, creds: CredentialBag = {}): Promise<TestResult> {
   const apiKey = envValue(["TRUSTPILOT_API_KEY"], creds);
-  if (!apiKey) return { ok: false, status: 0, message: "No Trustpilot API key is configured." };
-  if (!domain) return { ok: false, status: 0, message: "Add your Trustpilot business domain first." };
+  if (!apiKey) return notConfigured("No Trustpilot API key is configured.");
+  if (!domain) return { ok: false, status: 0, message: "Add your Trustpilot business domain first.", code: "NOT_CONFIGURED" };
   const url = new URL("https://api.trustpilot.com/v1/business-units/find");
   url.searchParams.set("name", domain);
   url.searchParams.set("apikey", apiKey);
@@ -373,8 +373,8 @@ export async function testTrustpilot(domain: string | null, creds: CredentialBag
 
 export async function testTripadvisor(query: string | null, creds: CredentialBag = {}): Promise<TestResult> {
   const apiKey = envValue(["TRIPADVISOR_API_KEY"], creds);
-  if (!apiKey) return { ok: false, status: 0, message: "No Tripadvisor API key is configured." };
-  if (!query) return { ok: false, status: 0, message: "Add your Tripadvisor listing name or location ID first." };
+  if (!apiKey) return notConfigured("No Tripadvisor API key is configured.");
+  if (!query) return { ok: false, status: 0, message: "Add your Tripadvisor listing name or location ID first.", code: "NOT_CONFIGURED" };
   const numeric = /^\d+$/.test(query);
   const url = numeric
     ? new URL(`https://api.content.tripadvisor.com/api/v1/location/${query}/details`)
