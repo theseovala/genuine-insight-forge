@@ -432,6 +432,171 @@ export type Database = {
           },
         ]
       }
+      integration_connections: {
+        Row: {
+          access_token_ciphertext: string | null
+          account_label: string | null
+          account_ref: string | null
+          api_key_ciphertext: string | null
+          connected_at: string | null
+          connected_by: string | null
+          created_at: string
+          id: string
+          kind: string
+          last_error: string | null
+          last_test_ok: boolean | null
+          last_tested_at: string | null
+          metadata: Json
+          provider: string
+          refresh_token_ciphertext: string | null
+          scopes: string[]
+          status: string
+          token_expires_at: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          access_token_ciphertext?: string | null
+          account_label?: string | null
+          account_ref?: string | null
+          api_key_ciphertext?: string | null
+          connected_at?: string | null
+          connected_by?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          last_error?: string | null
+          last_test_ok?: boolean | null
+          last_tested_at?: string | null
+          metadata?: Json
+          provider: string
+          refresh_token_ciphertext?: string | null
+          scopes?: string[]
+          status?: string
+          token_expires_at?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          access_token_ciphertext?: string | null
+          account_label?: string | null
+          account_ref?: string | null
+          api_key_ciphertext?: string | null
+          connected_at?: string | null
+          connected_by?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          last_error?: string | null
+          last_test_ok?: boolean | null
+          last_tested_at?: string | null
+          metadata?: Json
+          provider?: string
+          refresh_token_ciphertext?: string | null
+          scopes?: string[]
+          status?: string
+          token_expires_at?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_connections_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          http_status: number | null
+          id: string
+          level: string
+          message: string
+          provider: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          http_status?: number | null
+          id?: string
+          level?: string
+          message: string
+          provider: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          http_status?: number | null
+          id?: string
+          level?: string
+          message?: string
+          provider?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_oauth_states: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          payload_ciphertext: string
+          provider: string
+          redirect_origin: string
+          state_hash: string
+          used_at: string | null
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          payload_ciphertext: string
+          provider: string
+          redirect_origin: string
+          state_hash: string
+          used_at?: string | null
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          payload_ciphertext?: string
+          provider?: string
+          redirect_origin?: string
+          state_hash?: string
+          used_at?: string | null
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_oauth_states_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       locations: {
         Row: {
           city: string
@@ -971,6 +1136,27 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "google_oauth_states"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      claim_integration_oauth_state: {
+        Args: { _state_hash: string }
+        Returns: {
+          created_at: string
+          expires_at: string
+          id: string
+          payload_ciphertext: string
+          provider: string
+          redirect_origin: string
+          state_hash: string
+          used_at: string | null
+          user_id: string
+          workspace_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "integration_oauth_states"
           isOneToOne: false
           isSetofReturn: true
         }
