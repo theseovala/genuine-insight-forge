@@ -34,6 +34,8 @@ export interface IntegrationDefinition {
   credentialGroup?: string;
   /** Provider-specific credential schema shown in the configuration panel. */
   credentialFields?: CredentialField[];
+  /** Provider requires a separate approval beyond an API key (honest status). */
+  approvalRequired?: string;
 }
 
 const GOOGLE_OAUTH_FIELDS: CredentialField[] = [
@@ -62,6 +64,60 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
       { key: "GOOGLE_BUSINESS_CLIENT_ID", label: "Client ID", secret: false, placeholder: "...apps.googleusercontent.com" },
       { key: "GOOGLE_BUSINESS_CLIENT_SECRET", label: "Client secret", secret: true, placeholder: "GOCSPX-..." },
     ],
+  },
+  {
+    id: "google_maps",
+    group: "Google",
+    label: "Google Maps / Places",
+    description: "Public place data, ratings and review snippets via Places API (New).",
+    kind: "api_key",
+    requiredSecrets: ["GOOGLE_MAPS_API_KEY"],
+    scopes: [],
+    docsUrl: "https://developers.google.com/maps/documentation/places/web-service/overview",
+    credentialGroup: "google_maps",
+    credentialFields: [
+      { key: "GOOGLE_MAPS_API_KEY", label: "API key", secret: true, hint: "Enable Places API (New) + Geocoding API on the key. Server-side use only." },
+    ],
+  },
+  {
+    id: "google_search_console",
+    group: "Google",
+    label: "Google Search Console",
+    description: "Search performance and indexing data for verified properties.",
+    kind: "oauth2",
+    requiredSecrets: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET"],
+    scopes: ["https://www.googleapis.com/auth/webmasters.readonly", "openid", "email"],
+    docsUrl: "https://developers.google.com/webmaster-tools/about",
+    credentialGroup: "google_oauth",
+    credentialFields: GOOGLE_OAUTH_FIELDS,
+  },
+  {
+    id: "google_analytics",
+    group: "Google",
+    label: "Google Analytics 4",
+    description: "Traffic and audience data from the GA4 property.",
+    kind: "oauth2",
+    requiredSecrets: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET"],
+    scopes: ["https://www.googleapis.com/auth/analytics.readonly", "openid", "email"],
+    docsUrl: "https://developers.google.com/analytics/devguides/config/admin/v1",
+    credentialGroup: "google_oauth",
+    credentialFields: GOOGLE_OAUTH_FIELDS,
+  },
+  {
+    id: "google_ads",
+    group: "Google",
+    label: "Google Ads",
+    description: "Campaign performance via the Google Ads API.",
+    kind: "oauth2",
+    requiredSecrets: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_ADS_DEVELOPER_TOKEN"],
+    scopes: ["https://www.googleapis.com/auth/adwords", "openid", "email"],
+    docsUrl: "https://developers.google.com/google-ads/api/docs/start",
+    credentialGroup: "google_oauth",
+    credentialFields: [
+      ...GOOGLE_OAUTH_FIELDS,
+      { key: "GOOGLE_ADS_DEVELOPER_TOKEN", label: "Developer token", secret: true, hint: "Requires Google Ads API access approval." },
+    ],
+    approvalRequired: "Google Ads API developer tokens require an approved developer account (basic access).",
   },
   {
     id: "google_gmail",
@@ -112,6 +168,60 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     credentialFields: META_FIELDS,
   },
   {
+    id: "whatsapp",
+    group: "Meta",
+    label: "WhatsApp Business",
+    description: "WhatsApp Business Cloud API messaging and templates.",
+    kind: "api_key",
+    requiredSecrets: ["WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID"],
+    scopes: [],
+    docsUrl: "https://developers.facebook.com/docs/whatsapp/cloud-api",
+    credentialGroup: "whatsapp",
+    credentialFields: [
+      { key: "WHATSAPP_ACCESS_TOKEN", label: "Access token", secret: true, hint: "System-user token with whatsapp_business_messaging." },
+      { key: "WHATSAPP_PHONE_NUMBER_ID", label: "Phone number ID", secret: false, hint: "From the WhatsApp Business account in Meta Business." },
+    ],
+  },
+  {
+    id: "trustpilot",
+    group: "Review sites",
+    label: "Trustpilot business profile",
+    description: "Service reviews for the verified business unit.",
+    kind: "api_key",
+    requiredSecrets: ["TRUSTPILOT_API_KEY"],
+    scopes: [],
+    docsUrl: "https://documentation-apidocumentation.trustpilot.com/",
+    accountField: { label: "Business domain", hint: "e.g. seovale.com — used to resolve your Trustpilot business unit." },
+    credentialGroup: "trustpilot",
+    credentialFields: [{ key: "TRUSTPILOT_API_KEY", label: "API key", secret: true }],
+  },
+  {
+    id: "tripadvisor",
+    group: "Review sites",
+    label: "Tripadvisor business listing",
+    description: "Listing details and review summary via the Content API.",
+    kind: "api_key",
+    requiredSecrets: ["TRIPADVISOR_API_KEY"],
+    scopes: [],
+    docsUrl: "https://tripadvisor-content-api.readme.io/reference/overview",
+    accountField: { label: "Listing name or location ID", hint: "Exact business name or numeric Tripadvisor location ID." },
+    credentialGroup: "tripadvisor",
+    credentialFields: [{ key: "TRIPADVISOR_API_KEY", label: "Content API key", secret: true }],
+  },
+  {
+    id: "yelp",
+    group: "Review sites",
+    label: "Yelp Fusion",
+    description: "Business details and reviews via the Yelp Fusion API.",
+    kind: "api_key",
+    requiredSecrets: ["YELP_FUSION_API_KEY"],
+    scopes: [],
+    docsUrl: "https://docs.developer.yelp.com/docs/fusion-intro",
+    accountField: { label: "Business alias or ID", hint: "Yelp business alias, e.g. the slug from the business page URL." },
+    credentialGroup: "yelp",
+    credentialFields: [{ key: "YELP_FUSION_API_KEY", label: "API key", secret: true, hint: "Create at the Yelp Fusion dashboard." }],
+  },
+  {
     id: "reddit",
     group: "Community",
     label: "Reddit",
@@ -142,30 +252,144 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     ],
   },
   {
-    id: "trustpilot",
-    group: "Review sites",
-    label: "Trustpilot business profile",
-    description: "Service reviews for the verified business unit.",
-    kind: "api_key",
-    requiredSecrets: ["TRUSTPILOT_API_KEY"],
-    scopes: [],
-    docsUrl: "https://documentation-apidocumentation.trustpilot.com/",
-    accountField: { label: "Business domain", hint: "e.g. seovale.com — used to resolve your Trustpilot business unit." },
-    credentialGroup: "trustpilot",
-    credentialFields: [{ key: "TRUSTPILOT_API_KEY", label: "API key", secret: true }],
+    id: "pinterest",
+    group: "Community",
+    label: "Pinterest",
+    description: "Boards, pins and engagement via the Pinterest API v5.",
+    kind: "oauth2",
+    requiredSecrets: ["PINTEREST_CLIENT_ID", "PINTEREST_CLIENT_SECRET"],
+    scopes: ["boards:read", "pins:read", "user_accounts:read"],
+    docsUrl: "https://developers.pinterest.com/docs/getting-started/authentication/",
+    credentialGroup: "pinterest",
+    credentialFields: [
+      { key: "PINTEREST_CLIENT_ID", label: "App ID (Client ID)", secret: false, hint: "From the Pinterest developer app." },
+      { key: "PINTEREST_CLIENT_SECRET", label: "App secret", secret: true },
+    ],
   },
   {
-    id: "tripadvisor",
-    group: "Review sites",
-    label: "Tripadvisor business listing",
-    description: "Listing details and review summary via the Content API.",
+    id: "semrush",
+    group: "SEO",
+    label: "Semrush",
+    description: "Keyword, ranking and traffic data via the Semrush Units API.",
     kind: "api_key",
-    requiredSecrets: ["TRIPADVISOR_API_KEY"],
+    requiredSecrets: ["SEMRUSH_API_KEY"],
     scopes: [],
-    docsUrl: "https://tripadvisor-content-api.readme.io/reference/overview",
-    accountField: { label: "Listing name or location ID", hint: "Exact business name or numeric Tripadvisor location ID." },
-    credentialGroup: "tripadvisor",
-    credentialFields: [{ key: "TRIPADVISOR_API_KEY", label: "Content API key", secret: true }],
+    docsUrl: "https://developer.semrush.com/api/",
+    credentialGroup: "semrush",
+    credentialFields: [{ key: "SEMRUSH_API_KEY", label: "API key", secret: true }],
+  },
+  {
+    id: "ahrefs",
+    group: "SEO",
+    label: "Ahrefs",
+    description: "Backlinks, keywords and site data via Ahrefs API v3.",
+    kind: "api_key",
+    requiredSecrets: ["AHREFS_API_TOKEN"],
+    scopes: [],
+    docsUrl: "https://docs.ahrefs.com/reference/get-available-datasets",
+    credentialGroup: "ahrefs",
+    credentialFields: [{ key: "AHREFS_API_TOKEN", label: "API token", secret: true, hint: "API access requires an Ahrefs plan with the API add-on." }],
+    approvalRequired: "Ahrefs API access requires a plan with the API add-on enabled.",
+  },
+  {
+    id: "moz",
+    group: "SEO",
+    label: "Moz",
+    description: "Domain and page metrics via the Moz Links API v2.",
+    kind: "api_key",
+    requiredSecrets: ["MOZ_ACCESS_ID", "MOZ_SECRET_KEY"],
+    scopes: [],
+    docsUrl: "https://docs.moz.com/guides/moz-api/moz-api-reference/get-url-metrics",
+    credentialGroup: "moz",
+    credentialFields: [
+      { key: "MOZ_ACCESS_ID", label: "Access ID", secret: false },
+      { key: "MOZ_SECRET_KEY", label: "Secret key", secret: true },
+    ],
+  },
+  {
+    id: "dataforseo",
+    group: "SEO",
+    label: "DataForSEO",
+    description: "SERP, keyword and backlink APIs (pay-as-you-go).",
+    kind: "api_key",
+    requiredSecrets: ["DATAFORSEO_LOGIN", "DATAFORSEO_PASSWORD"],
+    scopes: [],
+    docsUrl: "https://docs.dataforseo.com/",
+    credentialGroup: "dataforseo",
+    credentialFields: [
+      { key: "DATAFORSEO_LOGIN", label: "API login", secret: false },
+      { key: "DATAFORSEO_PASSWORD", label: "API password", secret: true },
+    ],
+  },
+  {
+    id: "openai",
+    group: "AI",
+    label: "OpenAI",
+    description: "Direct OpenAI API access for AI features (used as a provider fallback).",
+    kind: "api_key",
+    requiredSecrets: ["OPENAI_API_KEY"],
+    scopes: [],
+    docsUrl: "https://platform.openai.com/docs/api-reference",
+    credentialGroup: "openai",
+    credentialFields: [{ key: "OPENAI_API_KEY", label: "API key", secret: true, placeholder: "sk-..." }],
+  },
+  {
+    id: "resend_email",
+    group: "Communication",
+    label: "Email (Resend)",
+    description: "Transactional email delivery for alerts and digests.",
+    kind: "api_key",
+    requiredSecrets: ["RESEND_API_KEY"],
+    scopes: [],
+    docsUrl: "https://resend.com/docs/api-reference",
+    credentialGroup: "resend_email",
+    credentialFields: [{ key: "RESEND_API_KEY", label: "API key", secret: true }],
+  },
+  {
+    id: "twilio_sms",
+    group: "Communication",
+    label: "SMS (Twilio)",
+    description: "SMS delivery for critical negative-review alerts.",
+    kind: "api_key",
+    requiredSecrets: ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN"],
+    scopes: [],
+    docsUrl: "https://www.twilio.com/docs/usage/api",
+    accountField: { label: "Sender phone number", hint: "Twilio number or sender ID used as the SMS from-address." },
+    credentialGroup: "twilio_sms",
+    credentialFields: [
+      { key: "TWILIO_ACCOUNT_SID", label: "Account SID", secret: false, placeholder: "AC..." },
+      { key: "TWILIO_AUTH_TOKEN", label: "Auth token", secret: true },
+    ],
+  },
+  {
+    id: "stripe",
+    group: "Payments",
+    label: "Stripe",
+    description: "Subscription billing and payment records.",
+    kind: "api_key",
+    requiredSecrets: ["STRIPE_SECRET_KEY"],
+    scopes: [],
+    docsUrl: "https://docs.stripe.com/api",
+    credentialGroup: "stripe",
+    credentialFields: [
+      { key: "STRIPE_SECRET_KEY", label: "Secret key", secret: true, placeholder: "sk_live_... / sk_test_..." },
+      { key: "STRIPE_WEBHOOK_SECRET", label: "Webhook signing secret", secret: true, placeholder: "whsec_..." },
+    ],
+  },
+  {
+    id: "razorpay",
+    group: "Payments",
+    label: "Razorpay",
+    description: "Indian payment gateway for subscriptions and invoices.",
+    kind: "api_key",
+    requiredSecrets: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"],
+    scopes: [],
+    docsUrl: "https://razorpay.com/docs/api/",
+    credentialGroup: "razorpay",
+    credentialFields: [
+      { key: "RAZORPAY_KEY_ID", label: "Key ID", secret: false, placeholder: "rzp_live_..." },
+      { key: "RAZORPAY_KEY_SECRET", label: "Key secret", secret: true },
+    ],
   },
   {
     id: "indeed",
@@ -178,6 +402,7 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     docsUrl: "https://docs.indeed.com/",
     manualReason:
       "Indeed does not publish a self-serve company-review API. Access requires an approved Indeed partner agreement, so this stays unconnected until credentials are granted.",
+    approvalRequired: "Indeed company-review API access requires an approved Indeed partner agreement.",
   },
   {
     id: "glassdoor",
@@ -190,6 +415,7 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     docsUrl: "https://www.glassdoor.com/developer/index.htm",
     manualReason:
       "Glassdoor closed its public review API; data access is partner-only. No connection can be established without an approved partner key.",
+    approvalRequired: "Glassdoor API access is partner-only; requires an approved Glassdoor partnership.",
   },
 ];
 
@@ -198,3 +424,16 @@ export const integrationById = (id: string) => INTEGRATIONS.find((i) => i.id ===
 export const credentialGroupOf = (id: string) => integrationById(id)?.credentialGroup ?? id;
 
 export type IntegrationStatus = "connected" | "disconnected" | "error" | "expired" | "unavailable";
+
+/** Standardized live-test outcome codes (never converted into fake success). */
+export type TestOutcomeCode =
+  | "CONNECTED"
+  | "NOT_CONFIGURED"
+  | "INVALID_CREDENTIALS"
+  | "AUTHENTICATION_FAILED"
+  | "INSUFFICIENT_SCOPE"
+  | "RATE_LIMITED"
+  | "PROVIDER_ERROR"
+  | "APPROVAL_REQUIRED"
+  | "TOKEN_EXPIRED"
+  | "UNAVAILABLE";
