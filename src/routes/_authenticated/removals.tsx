@@ -10,13 +10,24 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { currentWorkspaceId } from "@/lib/seovale-db";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   draftRemovalReply,
+  getScanSchedule,
   publishRemovalReply,
   scanReviewsForRemoval,
   updateRemovalCase,
+  updateScanSchedule,
 } from "@/lib/removal.functions";
 import { cn } from "@/lib/utils";
+
 
 function AppealReply({ caseId, onPublished }: { caseId: string; onPublished: () => void }) {
   const [reply, setReply] = useState("");
@@ -178,7 +189,135 @@ function useLastScan() {
   });
 }
 
+const INTERVALS = [
+  { value: 60, label: "Every hour" },
+  { value: 180, label: "Every 3 hours" },
+  { value: 360, label: "Every 6 hours" },
+  { value: 720, label: "Every 12 hours" },
+  { value: 1440, label: "Once a day" },
+  { value: 10080, label: "Once a week" },
+];
+
+const BATCHES = [10, 20, 40, 60, 100, 120];
+
+interface Schedule {
+  canEdit: boolean;
+  enabled: boolean;
+  intervalMinutes: number;
+  batchSize: number;
+  lastRunAt: string | null;
+  nextRunAt: string | null;
+  pausedReason: string | null;
+}
+
+function ScanSchedule() {
+  const qc = useQueryClient();
+  const read = useServerFn(getScanSchedule);
+  const save = useServerFn(updateScanSchedule);
+
+  const { data } = useQuery({
+    queryKey: ["removal_scan_schedule"],
+    queryFn: async () => (await read()) as Schedule,
+  });
+
+  const update = useMutation({
+    mutationFn: async (patch: {
+      enabled?: boolean;
+      intervalMinutes?: number;
+      batchSize?: number;
+      resume?: boolean;
+    }) => save({ data: patch }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["removal_scan_schedule"] });
+      toast.success("Automatic scan updated");
+    },
+    onError: (error: unknown) =>
+      toast.error(error instanceof Error ? error.message : "Could not save the scan schedule."),
+  });
+
+  if (!data) return null;
+  const disabled = !data.canEdit || update.isPending;
+
+  return (
+    <Section
+      title="Automatic scanning"
+      description="After new reviews sync, the scan runs on its own at the interval you choose."
+    >
+      <div className="flex flex-wrap items-end gap-4">
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <Switch
+            checked={data.enabled}
+            disabled={disabled}
+            onCheckedChange={(enabled) => update.mutate({ enabled })}
+          />
+          {data.enabled ? "On" : "Off"}
+        </label>
+
+        <div className="min-w-44">
+          <span className="mb-1 block text-xs font-semibold text-muted-foreground">How often</span>
+          <Select
+            value={String(data.intervalMinutes)}
+            disabled={disabled}
+            onValueChange={(value) => update.mutate({ intervalMinutes: Number(value) })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {INTERVALS.map((option) => (
+                <SelectItem key={option.value} value={String(option.value)}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="min-w-40">
+          <span className="mb-1 block text-xs font-semibold text-muted-foreground">
+            Reviews per run
+          </span>
+          <Select
+            value={String(data.batchSize)}
+            disabled={disabled}
+            onValueChange={(value) => update.mutate({ batchSize: Number(value) })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {BATCHES.map((size) => (
+                <SelectItem key={size} value={String(size)}>
+                  {size} reviews
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="text-xs text-muted-foreground">
+          <div>Last run: {data.lastRunAt ? new Date(data.lastRunAt).toLocaleString() : "—"}</div>
+          <div>
+            Next run:{" "}
+            {data.enabled && data.nextRunAt ? new Date(data.nextRunAt).toLocaleString() : "—"}
+          </div>
+        </div>
+      </div>
+
+      {data.pausedReason && (
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs">
+          <span className="font-semibold text-destructive">Paused: {data.pausedReason}</span>
+          <Button size="sm" variant="outline" disabled={disabled} onClick={() => update.mutate({ resume: true })}>
+            Resume scanning
+          </Button>
+        </div>
+      )}
+    </Section>
+  );
+}
+
 function RemovalsPage() {
+
   const [tab, setTab] = useState<(typeof tabs)[number]>("Flagged");
   const { data: cases = [], isLoading } = useRemovalCases();
   const { data: lastScan } = useLastScan();
@@ -188,7 +327,7 @@ function RemovalsPage() {
   const autoScanned = useRef(false);
 
   const runScan = useMutation({
-    mutationFn: async () => scan({ data: { limit: 40 } }),
+    mutationFn: async () => scan({ data: {} }),
     onSuccess: (result: { checked: number; flagged: number }) => {
       void qc.invalidateQueries({ queryKey: ["removal_cases"] });
       void qc.invalidateQueries({ queryKey: ["removal_scans", "latest"] });
@@ -264,6 +403,12 @@ function RemovalsPage() {
           sub={lastScan ? `${lastScan.reviews_flagged} flagged` : "No scan yet"}
         />
       </div>
+
+      <div className="mb-6">
+        <ScanSchedule />
+      </div>
+
+
 
       <Section
         title="Removal cases"

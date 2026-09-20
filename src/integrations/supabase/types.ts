@@ -599,6 +599,56 @@ export type Database = {
           },
         ]
       }
+      removal_scan_settings: {
+        Row: {
+          batch_size: number
+          created_at: string
+          enabled: boolean
+          id: string
+          interval_minutes: number
+          last_run_at: string | null
+          lease_expires_at: string | null
+          next_run_at: string
+          paused_reason: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          batch_size?: number
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          interval_minutes?: number
+          last_run_at?: string | null
+          lease_expires_at?: string | null
+          next_run_at?: string
+          paused_reason?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          batch_size?: number
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          interval_minutes?: number
+          last_run_at?: string | null
+          lease_expires_at?: string | null
+          next_run_at?: string
+          paused_reason?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "removal_scan_settings_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       removal_scans: {
         Row: {
           created_at: string
@@ -769,6 +819,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      scheduler_tokens: {
+        Row: {
+          created_at: string
+          name: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          name: string
+          token: string
+        }
+        Update: {
+          created_at?: string
+          name?: string
+          token?: string
+        }
+        Relationships: []
       }
       sync_runs: {
         Row: {

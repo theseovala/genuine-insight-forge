@@ -39,3 +39,5 @@
 - [ ] Complete Google authorization: real credentials are saved; Google-side Business Profile API/account approval still blocks the connection.
 
 - [x] Review Removal priority: flagged cases include AI appeal replies; Google-origin replies post to Google when connected, otherwise remain saved on the review
+
+- [x] Automatic review-removal scan schedule (interval + batch size per workspace, hourly scheduler, single-flight lease, pause on credit/access failure)
