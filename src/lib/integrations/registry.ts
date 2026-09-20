@@ -3,6 +3,16 @@
 
 export type IntegrationKind = "oauth2" | "api_key" | "managed" | "manual";
 
+export interface CredentialField {
+  /** Storage key — matches the server environment variable name. */
+  key: string;
+  label: string;
+  /** Secret values are write-only: they are never returned to the browser. */
+  secret: boolean;
+  placeholder?: string;
+  hint?: string;
+}
+
 export interface IntegrationDefinition {
   id: string;
   group: string;
@@ -17,7 +27,25 @@ export interface IntegrationDefinition {
   accountField?: { label: string; hint: string };
   /** Why a manual provider cannot be self-served. */
   manualReason?: string;
+  /**
+   * Vault bucket the credentials are stored under. Providers that share one
+   * developer application (Gmail + YouTube, Facebook + Instagram) share a group.
+   */
+  credentialGroup?: string;
+  /** Provider-specific credential schema shown in the configuration panel. */
+  credentialFields?: CredentialField[];
 }
+
+const GOOGLE_OAUTH_FIELDS: CredentialField[] = [
+  { key: "GOOGLE_OAUTH_CLIENT_ID", label: "Client ID", secret: false, placeholder: "1234567890-abc.apps.googleusercontent.com" },
+  { key: "GOOGLE_OAUTH_CLIENT_SECRET", label: "Client secret", secret: true, placeholder: "GOCSPX-..." },
+  { key: "GOOGLE_API_KEY", label: "API key (optional)", secret: true, hint: "Only needed for API-key Google endpoints." },
+];
+
+const META_FIELDS: CredentialField[] = [
+  { key: "FACEBOOK_APP_ID", label: "App ID", secret: false },
+  { key: "FACEBOOK_APP_SECRET", label: "App secret", secret: true },
+];
 
 export const INTEGRATIONS: IntegrationDefinition[] = [
   {
