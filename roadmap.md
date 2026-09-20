@@ -41,3 +41,6 @@
 - [x] Review Removal priority: flagged cases include AI appeal replies; Google-origin replies post to Google when connected, otherwise remain saved on the review
 
 - [x] Automatic review-removal scan schedule (interval + batch size per workspace, hourly scheduler, single-flight lease, pause on credit/access failure)
+- [ ] Zero-review dashboard must show real data unavailable, without derived percentages or misleading actions
+- [ ] Create immediate in-app alerts for every newly synced or updated real negative review, without duplicates
+- [ ] Automatically draft a response when a real review is opened and provide one-click copy for Google
