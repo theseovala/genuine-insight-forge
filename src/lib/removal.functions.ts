@@ -100,13 +100,12 @@ export const updateScanSchedule = createServerFn({ method: "POST" })
     const patch: Record<string, unknown> = {};
     if (data.enabled !== undefined) patch["enabled"] = data.enabled;
     if (data.intervalMinutes !== undefined) {
-      patch["intervalMinutes"] = undefined;
       patch["interval_minutes"] = data.intervalMinutes;
       patch["next_run_at"] = new Date(Date.now() + data.intervalMinutes * 60_000).toISOString();
-      delete patch["intervalMinutes"];
     }
     if (data.batchSize !== undefined) patch["batch_size"] = data.batchSize;
     if (data.resume) patch["paused_reason"] = null;
+
 
     const { data: updated, error } = await context.supabase
       .from("removal_scan_settings")
