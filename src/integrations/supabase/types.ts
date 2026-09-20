@@ -179,6 +179,47 @@ export type Database = {
           },
         ]
       }
+      audit_logs: {
+        Row: {
+          action: string
+          actor: string | null
+          created_at: string
+          id: string
+          metadata: Json
+          target_id: string | null
+          target_type: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          action: string
+          actor?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          target_id?: string | null
+          target_type?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          target_id?: string | null
+          target_type?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brand_settings: {
         Row: {
           alert_email: string | null
@@ -432,6 +473,56 @@ export type Database = {
           },
         ]
       }
+      integration_api_logs: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          endpoint: string
+          error_message: string | null
+          http_status: number | null
+          id: string
+          method: string
+          operation: string
+          outcome_code: string | null
+          provider: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          endpoint: string
+          error_message?: string | null
+          http_status?: number | null
+          id?: string
+          method?: string
+          operation: string
+          outcome_code?: string | null
+          provider: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          endpoint?: string
+          error_message?: string | null
+          http_status?: number | null
+          id?: string
+          method?: string
+          operation?: string
+          outcome_code?: string | null
+          provider?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_api_logs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integration_connections: {
         Row: {
           access_token_ciphertext: string | null
@@ -550,6 +641,47 @@ export type Database = {
           },
         ]
       }
+      integration_health: {
+        Row: {
+          last_checked_at: string
+          last_error: string | null
+          last_ok_at: string | null
+          latency_ms: number | null
+          outcome_code: string | null
+          provider: string
+          status: string
+          workspace_id: string
+        }
+        Insert: {
+          last_checked_at?: string
+          last_error?: string | null
+          last_ok_at?: string | null
+          latency_ms?: number | null
+          outcome_code?: string | null
+          provider: string
+          status: string
+          workspace_id: string
+        }
+        Update: {
+          last_checked_at?: string
+          last_error?: string | null
+          last_ok_at?: string | null
+          latency_ms?: number | null
+          outcome_code?: string | null
+          provider?: string
+          status?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_health_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integration_oauth_states: {
         Row: {
           created_at: string
@@ -634,6 +766,212 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "integration_provider_credentials_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_rate_limits: {
+        Row: {
+          id: string
+          limit_value: number | null
+          provider: string
+          recorded_at: string
+          remaining: number | null
+          reset_at: string | null
+          source: string
+          workspace_id: string
+        }
+        Insert: {
+          id?: string
+          limit_value?: number | null
+          provider: string
+          recorded_at?: string
+          remaining?: number | null
+          reset_at?: string | null
+          source?: string
+          workspace_id: string
+        }
+        Update: {
+          id?: string
+          limit_value?: number | null
+          provider?: string
+          recorded_at?: string
+          remaining?: number | null
+          reset_at?: string | null
+          source?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_rate_limits_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_sync_jobs: {
+        Row: {
+          attempts: number
+          completed_at: string | null
+          created_at: string
+          id: string
+          idempotency_key: string | null
+          job_type: string
+          last_error: string | null
+          lease_expires_at: string | null
+          max_attempts: number
+          next_attempt_at: string
+          payload: Json
+          priority: number
+          provider: string
+          started_at: string | null
+          status: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          idempotency_key?: string | null
+          job_type: string
+          last_error?: string | null
+          lease_expires_at?: string | null
+          max_attempts?: number
+          next_attempt_at?: string
+          payload?: Json
+          priority?: number
+          provider: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          idempotency_key?: string | null
+          job_type?: string
+          last_error?: string | null
+          lease_expires_at?: string | null
+          max_attempts?: number
+          next_attempt_at?: string
+          payload?: Json
+          priority?: number
+          provider?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_sync_jobs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_usage: {
+        Row: {
+          created_at: string
+          id: string
+          metric: string
+          period_end: string
+          period_start: string
+          provider: string
+          source: string
+          value: number
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metric: string
+          period_end: string
+          period_start: string
+          provider: string
+          source?: string
+          value: number
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metric?: string
+          period_end?: string
+          period_start?: string
+          provider?: string
+          source?: string
+          value?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_usage_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_webhook_events: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          event_type: string
+          headers: Json
+          id: string
+          payload: Json
+          processed_at: string | null
+          provider: string
+          provider_event_id: string | null
+          signature_valid: boolean | null
+          status: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          event_type: string
+          headers?: Json
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          provider: string
+          provider_event_id?: string | null
+          signature_valid?: boolean | null
+          status?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          event_type?: string
+          headers?: Json
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          provider?: string
+          provider_event_id?: string | null
+          signature_valid?: boolean | null
+          status?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_webhook_events_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
