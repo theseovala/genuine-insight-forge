@@ -327,7 +327,7 @@ function RemovalsPage() {
   const autoScanned = useRef(false);
 
   const runScan = useMutation({
-    mutationFn: async () => scan({ data: { limit: 40 } }),
+    mutationFn: async () => scan({ data: {} }),
     onSuccess: (result: { checked: number; flagged: number }) => {
       void qc.invalidateQueries({ queryKey: ["removal_cases"] });
       void qc.invalidateQueries({ queryKey: ["removal_scans", "latest"] });
@@ -403,6 +403,12 @@ function RemovalsPage() {
           sub={lastScan ? `${lastScan.reviews_flagged} flagged` : "No scan yet"}
         />
       </div>
+
+      <div className="mb-6">
+        <ScanSchedule />
+      </div>
+
+
 
       <Section
         title="Removal cases"
