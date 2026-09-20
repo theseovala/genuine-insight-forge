@@ -115,6 +115,31 @@ async function reviews(location: GoogleLocation, token: string, limit: number) {
   return result;
 }
 
+/**
+ * Publishes a public reply to one Google review. `externalId` is the stored
+ * `gbp:<locationId>:<reviewId>` reference; the owning account is resolved from Google.
+ */
+export async function postGoogleReviewReply(token: string, externalId: string, comment: string) {
+  const parts = externalId.split(":");
+  if (parts[0] !== "gbp" || parts.length < 3) throw new Error("This review did not come from Google Business Profile.");
+  const locationId = parts[1];
+  const reviewId = parts.slice(2).join(":");
+  let lastStatus = 0;
+  for (const account of await accounts(token)) {
+    const response = await fetch(`${REVIEWS_API}/${account}/locations/${locationId}/reviews/${reviewId}/reply`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ comment }),
+    });
+    if (response.ok) return true;
+    lastStatus = response.status;
+    if (response.status !== 404 && response.status !== 403) {
+      throw new Error(`Google rejected the reply (${response.status}).`);
+    }
+  }
+  throw new Error(`Google did not accept the reply${lastStatus ? ` (${lastStatus})` : ""}.`);
+}
+
 export async function fetchGoogleReviews(token: string, perLocation = 100) {
   const result: Array<{ location: GoogleLocation; reviews: GoogleReview[] }> = [];
   for (const account of await accounts(token)) {
