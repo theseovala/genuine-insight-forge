@@ -191,7 +191,76 @@ export const OAUTH_PROVIDERS: Record<string, OAuthProviderConfig> = {
       const payload = await readJson(response);
       if (!response.ok) return failure(response, payload);
       const user = payload["data"] ?? {};
-      return { ok: true, status: response.status, message: "Live X API call succeeded.", label: user["username"] ? `@${user["username"]}` : null, accountRef: user["id"] ?? null };
+      return { ok: true, status: response.status, message: "Live X API call succeeded.", label: user["username"] ? `@${user["username"]}` : null, accountRef: user["id"] ?? null, code: "CONNECTED" };
+    },
+  },
+  pinterest: {
+    authUrl: "https://www.pinterest.com/oauth/",
+    tokenUrl: "https://api.pinterest.com/v5/oauth/token",
+    clientIdEnv: ["PINTEREST_CLIENT_ID"],
+    clientSecretEnv: ["PINTEREST_CLIENT_SECRET"],
+    usePkce: true,
+    tokenAuth: "basic",
+    test: async (token) => {
+      const response = await fetch("https://api.pinterest.com/v5/user_account", { headers: { Authorization: `Bearer ${token}` } });
+      const payload = await readJson(response);
+      if (!response.ok) return failure(response, payload);
+      return {
+        ok: true,
+        status: response.status,
+        message: "Live Pinterest API call succeeded.",
+        label: payload["username"] ? `@${payload["username"]}` : null,
+        accountRef: payload["id"] ?? null,
+        code: "CONNECTED",
+      };
+    },
+  },
+  google_search_console: {
+    authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+    tokenUrl: "https://oauth2.googleapis.com/token",
+    clientIdEnv: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_BUSINESS_CLIENT_ID"],
+    clientSecretEnv: ["GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_BUSINESS_CLIENT_SECRET"],
+    usePkce: true,
+    tokenAuth: "body",
+    extraAuthParams: { access_type: "offline", prompt: "consent select_account", include_granted_scopes: "true" },
+    test: (token) =>
+      googleTest("https://www.googleapis.com/webmasters/v3/sites", token, (p) => {
+        const site = (p["siteEntry"] ?? [])[0];
+        return { label: site?.["siteUrl"] ?? null, ref: site?.["siteUrl"] ?? null };
+      }),
+  },
+  google_analytics: {
+    authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+    tokenUrl: "https://oauth2.googleapis.com/token",
+    clientIdEnv: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_BUSINESS_CLIENT_ID"],
+    clientSecretEnv: ["GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_BUSINESS_CLIENT_SECRET"],
+    usePkce: true,
+    tokenAuth: "body",
+    extraAuthParams: { access_type: "offline", prompt: "consent select_account", include_granted_scopes: "true" },
+    test: (token) =>
+      googleTest("https://analyticsadmin.googleapis.com/v1beta/accountSummaries?pageSize=1", token, (p) => {
+        const account = (p["accountSummaries"] ?? [])[0];
+        return { label: account?.["displayName"] ?? null, ref: account?.["name"] ?? null };
+      }),
+  },
+  google_ads: {
+    authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+    tokenUrl: "https://oauth2.googleapis.com/token",
+    clientIdEnv: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_BUSINESS_CLIENT_ID"],
+    clientSecretEnv: ["GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_BUSINESS_CLIENT_SECRET"],
+    usePkce: true,
+    tokenAuth: "body",
+    extraAuthParams: { access_type: "offline", prompt: "consent select_account", include_granted_scopes: "true" },
+    test: async (token) => {
+      const devToken = envValue(["GOOGLE_ADS_DEVELOPER_TOKEN"]);
+      if (!devToken) return notConfigured("A Google Ads developer token is required (Google Ads API access approval).");
+      const response = await fetch("https://googleads.googleapis.com/v17/customers:listAccessibleCustomers", {
+        headers: { Authorization: `Bearer ${token}`, "developer-token": devToken },
+      });
+      const payload = await readJson(response);
+      if (!response.ok) return failure(response, payload);
+      const first = (payload["resourceNames"] ?? [])[0];
+      return { ok: true, status: response.status, message: "Live Google Ads API call succeeded.", label: first ?? null, accountRef: first ?? null, code: "CONNECTED" };
     },
   },
 };
