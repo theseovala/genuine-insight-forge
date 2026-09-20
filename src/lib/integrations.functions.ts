@@ -146,7 +146,7 @@ export const startIntegrationOAuth = createServerFn({ method: "POST" })
     const callbackOrigin = googleCallbackOrigin(origin);
     const redirectUri = `${callbackOrigin}/api/public/integrations/callback`;
     const state = randomToken();
-    const challenge = definition.id in { google_gmail: 1, youtube: 1, twitter: 1 } ? pkce() : null;
+    const challenge = definition.id in { google_gmail: 1, youtube: 1, twitter: 1, pinterest: 1 } ? pkce() : null;
     const codes = challenge ?? { verifier: null, challenge: null };
     const { error } = await supabaseAdmin.from("integration_oauth_states").insert({
       workspace_id: member.workspace_id,
@@ -248,10 +248,7 @@ export const testIntegration = createServerFn({ method: "POST" })
     let result: TestResult;
 
     if (definition.kind === "api_key") {
-      result =
-        definition.id === "trustpilot"
-          ? await providers.testTrustpilot(row?.account_ref ?? null, creds)
-          : await providers.testTripadvisor(row?.account_ref ?? null, creds);
+      result = await providers.testApiKeyProvider(definition.id, row?.account_ref ?? null, creds);
     } else {
       if (!row?.access_token_ciphertext) throw new Error(`${definition.label} is not connected yet.`);
       const { decryptValue, encryptValue } = await import("@/lib/integrations/crypto.server");
@@ -406,10 +403,7 @@ export const saveProviderCredentials = createServerFn({ method: "POST" })
         .eq("workspace_id", member.workspace_id)
         .eq("provider", data.provider)
         .maybeSingle();
-      const result =
-        definition.id === "trustpilot"
-          ? await providers.testTrustpilot(row?.account_ref ?? null, bag)
-          : await providers.testTripadvisor(row?.account_ref ?? null, bag);
+      const result = await providers.testApiKeyProvider(definition.id, row?.account_ref ?? null, bag);
       await supabaseAdmin.from("integration_connections").upsert(
         {
           workspace_id: member.workspace_id,
