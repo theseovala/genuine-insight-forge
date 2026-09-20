@@ -1,16 +1,19 @@
 # Seovale — build roadmap
 
+- [ ] STRICT DATA INTEGRITY: remove all seeded/demo/fake records and reports; show only verified live-source data and honest empty states
+- [ ] Audit every screen and metric so no placeholder, synthetic, or unverified claim is presented as real
+
 - [x] Locked rule: preserve the original Seovale UI/UX for every future file; import useful functionality only
 - [x] Review `orbitrep_1.zip` for feature-only reuse (no application source or reusable features were included)
 - [x] Copy the RepuVala command center app into this project
 - [x] Real backend schema (reviews, alerts, locations, platforms, competitors, reports, brand settings, profiles)
-- [x] Realistic seeded review history (260 reviews, 6 locations, 6 platforms, 12 months)
+- [ ] Remove the previously seeded review history, locations, platforms, alerts, competitors, and reports
 - [x] Email sign-up / sign-in enabled
 - [x] Rebrand everything to Seovale (titles, shell, footer, copy)
 - [x] Remove mock data; every page reads stored data
 - [x] Real auth flow: public landing at /, /auth sign-in + sign-up, app behind an authenticated layout
 - [x] Real AI (Lovable AI Gateway): reply writing, review analysis, report summaries
-- [x] Deep end-to-end recheck of every page, action and number
+- [ ] Deep end-to-end recheck of every page, action and number after fake-data cleanup
   - [x] Feedback theme trends only shown when there is enough data to compare
   - [x] Publish reply, resolve alert, settings save and report generation all verified writing to the backend
   - [x] AI reply writing, feedback briefing and report writing verified live
