@@ -12,7 +12,9 @@ import {
   Loader2,
   ExternalLink,
   RefreshCw,
+  Boxes,
 } from "lucide-react";
+import { IntegrationManager } from "@/components/app/IntegrationManager";
 import { AppShell } from "@/components/app/AppShell";
 import { PageHeader, Section, PlatformIcon, StatusBadge, EmptyState } from "@/components/app/primitives";
 import { Button } from "@/components/ui/button";
@@ -53,6 +55,7 @@ export const Route = createFileRoute("/_authenticated/settings")({
 const tabs = [
   { id: "business", label: "Business profile", icon: Building2 },
   { id: "platforms", label: "Connected platforms", icon: Plug },
+  { id: "integrations", label: "Integration manager", icon: Boxes },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "locations", label: "Locations", icon: MapPin },
   { id: "account", label: "Account", icon: CreditCard },
