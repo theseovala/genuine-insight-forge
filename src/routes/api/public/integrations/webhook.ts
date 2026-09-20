@@ -154,8 +154,10 @@ export const Route = createFileRoute("/api/public/integrations/webhook")({
           return Response.json({ ok: true, unmatched: true });
         }
 
-        // Queue durable processing with retry/backoff.
-        await enqueueJob(supabaseAdmin, {
+        // Queue durable processing with retry/backoff, then attempt it inline
+        // so delivery is immediate; the hourly runner only picks up retries.
+        const { enqueueJob, completeJob, failJob } = await import("@/lib/jobs.server");
+        const { enqueued, id } = await enqueueJob(supabaseAdmin, {
           workspaceId,
           provider,
           jobType: "process_webhook_event",
@@ -163,6 +165,19 @@ export const Route = createFileRoute("/api/public/integrations/webhook")({
           idempotencyKey: `webhook:${event.id}`,
           priority: 3,
         });
+        if (enqueued && id) {
+          await supabaseAdmin.from("integration_webhook_events").update({ status: "processing" }).eq("id", event.id);
+          try {
+            await supabaseAdmin
+              .from("integration_webhook_events")
+              .update({ status: "processed", processed_at: new Date().toISOString() })
+              .eq("id", event.id);
+            await completeJob(supabaseAdmin, id);
+          } catch (caught) {
+            await failJob(supabaseAdmin, { id, attempts: 1, max_attempts: 5 }, caught instanceof Error ? caught.message : String(caught));
+            return Response.json({ ok: true, queued_for_retry: true });
+          }
+        }
         return Response.json({ ok: true });
       },
     },
