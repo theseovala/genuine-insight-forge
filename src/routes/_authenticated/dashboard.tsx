@@ -218,8 +218,8 @@ function Dashboard() {
         <StatCard label="Average rating" value={summary.avgRating || "—"} sub="Across all platforms" trend={ratingTrendVal} icon={Star} tone="rating">
           <Stars value={summary.avgRating} className="mt-3" />
         </StatCard>
-        <StatCard label="Total reviews" value={summary.total.toLocaleString()} sub={`${summary.sentiment.positive}% positive`} icon={MessagesSquare} tone="primary" />
-        <StatCard label="Response rate" value={`${summary.responseRate}%`} sub={`${summary.unanswered} unanswered`} icon={Timer} tone="positive" />
+        <StatCard label="Total reviews" value={summary.total.toLocaleString()} sub={summary.total ? `${summary.sentiment.positive}% positive` : "No verified reviews"} icon={MessagesSquare} tone="primary" />
+        <StatCard label="Response rate" value={summary.total ? `${summary.responseRate}%` : "—"} sub={summary.total ? `${summary.unanswered} unanswered` : "No verified reviews"} icon={Timer} tone="positive" />
         <StatCard label="Open alerts" value={openAlerts.length} sub={`${connectedCount} platforms connected`} icon={ShieldAlert} tone="negative" />
       </div>
 
@@ -256,6 +256,10 @@ function Dashboard() {
         </Section>
 
         <Section title="Sentiment overview" description="All tracked reviews">
+          {summary.total === 0 ? (
+            <EmptyState icon={MessagesSquare} title="No sentiment data" description="Sentiment appears after verified reviews are synced." />
+          ) : (
+          <>
           <div className="flex items-baseline gap-2">
             <span className="font-display text-3xl font-bold">{summary.sentiment.positive}%</span>
             <span className="text-sm text-muted-foreground">positive</span>
@@ -285,6 +289,8 @@ function Dashboard() {
               </BarChart>
             </ResponsiveContainer>
           </div>
+          </>
+          )}
         </Section>
       </div>
 
@@ -378,15 +384,22 @@ function Dashboard() {
           <Sparkles className="size-5" />
         </span>
         <div className="flex-1">
-          <h3 className="font-display text-base font-bold">What should you do next?</h3>
+          <h3 className="font-display text-base font-bold">{summary.total ? "What should you do next?" : "Connect your first live source"}</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Follow the Seovale journey: Dashboard → Alert → Review → Analysis → Action → Report.
-            Start with your open alerts, then clear the response queue.
+            {summary.total
+              ? "Follow the Seovale journey: Dashboard → Alert → Review → Analysis → Action → Report. Start with your open alerts, then clear the response queue."
+              : "Real reviews, alerts, analysis and reports will appear only after a verified platform sync completes."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" asChild><Link to="/analytics">Analyse trend</Link></Button>
-          <Button asChild><Link to="/alerts">Start with alerts <ArrowRight /></Link></Button>
+          {summary.total ? (
+            <>
+              <Button variant="outline" asChild><Link to="/analytics">Analyse trend</Link></Button>
+              <Button asChild><Link to="/alerts">Start with alerts <ArrowRight /></Link></Button>
+            </>
+          ) : (
+            <Button asChild><Link to="/settings">Connect platform <ArrowRight /></Link></Button>
+          )}
         </div>
       </div>
     </AppShell>
