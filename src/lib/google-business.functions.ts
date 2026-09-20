@@ -34,7 +34,10 @@ export const startGoogleBusinessConnection = createServerFn({ method: "POST" })
     const { assertAllowedOrigin, createGoogleAuthorization, encryptSecret, googleCallbackOrigin, hashValue } = await import("./google-business.server");
     const origin = assertAllowedOrigin(data.origin);
     const callbackOrigin = googleCallbackOrigin(origin);
-    const auth = createGoogleAuthorization(`${callbackOrigin}/api/public/google-business/callback`);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { loadProviderCredentials } = await import("./integrations/credentials.server");
+    const googleCreds = await loadProviderCredentials(supabaseAdmin, member.workspace_id, "google_business");
+    const auth = createGoogleAuthorization(`${callbackOrigin}/api/public/google-business/callback`, googleCreds);
     const { error } = await context.supabase.from("google_oauth_states").insert({
       workspace_id: member.workspace_id,
       user_id: context.userId,

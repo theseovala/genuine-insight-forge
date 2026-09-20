@@ -24,7 +24,9 @@ export const Route = createFileRoute("/api/public/google-business/callback")({
           } catch {
             // Supports authorization attempts created before stable callbacks were introduced.
           }
-          const tokens = await exchangeGoogleCode(code, verifier, `${callbackOrigin}/api/public/google-business/callback`);
+          const { loadProviderCredentials } = await import("@/lib/integrations/credentials.server");
+          const googleCreds = await loadProviderCredentials(supabaseAdmin, saved.workspace_id, "google_business");
+          const tokens = await exchangeGoogleCode(code, verifier, `${callbackOrigin}/api/public/google-business/callback`, googleCreds);
           const { data: existing } = await supabaseAdmin.from("google_business_connections").select("refresh_token_ciphertext").eq("workspace_id", saved.workspace_id).maybeSingle();
           const refreshToken = tokens.refreshToken ? await encryptSecret(tokens.refreshToken) : existing?.refresh_token_ciphertext;
           if (!refreshToken) throw new Error("Google did not return offline access.");
