@@ -210,12 +210,20 @@ function PlatformsTab() {
     mutationFn: ({ authWindow }: { authWindow: Window | null }) =>
       startFn({ data: { origin: window.location.origin } }).then((result) => ({ ...result, authWindow })),
     onSuccess: ({ authorizationUrl, authWindow }) => {
+      // Preferred: navigate the pre-opened popup (keeps popup blockers happy).
+      // Sandboxed preview iframes cannot navigate another window — fall back to
+      // opening the URL directly, then to a full-tab redirect.
       if (authWindow && !authWindow.closed) {
-        authWindow.opener = null;
-        authWindow.location.href = authorizationUrl;
-        return;
+        try {
+          authWindow.opener = null;
+          authWindow.location.href = authorizationUrl;
+          return;
+        } catch {
+          authWindow.close();
+        }
       }
-      window.location.assign(authorizationUrl);
+      const popup = window.open(authorizationUrl, "_blank", "noopener,noreferrer");
+      if (!popup) window.location.assign(authorizationUrl);
     },
     onError: (error: Error, { authWindow }) => {
       authWindow?.close();
