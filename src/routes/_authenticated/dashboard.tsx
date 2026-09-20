@@ -20,6 +20,7 @@ import {
   Bar,
 } from "recharts";
 import { AppShell } from "@/components/app/AppShell";
+import { IntegrationStatusStrip } from "@/components/app/IntegrationStatusStrip";
 import {
   PageHeader,
   StatCard,

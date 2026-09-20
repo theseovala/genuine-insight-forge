@@ -16,21 +16,7 @@ import {
   testIntegration,
 } from "@/lib/integrations.functions";
 
-const statusLabel: Record<string, string> = {
-  connected: "Connected",
-  disconnected: "Disconnected",
-  error: "Error",
-  expired: "Expired",
-  unavailable: "Unavailable",
-};
-
-const statusTone: Record<string, string> = {
-  connected: "bg-positive-soft text-positive",
-  disconnected: "bg-neutral-soft text-muted-foreground",
-  error: "bg-negative-soft text-negative",
-  expired: "bg-warning-soft text-rating-foreground",
-  unavailable: "bg-secondary text-secondary-foreground",
-};
+import { integrationStatusLabel as statusLabel, integrationStatusTone as statusTone } from "@/lib/integrations/status";
 
 function openAuthorization(url: string) {
   const popup = window.open(url, "_blank", "noopener,noreferrer");
