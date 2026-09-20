@@ -26,9 +26,12 @@ export interface OAuthProviderConfig {
 
 const USER_AGENT = "Seovale/1.0 (reputation monitoring)";
 
-export function envValue(names: string[]) {
+export type CredentialBag = Record<string, string>;
+
+/** Vault credentials win over the server environment fallback. */
+export function envValue(names: string[], creds: CredentialBag = {}) {
   for (const name of names) {
-    const value = process.env[name];
+    const value = creds[name] ?? process.env[name];
     if (value) return value;
   }
   return undefined;
@@ -168,19 +171,19 @@ export const OAUTH_PROVIDERS: Record<string, OAuthProviderConfig> = {
   },
 };
 
-export function providerConfigured(providerId: string) {
+export function providerConfigured(providerId: string, creds: CredentialBag = {}) {
   const oauth = OAUTH_PROVIDERS[providerId];
-  if (oauth) return Boolean(envValue(oauth.clientIdEnv) && envValue(oauth.clientSecretEnv));
+  if (oauth) return Boolean(envValue(oauth.clientIdEnv, creds) && envValue(oauth.clientSecretEnv, creds));
   const definition = integrationById(providerId);
   if (!definition || definition.requiredSecrets.length === 0) return false;
-  return definition.requiredSecrets.every((name) => Boolean(process.env[name]));
+  return definition.requiredSecrets.every((name) => Boolean(creds[name] ?? process.env[name]));
 }
 
-export function buildAuthorizationUrl(providerId: string, redirectUri: string, state: string, challenge: string | null) {
+export function buildAuthorizationUrl(providerId: string, redirectUri: string, state: string, challenge: string | null, creds: CredentialBag = {}) {
   const config = OAUTH_PROVIDERS[providerId];
   const definition = integrationById(providerId);
   if (!config || !definition) throw new Error("This integration does not support OAuth.");
-  const clientId = envValue(config.clientIdEnv);
+  const clientId = envValue(config.clientIdEnv, creds);
   if (!clientId) throw new Error(`${config.clientIdEnv[0]} is not configured.`);
   const url = new URL(config.authUrl);
   url.searchParams.set("client_id", clientId);
@@ -196,11 +199,11 @@ export function buildAuthorizationUrl(providerId: string, redirectUri: string, s
   return url.toString();
 }
 
-async function tokenRequest(providerId: string, body: URLSearchParams) {
+async function tokenRequest(providerId: string, body: URLSearchParams, creds: CredentialBag = {}) {
   const config = OAUTH_PROVIDERS[providerId];
   if (!config) throw new Error("Unknown OAuth integration.");
-  const clientId = envValue(config.clientIdEnv);
-  const clientSecret = envValue(config.clientSecretEnv);
+  const clientId = envValue(config.clientIdEnv, creds);
+  const clientSecret = envValue(config.clientSecretEnv, creds);
   if (!clientId || !clientSecret) throw new Error("This integration is missing its application credentials.");
   const headers: Record<string, string> = { "content-type": "application/x-www-form-urlencoded", ...(config.headers ?? {}) };
   if (config.tokenAuth === "basic") {
@@ -224,20 +227,20 @@ async function tokenRequest(providerId: string, body: URLSearchParams) {
   };
 }
 
-export function exchangeCode(providerId: string, code: string, verifier: string | null, redirectUri: string) {
+export function exchangeCode(providerId: string, code: string, verifier: string | null, redirectUri: string, creds: CredentialBag = {}) {
   const body = new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: redirectUri });
   if (verifier) body.set("code_verifier", verifier);
-  return tokenRequest(providerId, body);
+  return tokenRequest(providerId, body, creds);
 }
 
-export function refreshAccessToken(providerId: string, refreshToken: string) {
-  return tokenRequest(providerId, new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken }));
+export function refreshAccessToken(providerId: string, refreshToken: string, creds: CredentialBag = {}) {
+  return tokenRequest(providerId, new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken }), creds);
 }
 
 /** Long-lived Meta user token (60 days) — short-lived tokens expire in ~1 hour. */
-export async function exchangeMetaLongLivedToken(shortLivedToken: string) {
-  const clientId = process.env["FACEBOOK_APP_ID"];
-  const clientSecret = process.env["FACEBOOK_APP_SECRET"];
+export async function exchangeMetaLongLivedToken(shortLivedToken: string, creds: CredentialBag = {}) {
+  const clientId = envValue(["FACEBOOK_APP_ID"], creds);
+  const clientSecret = envValue(["FACEBOOK_APP_SECRET"], creds);
   if (!clientId || !clientSecret) return null;
   const url = new URL("https://graph.facebook.com/v21.0/oauth/access_token");
   url.searchParams.set("grant_type", "fb_exchange_token");
@@ -255,9 +258,9 @@ export async function exchangeMetaLongLivedToken(shortLivedToken: string) {
 
 /* ---------- API-key providers ---------- */
 
-export async function testTrustpilot(domain: string | null): Promise<TestResult> {
-  const apiKey = process.env["TRUSTPILOT_API_KEY"];
-  if (!apiKey) return { ok: false, status: 0, message: "TRUSTPILOT_API_KEY is not configured." };
+export async function testTrustpilot(domain: string | null, creds: CredentialBag = {}): Promise<TestResult> {
+  const apiKey = envValue(["TRUSTPILOT_API_KEY"], creds);
+  if (!apiKey) return { ok: false, status: 0, message: "No Trustpilot API key is configured." };
   if (!domain) return { ok: false, status: 0, message: "Add your Trustpilot business domain first." };
   const url = new URL("https://api.trustpilot.com/v1/business-units/find");
   url.searchParams.set("name", domain);
@@ -274,9 +277,9 @@ export async function testTrustpilot(domain: string | null): Promise<TestResult>
   };
 }
 
-export async function testTripadvisor(query: string | null): Promise<TestResult> {
-  const apiKey = process.env["TRIPADVISOR_API_KEY"];
-  if (!apiKey) return { ok: false, status: 0, message: "TRIPADVISOR_API_KEY is not configured." };
+export async function testTripadvisor(query: string | null, creds: CredentialBag = {}): Promise<TestResult> {
+  const apiKey = envValue(["TRIPADVISOR_API_KEY"], creds);
+  if (!apiKey) return { ok: false, status: 0, message: "No Tripadvisor API key is configured." };
   if (!query) return { ok: false, status: 0, message: "Add your Tripadvisor listing name or location ID first." };
   const numeric = /^\d+$/.test(query);
   const url = numeric

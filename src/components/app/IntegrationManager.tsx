@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Loader2, ExternalLink, ShieldCheck, Activity, KeyRound, Plug } from "lucide-react";
+import { Loader2, ExternalLink, ShieldCheck, Activity, KeyRound, Plug, Lock, RotateCcw, Trash2, Copy, ChevronDown } from "lucide-react";
 import { Section, StatusBadge, EmptyState } from "@/components/app/primitives";
 import { Button } from "@/components/ui/button";
 import { relativeTime } from "@/lib/seovale-db";
@@ -11,16 +11,165 @@ import {
   disconnectIntegration,
   listIntegrationEvents,
   listIntegrations,
+  revokeProviderCredentials,
   saveIntegrationAccount,
+  saveProviderCredentials,
   startIntegrationOAuth,
   testIntegration,
 } from "@/lib/integrations.functions";
+import type { IntegrationDefinition } from "@/lib/integrations/registry";
 
 import { integrationStatusLabel as statusLabel, integrationStatusTone as statusTone } from "@/lib/integrations/status";
 
 function openAuthorization(url: string) {
   const popup = window.open(url, "_blank", "noopener,noreferrer");
   if (!popup) window.location.assign(url);
+}
+
+
+type MaskedCredential = {
+  key: string;
+  label: string;
+  secret: boolean;
+  placeholder: string | null;
+  hint: string | null;
+  masked: string | null;
+  updatedAt: string | null;
+  fromEnvironment: boolean;
+};
+
+/** Secure provider configuration: write-only inputs, masked stored values. */
+function CredentialPanel({
+  definition,
+  credentials,
+  onChanged,
+}: {
+  definition: IntegrationDefinition;
+  credentials: MaskedCredential[];
+  onChanged: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const saveCredsFn = useServerFn(saveProviderCredentials);
+  const revokeCredsFn = useServerFn(revokeProviderCredentials);
+
+  const redirectUri =
+    definition.kind === "managed"
+      ? `${typeof window === "undefined" ? "" : window.location.origin}/api/public/google-business/callback`
+      : `${typeof window === "undefined" ? "" : window.location.origin}/api/public/integrations/callback`;
+
+  const saveCreds = useMutation({
+    mutationFn: () => saveCredsFn({ data: { provider: definition.id, values } }),
+    onSuccess: (result) => {
+      setValues({});
+      if (result.verified) toast.success(result.message);
+      else toast.message(result.message);
+      onChanged();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const revokeCreds = useMutation({
+    mutationFn: () => revokeCredsFn({ data: { provider: definition.id } }),
+    onSuccess: () => {
+      setValues({});
+      toast.success("Stored credentials and tokens deleted");
+      onChanged();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  return (
+    <div className="mt-3 rounded-lg border bg-muted/20">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
+      >
+        <Lock className="size-3.5" />
+        Provider credentials
+        <span className="font-normal">
+          {credentials.some((c) => c.masked || c.fromEnvironment) ? "· configured" : "· Not Configured"}
+        </span>
+        <ChevronDown className={`ml-auto size-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="space-y-3 border-t p-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {credentials.map((field) => (
+              <label key={field.key} className="block">
+                <span className="mb-1.5 flex items-center justify-between text-xs font-semibold text-muted-foreground">
+                  <span>{field.label}</span>
+                  <span className="font-normal">
+                    {field.masked
+                      ? `${field.secret ? field.masked : field.masked} · updated ${field.updatedAt ? relativeTime(field.updatedAt) : ""}`
+                      : field.fromEnvironment
+                        ? "set in server secrets"
+                        : "Not Configured"}
+                  </span>
+                </span>
+                <input
+                  type={field.secret ? "password" : "text"}
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={values[field.key] ?? ""}
+                  placeholder={field.placeholder ?? (field.masked ? "Enter a new value to rotate" : "")}
+                  onChange={(e) => setValues((v) => ({ ...v, [field.key]: e.target.value }))}
+                  className="h-10 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring/40"
+                />
+                {field.hint && <span className="mt-1 block text-[11px] text-muted-foreground">{field.hint}</span>}
+              </label>
+            ))}
+          </div>
+
+          <div className="rounded-lg border border-dashed px-3 py-2">
+            <p className="text-[11px] font-semibold text-muted-foreground">Authorized redirect URI</p>
+            <div className="mt-1 flex items-center gap-2">
+              <code className="min-w-0 flex-1 truncate text-[11px]">{redirectUri}</code>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  void navigator.clipboard.writeText(redirectUri);
+                  toast.success("Redirect URI copied");
+                }}
+              >
+                <Copy className="size-3.5" />
+              </Button>
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Register this exact URI in the provider console before authorizing.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              disabled={saveCreds.isPending || Object.values(values).every((v) => !v.trim())}
+              onClick={() => saveCreds.mutate()}
+            >
+              {saveCreds.isPending ? <Loader2 className="animate-spin" /> : <ShieldCheck />}
+              {credentials.some((c) => c.masked) ? "Rotate & verify" : "Save & verify"}
+            </Button>
+            {credentials.some((c) => c.masked) && (
+              <>
+                <Button size="sm" variant="outline" onClick={() => setValues({})} disabled={saveCreds.isPending}>
+                  <RotateCcw /> Clear form
+                </Button>
+                <Button size="sm" variant="ghost" disabled={revokeCreds.isPending} onClick={() => revokeCreds.mutate()}>
+                  {revokeCreds.isPending ? <Loader2 className="animate-spin" /> : <Trash2 />} Revoke credentials
+                </Button>
+              </>
+            )}
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Values are encrypted on the server before storage. Saved secrets are never sent back to this page — only the last four
+            characters are shown.
+          </p>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function IntegrationManager() {
@@ -248,6 +397,14 @@ export function IntegrationManager() {
                       )}
                     </div>
                   </div>
+
+                  {isAdmin && (definition.credentialFields?.length ?? 0) > 0 && (
+                    <CredentialPanel
+                      definition={definition}
+                      credentials={(item?.credentials ?? []) as MaskedCredential[]}
+                      onChanged={refresh}
+                    />
+                  )}
 
                   {definition.kind === "api_key" && isAdmin && (
                     <div className="mt-3 flex flex-wrap items-end gap-2">

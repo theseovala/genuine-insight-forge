@@ -42,12 +42,14 @@ export const Route = createFileRoute("/api/public/integrations/callback")({
             redirectUri: string;
           };
           const providers = await import("@/lib/integrations/providers.server");
-          const tokens = await providers.exchangeCode(saved.provider, code, payload.verifier, payload.redirectUri);
+          const { loadProviderCredentials } = await import("@/lib/integrations/credentials.server");
+          const creds = await loadProviderCredentials(supabaseAdmin, saved.workspace_id, saved.provider);
+          const tokens = await providers.exchangeCode(saved.provider, code, payload.verifier, payload.redirectUri, creds);
 
           let accessToken = tokens.accessToken;
           let expiresIn = tokens.expiresIn;
           if (saved.provider === "facebook" || saved.provider === "instagram") {
-            const longLived = await providers.exchangeMetaLongLivedToken(accessToken);
+            const longLived = await providers.exchangeMetaLongLivedToken(accessToken, creds);
             if (longLived) {
               accessToken = longLived.accessToken;
               expiresIn = longLived.expiresIn;
