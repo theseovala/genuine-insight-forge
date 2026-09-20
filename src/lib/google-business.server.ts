@@ -43,6 +43,7 @@ export function hashValue(value: string) {
 }
 
 const ALLOWED_HOST_SUFFIXES = [".lovable.app", ".lovableproject.com", ".lovable.dev", "seovale.com"];
+const STABLE_PREVIEW_ORIGIN = "https://id-preview--3909161c-29f3-4466-a802-1204f20720c3.lovable.app";
 
 export function assertAllowedOrigin(origin: string) {
   const url = new URL(origin);
@@ -55,6 +56,11 @@ export function assertAllowedOrigin(origin: string) {
   return url.origin;
 }
 
+export function googleCallbackOrigin(returnOrigin: string) {
+  const url = new URL(returnOrigin);
+  return url.hostname.endsWith(".lovableproject.com") ? STABLE_PREVIEW_ORIGIN : url.origin;
+}
+
 export function createGoogleAuthorization(redirectUri: string) {
   const state = base64Url(randomBytes(32));
   const verifier = base64Url(randomBytes(48));
@@ -65,7 +71,7 @@ export function createGoogleAuthorization(redirectUri: string) {
   url.searchParams.set("response_type", "code");
   url.searchParams.set("scope", `${BUSINESS_SCOPE} openid email`);
   url.searchParams.set("access_type", "offline");
-  url.searchParams.set("prompt", "consent");
+  url.searchParams.set("prompt", "consent select_account");
   url.searchParams.set("include_granted_scopes", "true");
   url.searchParams.set("state", state);
   url.searchParams.set("code_challenge", challenge);

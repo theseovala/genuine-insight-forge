@@ -31,14 +31,15 @@ export const startGoogleBusinessConnection = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const member = await workspace(context);
     if (member.role === "member") throw new Error("Only a workspace owner or admin can connect Google.");
-    const { assertAllowedOrigin, createGoogleAuthorization, encryptSecret, hashValue } = await import("./google-business.server");
+    const { assertAllowedOrigin, createGoogleAuthorization, encryptSecret, googleCallbackOrigin, hashValue } = await import("./google-business.server");
     const origin = assertAllowedOrigin(data.origin);
-    const auth = createGoogleAuthorization(`${origin}/api/public/google-business/callback`);
+    const callbackOrigin = googleCallbackOrigin(origin);
+    const auth = createGoogleAuthorization(`${callbackOrigin}/api/public/google-business/callback`);
     const { error } = await context.supabase.from("google_oauth_states").insert({
       workspace_id: member.workspace_id,
       user_id: context.userId,
       state_hash: hashValue(auth.state),
-      code_verifier_ciphertext: await encryptSecret(auth.verifier),
+      code_verifier_ciphertext: await encryptSecret(JSON.stringify({ verifier: auth.verifier, callbackOrigin })),
       redirect_origin: origin,
       expires_at: new Date(Date.now() + 600_000).toISOString(),
     });
