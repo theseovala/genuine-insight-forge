@@ -207,9 +207,20 @@ function PlatformsTab() {
   const disconnectGoogleFn = useServerFn(disconnectGoogleBusiness);
   const google = useQuery({ queryKey: ["google_business_connection"], queryFn: () => statusFn() });
   const connectGoogle = useMutation({
-    mutationFn: () => startFn({ data: { origin: window.location.origin } }),
-    onSuccess: ({ authorizationUrl }) => window.location.assign(authorizationUrl),
-    onError: (error: Error) => toast.error(error.message),
+    mutationFn: ({ authWindow }: { authWindow: Window | null }) =>
+      startFn({ data: { origin: window.location.origin } }).then((result) => ({ ...result, authWindow })),
+    onSuccess: ({ authorizationUrl, authWindow }) => {
+      if (authWindow && !authWindow.closed) {
+        authWindow.opener = null;
+        authWindow.location.href = authorizationUrl;
+        return;
+      }
+      window.location.assign(authorizationUrl);
+    },
+    onError: (error: Error, { authWindow }) => {
+      authWindow?.close();
+      toast.error(error.message);
+    },
   });
   const syncGoogle = useMutation({
     mutationFn: () => syncFn(),
@@ -270,7 +281,22 @@ function PlatformsTab() {
                   <Button size="sm" variant="outline" onClick={() => isGoogle ? removeGoogle.mutate() : disconnect.mutate(p.id, { onSuccess: () => toast.success(`${p.display_name} disconnected`), onError: (err) => toast.error(err.message || "Could not disconnect") })} disabled={disconnect.isPending || removeGoogle.isPending}>Disconnect</Button>
                 </>
               ) : p.supports_oauth ? (
-                <Button size="sm" disabled={isGoogle && (!google.data?.configured || connectGoogle.isPending)} onClick={() => isGoogle ? connectGoogle.mutate() : toast("This platform connection will be available in a future provider rollout.")}>
+                <Button
+                  size="sm"
+                  disabled={isGoogle && (!google.data?.configured || connectGoogle.isPending)}
+                  onClick={() => {
+                    if (!isGoogle) {
+                      toast("This platform connection will be available in a future provider rollout.");
+                      return;
+                    }
+                    const authWindow = window.open("about:blank", "seovale-google-business");
+                    if (authWindow) {
+                      authWindow.document.title = "Connecting Google Business Profile…";
+                      authWindow.document.body.textContent = "Opening Google securely…";
+                    }
+                    connectGoogle.mutate({ authWindow });
+                  }}
+                >
                   {connectGoogle.isPending && isGoogle && <Loader2 className="animate-spin" />}Connect
                 </Button>
               ) : (
