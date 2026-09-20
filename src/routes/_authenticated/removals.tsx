@@ -396,6 +396,13 @@ function RemovalsPage() {
                     </Button>
                   )}
                 </div>
+
+                {["flagged", "submitted"].includes(c.status) && (
+                  <AppealReply
+                    caseId={c.id}
+                    onPublished={() => void qc.invalidateQueries({ queryKey: ["removal_cases"] })}
+                  />
+                )}
               </li>
             ))}
           </ul>
