@@ -46,7 +46,7 @@ export async function enqueueJob(
 export async function claimDueJobs(admin: SupabaseClient, limit: number, leaseMinutes = 5) {
   const { data: due, error } = await admin
     .from("integration_sync_jobs")
-    .select("id,workspace_id,provider,job_type,payload,attempts,max_attempts")
+    .select("id,workspace_id,provider,job_type,payload,attempts,max_attempts,started_at")
     .in("status", ["pending", "retrying"])
     .lte("next_attempt_at", new Date().toISOString())
     .or(`lease_expires_at.is.null,lease_expires_at.lt.${new Date().toISOString()}`)
