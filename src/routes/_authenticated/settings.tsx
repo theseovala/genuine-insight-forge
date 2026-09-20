@@ -110,6 +110,11 @@ function Toggle({
 function SettingsPage() {
   const [tab, setTab] = useState<(typeof tabs)[number]["id"]>("business");
 
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    if (requested && tabs.some((t) => t.id === requested)) setTab(requested as (typeof tabs)[number]["id"]);
+  }, []);
+
   return (
     <AppShell>
       <PageHeader eyebrow="Configure" title="Settings" description="Set up the business, platforms and rules that power Seovale." />
@@ -133,6 +138,7 @@ function SettingsPage() {
         <div className="min-w-0 space-y-4">
           {tab === "business" && <BusinessProfileTab />}
           {tab === "platforms" && <PlatformsTab />}
+          {tab === "integrations" && <IntegrationManager />}
           {tab === "notifications" && <NotificationsTab />}
           {tab === "locations" && <LocationsTab />}
           {tab === "account" && <AccountTab />}
