@@ -78,4 +78,4 @@
 - [ ] Provider-specific usage/rate-limit extraction from real provider response headers during sync
 
 ## In progress (added 20:11 UTC)
-- [ ] Ultra Premium UI enhancement — keep palette/fonts/layout/spacing; add depth layers, glow, card sheen, premium buttons, sidebar active glow, density, micro-animations, reduced-motion support. Inspect every major screen after.
+- [x] Ultra Premium UI enhancement (done 20:2x UTC — depth tokens, bg-ambient, edge illumination, sidebar active glow, premium gradient buttons, dark-mode depth; verified desktop, 0 overflow, 0 console errors) — keep palette/fonts/layout/spacing; add depth layers, glow, card sheen, premium buttons, sidebar active glow, density, micro-animations, reduced-motion support. Inspect every major screen after.
