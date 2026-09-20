@@ -83,6 +83,7 @@ export const draftReply = createServerFn({ method: "POST" })
       .select("author, rating, sentiment, platform, location_name, title, body, tags")
       .eq("id", data.reviewId)
       .eq("workspace_id", scopeId)
+      .neq("source", "seed")
       .maybeSingle();
     if (error) throw error;
     if (!review) throw new Error("That review no longer exists.");
@@ -133,6 +134,7 @@ export const analyseFeedback = createServerFn({ method: "POST" })
       .from("reviews")
       .select("rating, sentiment, platform, location_name, body, tags, external_created_at")
       .eq("workspace_id", scopeId)
+      .neq("source", "seed")
       .order("external_created_at", { ascending: false })
       .limit(120);
     if (data.location && data.location !== "All locations") {
@@ -175,6 +177,7 @@ export const generateReport = createServerFn({ method: "POST" })
       .from("reviews")
       .select("rating, sentiment, status, platform, location_name, body, external_created_at")
       .eq("workspace_id", workspaceId)
+      .neq("source", "seed")
       .order("external_created_at", { ascending: false })
       .limit(300);
     if (data.scope !== "All locations") query = query.eq("location_name", data.scope);

@@ -107,7 +107,7 @@ function ReportsPage() {
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending || loadingReviews || !reviews?.length}>
             {mutation.isPending ? <Loader2 className="animate-spin" /> : <Sparkles />}
             Generate report
           </Button>
@@ -122,6 +122,9 @@ function ReportsPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Section title="Rating & score trend" description="Last 6 months, all reviews">
+          {!loadingReviews && (!reviews || reviews.length === 0) ? (
+            <EmptyState icon={FileText} title="No verified review data" description="Connect and sync a review source before generating reports or trends." />
+          ) : (
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={trend} margin={{ left: -20, right: 8, top: 8 }}>
@@ -139,6 +142,7 @@ function ReportsPage() {
               </AreaChart>
             </ResponsiveContainer>
           </div>
+          )}
         </Section>
 
         <Section title="Platform performance" bodyClassName="p-0">

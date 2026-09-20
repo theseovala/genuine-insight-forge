@@ -174,6 +174,7 @@ export function useLiveReviews() {
           "id, platform, author, rating, sentiment, status, priority, location_name, title, body, tags, unread, reply, replied_at, external_created_at",
         )
         .eq("workspace_id", workspaceId)
+        .neq("source", "seed")
         .order("external_created_at", { ascending: false });
       if (error) throw error;
       return (data as ReviewRow[]).map(toReview);

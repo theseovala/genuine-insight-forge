@@ -729,7 +729,7 @@ export type Database = {
           replied_by?: string | null
           reply?: string | null
           sentiment?: string
-          source?: string
+          source: string
           status?: string
           tags?: string[]
           title?: string | null
