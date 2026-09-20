@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation } from "@tanstack/react-query";
-import { Search, SlidersHorizontal, Inbox, ChevronDown, Reply, Sparkles, Send } from "lucide-react";
+import { Search, Inbox, ChevronDown, Reply, Sparkles, Send, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
 import {
@@ -59,6 +59,7 @@ function ReviewCenter() {
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [copied, setCopied] = useState(false);
 
   const { location, locationNames } = useApp();
   const [loc, setLoc] = useState(ALL_LOCATIONS);
@@ -118,6 +119,16 @@ function ReviewCenter() {
     const isOpen = openId === r.id;
     setOpenId(isOpen ? null : r.id);
     setDraft(isOpen ? "" : (r.reply ?? ""));
+    setCopied(false);
+    if (!isOpen && !r.reply) aiMutation.mutate(r.id);
+  };
+
+  const copyDraft = async () => {
+    if (!draft.trim()) return;
+    await navigator.clipboard.writeText(draft.trim());
+    setCopied(true);
+    toast.success("Reply copied for Google");
+    window.setTimeout(() => setCopied(false), 1800);
   };
 
   return (
@@ -327,7 +338,7 @@ function ReviewCenter() {
                       <div className="rounded-lg border bg-card p-4">
                         <div className="mb-2 flex items-center justify-between">
                           <p className="text-xs font-semibold text-muted-foreground">
-                            {r.reply ? "Update response" : "Write a response"}
+                            {r.reply ? "Update response" : aiMutation.isPending ? "Creating reply draft…" : "AI reply draft"}
                           </p>
                           <Button
                             size="sm"
@@ -346,6 +357,14 @@ function ReviewCenter() {
                           className="w-full rounded-lg border bg-background p-3 text-sm outline-none focus:ring-2 focus:ring-ring/40"
                         />
                         <div className="mt-2 flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!draft.trim()}
+                            onClick={() => void copyDraft()}
+                          >
+                            {copied ? <Check /> : <Copy />} {copied ? "Copied" : "Copy for Google"}
+                          </Button>
                           <Button
                             size="sm"
                             disabled={!draft.trim() || publish.isPending}

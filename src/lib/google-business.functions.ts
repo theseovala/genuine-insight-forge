@@ -79,16 +79,30 @@ export const syncGoogleBusinessReviews = createServerFn({ method: "POST" })
           const sentiment = review.rating >= 4 ? "positive" : review.rating === 3 ? "neutral" : "negative";
           const priority = review.rating <= 2 ? "high" : review.rating === 3 ? "medium" : "low";
           const { data: existing } = await context.supabase.from("reviews").select("id").eq("workspace_id", member.workspace_id).eq("platform", "google").eq("external_id", review.id).maybeSingle();
+          let storedReviewId: string;
           if (existing) {
             const { error: updateError } = await context.supabase.from("reviews").update({ author: review.author, rating: review.rating, body: review.body, sentiment, priority, location_name: batch.location.name, external_created_at: review.createdAt }).eq("id", existing.id);
             if (updateError) throw updateError;
+            storedReviewId = existing.id;
             updated += 1;
           } else {
             const { data: inserted, error: insertError } = await context.supabase.from("reviews").insert({ workspace_id: member.workspace_id, platform: "google", external_id: review.id, source: "google_business", author: review.author, rating: review.rating, sentiment, status: "pending", priority, location_name: batch.location.name, body: review.body, external_created_at: review.createdAt }).select("id").single();
             if (insertError) throw insertError;
+            storedReviewId = inserted.id;
             created += 1;
-            if (review.rating <= (rules?.negative_rating_threshold ?? 2)) {
-              const { error: alertError } = await context.supabase.from("alerts").insert({ workspace_id: member.workspace_id, review_id: inserted.id, kind: "negative_review", severity: review.rating === 1 ? "critical" : "high", title: `${review.rating}-star Google review`, detail: review.body.slice(0, 240), location_name: batch.location.name });
+          }
+          if (review.rating <= (rules?.negative_rating_threshold ?? 2)) {
+            const { data: existingAlert, error: alertLookupError } = await context.supabase
+              .from("alerts")
+              .select("id")
+              .eq("workspace_id", member.workspace_id)
+              .eq("review_id", storedReviewId)
+              .eq("kind", "negative_review")
+              .limit(1)
+              .maybeSingle();
+            if (alertLookupError) throw alertLookupError;
+            if (!existingAlert) {
+              const { error: alertError } = await context.supabase.from("alerts").insert({ workspace_id: member.workspace_id, review_id: storedReviewId, kind: "negative_review", severity: review.rating === 1 ? "critical" : "high", title: `${review.rating}-star Google review`, detail: review.body.slice(0, 240), location_name: batch.location.name });
               if (alertError) throw alertError;
               alerts += 1;
             }
