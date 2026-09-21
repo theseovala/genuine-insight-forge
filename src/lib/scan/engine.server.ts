@@ -22,7 +22,14 @@ import {
 } from "./collectors.server";
 import { analyze } from "./analyze.server";
 import { discoverPlatforms, type PlatformDiscovery } from "./discovery.server";
-import { recordEvidence, reconcileConflicts, upsertFacts, type Confidence, type FactInput } from "./canonical.server";
+import {
+  ensureBusiness,
+  recordEvidence,
+  reconcileConflicts,
+  upsertFacts,
+  type Confidence,
+  type FactInput,
+} from "./canonical.server";
 
 /** How long a collected source stays valid for incremental re-use, per source. */
 export const FRESHNESS_MINUTES: Record<string, number> = {
@@ -458,6 +465,25 @@ export async function runScan(admin: SupabaseClient, scanId: string): Promise<Ru
   const rdapRaw = (sourceResults.find((s) => s.source === "rdap")?.raw ?? null) as Record<string, unknown> | null;
   const finalUrl = ((httpRow?.raw as any)?.finalUrl as string | null) ?? target.url;
   const facts = collectFacts(identity, html, finalUrl, tlsRaw, rdapRaw, observedAt);
+  // Canonical business + domain record for this site (one per workspace/domain).
+  const link = await ensureBusiness(admin, scan.workspace_id, {
+    domain: scan.target_domain,
+    url: finalUrl,
+    name: identity.name,
+    phone: identity.phone,
+    address: identity.address,
+    industry: identity.category,
+    sslStatus: (tlsRaw?.["issuer"] as string | undefined) ? "valid" : null,
+    reachable: Boolean(httpRow),
+    observedAt,
+  });
+  if (link) {
+    await admin
+      .from("scans")
+      .update({ business_id: link.businessId, domain_id: link.domainId })
+      .eq("id", scanId);
+  }
+
   const factChanges = await upsertFacts(admin, scan.workspace_id, scan.target_domain, scanId, facts);
   const conflicts = await reconcileConflicts(admin, scan.workspace_id, scan.target_domain, scanId, facts);
 
