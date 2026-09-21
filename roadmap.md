@@ -176,3 +176,7 @@
 - [ ] Notifications + language preference + support buttons from stored settings
 - [ ] Filters, pagination, state invalidation after every mutation, controlled polling
 - [ ] Final end-to-end functional test with real data
+
+- [x] Finding triage (mark resolved / ignore / reopen / copy) — real DB status, verified
+- [x] Licence action buttons: in-flight guard against double clicks
+- [x] Notification inbox verified on a real scan (example.com)
