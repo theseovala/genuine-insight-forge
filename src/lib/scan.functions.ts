@@ -200,7 +200,7 @@ export const getScan = createServerFn({ method: "GET" })
     const [sources, metrics, findings, report, stages, facts, conflicts, evidence] = await Promise.all([
       supabase.from("scan_sources").select("source,provider,status,http_status,duration_ms,error_message,created_at").eq("scan_id", data.id).order("source"),
       supabase.from("scan_metrics").select("category,metric_key,value_numeric,value_text,unit,source").eq("scan_id", data.id).order("category"),
-      supabase.from("scan_findings").select("category,code,severity,title,detail,recommendation,impact,evidence,source,created_at,confidence,priority_score,priority_rank,status,change_state").eq("scan_id", data.id).order("priority_rank", { ascending: true, nullsFirst: false }),
+      supabase.from("scan_findings").select("id,category,code,severity,title,detail,recommendation,impact,evidence,source,created_at,confidence,priority_score,priority_rank,status,change_state").eq("scan_id", data.id).order("priority_rank", { ascending: true, nullsFirst: false }),
       supabase.from("scan_reports").select("score,category_scores,summary,model,created_at,sections,action_plan,historical,ai_status,ai_error,ai_latency_ms").eq("scan_id", data.id).maybeSingle(),
 
       supabase.from("scan_stages").select("stage,label,position,status,detail,started_at,completed_at").eq("scan_id", data.id).order("position"),
@@ -381,3 +381,40 @@ export const exportScanCsv = createServerFn({ method: "POST" })
     return { filename: `seovale-scan-${scan.target_domain}-${new Date(scan.created_at).toISOString().slice(0, 10)}.csv`, csv: lines.join("\n") };
   });
 
+
+/**
+ * Finding triage. The status is stored on the finding row itself, scoped to the
+ * caller's workspace, so the report, filters and CSV all read the same value.
+ */
+export const setFindingStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        findingId: z.string().uuid(),
+        status: z.enum(["open", "acknowledged", "resolved", "ignored", "recheck_required"]),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const member = await workspace(context as Ctx);
+    const { data: finding, error: readError } = await context.supabase
+      .from("scan_findings")
+      .select("id, scan_id, scans!inner(workspace_id)")
+      .eq("id", data.findingId)
+      .maybeSingle();
+    if (readError) throw new Error(readError.message);
+    if (!finding || finding.scans?.workspace_id !== member.workspace_id) {
+      throw new Error("Finding not found.");
+    }
+    // Findings are read-only for members under RLS, so the write happens with the
+    // service role only after the ownership check above has passed.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error, count } = await supabaseAdmin
+      .from("scan_findings")
+      .update({ status: data.status }, { count: "exact" })
+      .eq("id", data.findingId);
+    if (error) throw new Error(error.message);
+    if (!count) throw new Error("Finding could not be updated.");
+    return { ok: true, status: data.status };
+  });

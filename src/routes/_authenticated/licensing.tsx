@@ -89,7 +89,12 @@ function LicensingPage() {
     toast.error(error.message);
   };
 
+  // Sensitive licence actions are expensive and audited, so a second click
+  // while one is in flight is ignored rather than queued.
+  const [busy, setBusy] = useState(false);
   const run = <T,>(fn: () => Promise<T>, success: string) => {
+    if (busy) return;
+    setBusy(true);
     const attempt = () =>
       fn()
         .then(() => {
@@ -97,8 +102,12 @@ function LicensingPage() {
           setPendingAction(null);
           setStepUpCode("");
           refresh();
+          setBusy(false);
         })
-        .catch((error: Error) => handleError(error, attempt));
+        .catch((error: Error) => {
+          setBusy(false);
+          handleError(error, attempt);
+        });
     attempt();
   };
 
@@ -344,7 +353,7 @@ function LicensingPage() {
                         <Badge className={installation.status === "active" ? STATUS_TONE["active"] : STATUS_TONE["pending"]}>{installation.status}</Badge>
                         <span className="text-muted-foreground">validated {when(installation.last_validated_at)}</span>
                         {data.isStaff && installation.status === "active" && (
-                          <Button size="sm" variant="ghost" onClick={() => run(() => resetInstallation({ data: { installationId: installation.id } }), "Installation reset.")}>
+                          <Button size="sm" variant="ghost" onClick={() => run(() => resetInstallation({ data: { installationId: installation.id } }), "Installation reset.")} disabled={busy}>
                             Reset
                           </Button>
                         )}
@@ -354,12 +363,12 @@ function LicensingPage() {
 
                   <div className="mt-4 flex flex-wrap gap-2">
                     {data.isStaff && license.status !== "active" && license.status !== "revoked" && (
-                      <Button size="sm" onClick={() => run(() => setLicenseStatus({ data: { licenseId: license.id, status: "active" } }), "Licence activated.")}>
+                      <Button size="sm" onClick={() => run(() => setLicenseStatus({ data: { licenseId: license.id, status: "active" } }), "Licence activated.")} disabled={busy}>
                         Activate
                       </Button>
                     )}
                     {data.isStaff && license.status === "active" && (
-                      <Button size="sm" variant="outline" onClick={() => run(() => setLicenseStatus({ data: { licenseId: license.id, status: "suspended" } }), "Licence suspended.")}>
+                      <Button size="sm" variant="outline" onClick={() => run(() => setLicenseStatus({ data: { licenseId: license.id, status: "suspended" } }), "Licence suspended.")} disabled={busy}>
                         Suspend
                       </Button>
                     )}
@@ -368,7 +377,7 @@ function LicensingPage() {
                         size="sm"
                         variant="outline"
                         onClick={() => run(() => setLicenseStatus({ data: { licenseId: license.id, status: "revoked", reason: "Revoked from admin panel" } }), "Licence revoked.")}
-                      >
+                       disabled={busy}>
                         Revoke
                       </Button>
                     )}
@@ -398,7 +407,7 @@ function LicensingPage() {
                             "Download authorized.",
                           )
                         }
-                      >
+                       disabled={busy}>
                         <Download className="mr-2 h-4 w-4" /> Download package {publishedRelease.version}
                       </Button>
                     )}

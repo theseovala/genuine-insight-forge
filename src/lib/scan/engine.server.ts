@@ -22,7 +22,14 @@ import {
 } from "./collectors.server";
 import { analyze } from "./analyze.server";
 import { discoverPlatforms, type PlatformDiscovery } from "./discovery.server";
-import { recordEvidence, reconcileConflicts, upsertFacts, type Confidence, type FactInput } from "./canonical.server";
+import {
+  ensureBusiness,
+  recordEvidence,
+  reconcileConflicts,
+  upsertFacts,
+  type Confidence,
+  type FactInput,
+} from "./canonical.server";
 
 /** How long a collected source stays valid for incremental re-use, per source. */
 export const FRESHNESS_MINUTES: Record<string, number> = {
@@ -458,6 +465,26 @@ export async function runScan(admin: SupabaseClient, scanId: string): Promise<Ru
   const rdapRaw = (sourceResults.find((s) => s.source === "rdap")?.raw ?? null) as Record<string, unknown> | null;
   const finalUrl = ((httpRow?.raw as any)?.finalUrl as string | null) ?? target.url;
   const facts = collectFacts(identity, html, finalUrl, tlsRaw, rdapRaw, observedAt);
+  // Canonical business + domain record for this site (one per workspace/domain).
+  const link = await ensureBusiness(admin, scan.workspace_id, {
+    domain: scan.target_domain,
+    url: finalUrl,
+    name: identity.name,
+    phone: identity.phone,
+    address: identity.address,
+    industry: identity.category,
+    sslStatus:
+      tlsRaw && "httpsReachable" in tlsRaw ? (tlsRaw["httpsReachable"] ? "valid" : "unreachable") : null,
+    reachable: Boolean(httpRow),
+    observedAt,
+  });
+  if (link) {
+    await admin
+      .from("scans")
+      .update({ business_id: link.businessId, domain_id: link.domainId })
+      .eq("id", scanId);
+  }
+
   const factChanges = await upsertFacts(admin, scan.workspace_id, scan.target_domain, scanId, facts);
   const conflicts = await reconcileConflicts(admin, scan.workspace_id, scan.target_domain, scanId, facts);
 
@@ -767,6 +794,27 @@ export async function runScan(admin: SupabaseClient, scanId: string): Promise<Ru
     .eq("id", scanId);
 
   await audit(admin, scan.workspace_id, `scan.${status}`, scanId, { score, findings: allFindings.length, reused, warnings });
+
+  // Real notification from the actual outcome — no notification is written
+  // unless the scan reached one of these terminal states.
+  await admin.from("notifications").insert({
+    workspace_id: scan.workspace_id,
+    user_id: requestedBy,
+    type: status === "failed" ? "scan_failed" : "scan_completed",
+    severity: status === "failed" ? "critical" : status === "completed_with_warnings" ? "warning" : "success",
+    title:
+      status === "failed"
+        ? `Scan failed for ${scan.target_domain}`
+        : status === "completed_with_warnings"
+          ? `Scan completed with warnings for ${scan.target_domain}`
+          : `Scan completed for ${scan.target_domain}`,
+    message:
+      status === "failed"
+        ? "No data source could be reached for this address."
+        : `Score ${score}/100 · ${allFindings.length} findings${warnings.length ? ` · failed checks: ${warnings.join(", ")}` : ""}`,
+    entity_type: "scan",
+    entity_id: scanId,
+  });
 
   return {
     status,

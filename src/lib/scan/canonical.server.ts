@@ -211,3 +211,85 @@ export async function recordEvidence(
   await admin.from("finding_evidence").insert(rows);
   return rows.length;
 }
+
+export interface BusinessLink {
+  businessId: string;
+  domainId: string;
+}
+
+/**
+ * Canonical business + domain record for a scanned site. One business per
+ * normalized domain inside a workspace, so re-scans reuse the same record
+ * instead of creating a competing copy. Only observed values are written.
+ */
+export async function ensureBusiness(
+  admin: SupabaseClient,
+  workspaceId: string,
+  args: {
+    domain: string;
+    url: string;
+    name?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    industry?: string | null;
+    description?: string | null;
+    sslStatus?: string | null;
+    reachable: boolean;
+    observedAt: string;
+  },
+): Promise<BusinessLink | null> {
+  const normalized = args.domain.trim().toLowerCase().replace(/^www\./, "");
+  if (!normalized) return null;
+
+  const { data: existingDomain } = await admin
+    .from("business_domains")
+    .select("id,business_id")
+    .eq("workspace_id", workspaceId)
+    .eq("normalized_domain", normalized)
+    .maybeSingle();
+
+  let businessId = (existingDomain?.business_id as string | undefined) ?? null;
+
+  const businessPatch: Record<string, unknown> = {
+    website: args.url,
+    last_checked_at: args.observedAt,
+    source_provider: "website",
+    confidence: args.name ? "high" : "medium",
+  };
+  if (args.name) businessPatch["name"] = args.name;
+  if (args.phone) businessPatch["phone"] = args.phone;
+  if (args.address) businessPatch["address"] = args.address;
+  if (args.industry) businessPatch["industry"] = args.industry;
+  if (args.description) businessPatch["description"] = args.description;
+
+  if (businessId) {
+    await admin.from("businesses").update(businessPatch).eq("id", businessId);
+  } else {
+    const { data: created, error } = await admin
+      .from("businesses")
+      .insert({ workspace_id: workspaceId, name: args.name ?? normalized, ...businessPatch })
+      .select("id")
+      .single();
+    if (error || !created) return null;
+    businessId = created.id as string;
+  }
+
+  const domainPatch = {
+    workspace_id: workspaceId,
+    business_id: businessId,
+    domain: args.domain,
+    normalized_domain: normalized,
+    protocol: args.url.startsWith("https://") ? "https" : "http",
+    verification_status: args.reachable ? "reachable" : "failed",
+    ssl_status: args.sslStatus ?? null,
+    last_checked_at: args.observedAt,
+  };
+  const { data: domainRow, error: domainError } = await admin
+    .from("business_domains")
+    .upsert(domainPatch, { onConflict: "workspace_id,normalized_domain" })
+    .select("id")
+    .single();
+  if (domainError || !domainRow) return null;
+
+  return { businessId, domainId: domainRow.id as string };
+}

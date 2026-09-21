@@ -366,6 +366,66 @@ export type Database = {
           },
         ]
       }
+      business_domains: {
+        Row: {
+          business_id: string
+          created_at: string
+          domain: string
+          id: string
+          last_checked_at: string | null
+          normalized_domain: string
+          protocol: string
+          ssl_status: string | null
+          status: string
+          updated_at: string
+          verification_status: string
+          workspace_id: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          domain: string
+          id?: string
+          last_checked_at?: string | null
+          normalized_domain: string
+          protocol?: string
+          ssl_status?: string | null
+          status?: string
+          updated_at?: string
+          verification_status?: string
+          workspace_id: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          domain?: string
+          id?: string
+          last_checked_at?: string | null
+          normalized_domain?: string
+          protocol?: string
+          ssl_status?: string | null
+          status?: string
+          updated_at?: string
+          verification_status?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_domains_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_domains_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       business_facts: {
         Row: {
           changed_at: string | null
@@ -437,6 +497,77 @@ export type Database = {
           },
           {
             foreignKeyName: "business_facts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      businesses: {
+        Row: {
+          address: string | null
+          confidence: string | null
+          country: string | null
+          created_at: string
+          description: string | null
+          email: string | null
+          id: string
+          industry: string | null
+          last_checked_at: string | null
+          legal_name: string | null
+          name: string
+          phone: string | null
+          source_provider: string | null
+          status: string
+          timezone: string | null
+          updated_at: string
+          website: string | null
+          workspace_id: string
+        }
+        Insert: {
+          address?: string | null
+          confidence?: string | null
+          country?: string | null
+          created_at?: string
+          description?: string | null
+          email?: string | null
+          id?: string
+          industry?: string | null
+          last_checked_at?: string | null
+          legal_name?: string | null
+          name: string
+          phone?: string | null
+          source_provider?: string | null
+          status?: string
+          timezone?: string | null
+          updated_at?: string
+          website?: string | null
+          workspace_id: string
+        }
+        Update: {
+          address?: string | null
+          confidence?: string | null
+          country?: string | null
+          created_at?: string
+          description?: string | null
+          email?: string | null
+          id?: string
+          industry?: string | null
+          last_checked_at?: string | null
+          legal_name?: string | null
+          name?: string
+          phone?: string | null
+          source_provider?: string | null
+          status?: string
+          timezone?: string | null
+          updated_at?: string
+          website?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "businesses_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -1283,6 +1414,33 @@ export type Database = {
           },
         ]
       }
+      language_settings: {
+        Row: {
+          created_at: string
+          language: string
+          locale: string | null
+          timezone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          language?: string
+          locale?: string | null
+          timezone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          language?: string
+          locale?: string | null
+          timezone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       license_activations: {
         Row: {
           correlation_id: string | null
@@ -2072,6 +2230,83 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "locations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_preferences: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          id: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          message: string | null
+          read_at: string | null
+          severity: string
+          title: string
+          type: string
+          user_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          message?: string | null
+          read_at?: string | null
+          severity?: string
+          title: string
+          type: string
+          user_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          message?: string | null
+          read_at?: string | null
+          severity?: string
+          title?: string
+          type?: string
+          user_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -2932,8 +3167,10 @@ export type Database = {
       scans: {
         Row: {
           attempts: number
+          business_id: string | null
           completed_at: string | null
           created_at: string
+          domain_id: string | null
           duration_ms: number | null
           error_message: string | null
           id: string
@@ -2950,8 +3187,10 @@ export type Database = {
         }
         Insert: {
           attempts?: number
+          business_id?: string | null
           completed_at?: string | null
           created_at?: string
+          domain_id?: string | null
           duration_ms?: number | null
           error_message?: string | null
           id?: string
@@ -2968,8 +3207,10 @@ export type Database = {
         }
         Update: {
           attempts?: number
+          business_id?: string | null
           completed_at?: string | null
           created_at?: string
+          domain_id?: string | null
           duration_ms?: number | null
           error_message?: string | null
           id?: string
@@ -2985,6 +3226,20 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "scans_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scans_domain_id_fkey"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "business_domains"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "scans_workspace_id_fkey"
             columns: ["workspace_id"]
@@ -3236,6 +3491,56 @@ export type Database = {
             foreignKeyName: "seo_rankings_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_settings: {
+        Row: {
+          created_at: string
+          default_message: string | null
+          email: string | null
+          help_url: string | null
+          hours: string | null
+          id: string
+          phone: string | null
+          support_name: string | null
+          updated_at: string
+          whatsapp: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          default_message?: string | null
+          email?: string | null
+          help_url?: string | null
+          hours?: string | null
+          id?: string
+          phone?: string | null
+          support_name?: string | null
+          updated_at?: string
+          whatsapp?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          default_message?: string | null
+          email?: string | null
+          help_url?: string | null
+          hours?: string | null
+          id?: string
+          phone?: string | null
+          support_name?: string | null
+          updated_at?: string
+          whatsapp?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_settings_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },

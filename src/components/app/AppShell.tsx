@@ -35,6 +35,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 export { navItems } from "./nav-items";
 import { navItems, navGroups } from "./nav-items";
 import { CommandPalette, useCommandPalette } from "./CommandPalette";
+import { NotificationBell } from "./NotificationBell";
 
 function NavList({
   collapsed,
@@ -278,59 +279,8 @@ function TopBar({
             <LifeBuoy />
           </Link>
         </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
-              <Bell />
-              {open.length > 0 && (
-                <span className="absolute right-2 top-2 size-2 rounded-full bg-negative animate-pulse-dot" />
-              )}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80 p-0">
-            <div className="flex items-center justify-between border-b px-4 py-3">
-              <p className="font-display text-sm font-bold">Notifications</p>
-              <span className="text-xs text-muted-foreground">{open.length} unresolved</span>
-            </div>
-            <div className="max-h-80 overflow-y-auto">
-              {open.slice(0, 4).map((a) => (
-                <Link
-                  key={a.id}
-                  to="/alerts"
-                  className="flex gap-3 border-b px-4 py-3 text-left transition-colors last:border-0 hover:bg-accent/60"
-                >
-                  <span
-                    className={cn(
-                      "mt-1.5 size-2 shrink-0 rounded-full",
-                      a.severity === "critical" || a.severity === "high"
-                        ? "bg-negative"
-                        : a.severity === "medium"
-                          ? "bg-warning"
-                          : "bg-info",
-                    )}
-                  />
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold">{a.title}</span>
-                    <span className="block text-xs text-muted-foreground">
-                      {a.location} · {a.time}
-                    </span>
-                  </span>
-                </Link>
-              ))}
-              {open.length === 0 && (
-                <p className="px-4 py-6 text-center text-xs text-muted-foreground">
-                  Nothing needs attention right now.
-                </p>
-              )}
-            </div>
-            <Link
-              to="/alerts"
-              className="block border-t px-4 py-2.5 text-center text-xs font-semibold text-primary hover:bg-accent/60"
-            >
-              Open Alert Center
-            </Link>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <NotificationBell />
+
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

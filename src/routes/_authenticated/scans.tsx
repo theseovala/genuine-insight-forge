@@ -33,6 +33,7 @@ import {
   pauseScan,
   resumeScan,
   cancelScan,
+  setFindingStatus,
 } from "@/lib/scan.functions";
 
 export const Route = createFileRoute("/_authenticated/scans")({
@@ -138,6 +139,18 @@ function ScansPage() {
       const status = (query.state.data as any)?.scan?.status;
       return status === "queued" || status === "running" || status === "retrying" ? 3000 : false;
     },
+  });
+
+  // Finding triage writes straight to the stored finding row, then the detail
+  // query is refetched so filters, report and CSV all show the same status.
+  const triage = useMutation({
+    mutationFn: (input: { findingId: string; status: "open" | "resolved" | "ignored" }) =>
+      setFindingStatus({ data: input }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["scan"] });
+      toast.success("Finding updated.");
+    },
+    onError: (error: Error) => toast.error(error.message),
   });
 
   // The scan runs on the server; the browser is never blocked while it works.
@@ -611,6 +624,48 @@ function ScansPage() {
                               ) : (
                                 <p className="mt-2 text-[11px]">No separate evidence record was stored for this finding.</p>
                               )}
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={triage.isPending}
+                                  onClick={() =>
+                                    triage.mutate({
+                                      findingId: finding.id,
+                                      status: (finding.status ?? "open") === "resolved" ? "open" : "resolved",
+                                    })
+                                  }
+                                >
+                                  {(finding.status ?? "open") === "resolved" ? "Reopen" : "Mark resolved"}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  disabled={triage.isPending}
+                                  onClick={() =>
+                                    triage.mutate({
+                                      findingId: finding.id,
+                                      status: (finding.status ?? "open") === "ignored" ? "open" : "ignored",
+                                    })
+                                  }
+                                >
+                                  {(finding.status ?? "open") === "ignored" ? "Un-ignore" : "Ignore"}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    void navigator.clipboard
+                                      .writeText(
+                                        `${finding.title}\n${finding.detail}\n${finding.recommendation ?? ""}`.trim(),
+                                      )
+                                      .then(() => toast.success("Finding copied."))
+                                      .catch(() => toast.error("Could not copy this finding."));
+                                  }}
+                                >
+                                  Copy
+                                </Button>
+                              </div>
                             </div>
                           ) : null}
                         </li>
