@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Bell, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useRealtimeInvalidate } from "@/hooks/use-realtime";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -42,10 +43,15 @@ export function NotificationBell() {
   const readAll = useServerFn(markAllNotificationsRead);
   const remove = useServerFn(deleteNotification);
 
+  // New notifications arrive as a server push, not on a timer.
+  useRealtimeInvalidate("notifications-inbox", ["notifications"], [["notifications"]]);
+
+
   const { data, isLoading, isError } = useQuery({
     queryKey: ["notifications"],
     queryFn: () => load(),
-    refetchInterval: 60_000,
+    // Realtime pushes new notifications; the slow poll is only a safety net.
+    refetchInterval: 300_000,
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["notifications"] });

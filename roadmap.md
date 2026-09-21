@@ -180,3 +180,6 @@
 - [x] Finding triage (mark resolved / ignore / reopen / copy) — real DB status, verified
 - [x] Licence action buttons: in-flight guard against double clicks
 - [x] Notification inbox verified on a real scan (example.com)
+- [ ] Integration center full pass: real connect/test/disconnect per provider
+- [ ] Real-time scan progress + notifications (Supabase realtime on scans/scan_stages/notifications)
+- [ ] Single super-admin login: theseovala@gmail.com (reset password), remove other auth users

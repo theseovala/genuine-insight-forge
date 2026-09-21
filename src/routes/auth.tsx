@@ -9,7 +9,6 @@ import { BrandMark } from "@/components/app/primitives";
 import { BRAND } from "@/lib/domain";
 
 export const Route = createFileRoute("/auth")({
-  ssr: false,
   head: () => ({
     meta: [
       { title: `Sign in — ${BRAND.name}` },

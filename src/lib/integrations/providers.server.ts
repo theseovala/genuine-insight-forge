@@ -562,6 +562,20 @@ export async function testApiKeyProvider(
         ref: null,
       }));
     }
+    case "anthropic": {
+      const key = envValue(["ANTHROPIC_API_KEY"], creds);
+      if (!key) return notConfigured("No Anthropic API key is configured.");
+      return simpleFetchTest(
+        "https://api.anthropic.com/v1/models?limit=1",
+        { "x-api-key": key, "anthropic-version": "2023-06-01" },
+        (p) => ({
+          ok: Array.isArray(p["data"]),
+          message: "Anthropic rejected the API key.",
+          label: "Anthropic API",
+          ref: null,
+        }),
+      );
+    }
     case "resend_email": {
       const key = envValue(["RESEND_API_KEY"], creds);
       if (!key) return notConfigured("No Resend API key is configured.");
@@ -718,4 +732,66 @@ export async function testApiKeyProvider(
     default:
       return { ok: false, status: 0, message: `No live test is defined for ${providerId}.`, code: "UNAVAILABLE" };
   }
+}
+
+/**
+ * Best-effort token revocation at the provider. Only providers with a
+ * documented revoke endpoint are attempted; everything else reports
+ * "unsupported" so the UI never claims a revocation that did not happen.
+ */
+export async function revokeOAuthToken(
+  provider: string,
+  accessToken: string,
+): Promise<{ revoked: boolean; supported: boolean; message: string }> {
+  const googleFamily = ["google_gmail", "youtube", "youtube_analytics", "google_search_console", "google_analytics", "google_ads"];
+  try {
+    if (googleFamily.includes(provider)) {
+      const response = await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(accessToken)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      });
+      return {
+        revoked: response.ok,
+        supported: true,
+        message: response.ok ? "Access revoked at Google." : `Google revoke returned HTTP ${response.status}.`,
+      };
+    }
+    if (provider === "facebook" || provider === "instagram" || provider === "whatsapp") {
+      const response = await fetch(`https://graph.facebook.com/v21.0/me/permissions?access_token=${encodeURIComponent(accessToken)}`, {
+        method: "DELETE",
+      });
+      return {
+        revoked: response.ok,
+        supported: true,
+        message: response.ok ? "Permissions removed at Meta." : `Meta revoke returned HTTP ${response.status}.`,
+      };
+    }
+    if (provider === "reddit") {
+      const response = await fetch("https://www.reddit.com/api/v1/revoke_token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ token: accessToken, token_type_hint: "access_token" }).toString(),
+      });
+      return {
+        revoked: response.ok,
+        supported: true,
+        message: response.ok ? "Token revoked at Reddit." : `Reddit revoke returned HTTP ${response.status}.`,
+      };
+    }
+    if (provider === "twitter") {
+      const response = await fetch("https://api.twitter.com/2/oauth2/revoke", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ token: accessToken, token_type_hint: "access_token" }).toString(),
+      });
+      return {
+        revoked: response.ok,
+        supported: true,
+        message: response.ok ? "Token revoked at X." : `X revoke returned HTTP ${response.status}.`,
+      };
+    }
+  } catch (caught) {
+    return { revoked: false, supported: true, message: caught instanceof Error ? caught.message : "Revoke request failed." };
+  }
+  return { revoked: false, supported: false, message: "This provider offers no revoke endpoint; the stored access was deleted here." };
 }
