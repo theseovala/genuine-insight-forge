@@ -399,6 +399,19 @@ export function IntegrationManager() {
                     </div>
                   </div>
 
+                  {isAdmin && definition.id === "google_business" && (
+                    <GoogleBusinessSetupGuide
+                      credentialsReady={(item?.credentials ?? []).some((c) => c.masked || c.fromEnvironment)}
+                    />
+                  )}
+
+                  {isAdmin && definition.id === "google_maps" && (
+                    <GoogleMapsSetupGuide
+                      credentialsReady={(item?.credentials ?? []).some((c) => c.masked || c.fromEnvironment)}
+                      verified={status === "connected"}
+                    />
+                  )}
+
                   {isAdmin && (definition.credentialFields?.length ?? 0) > 0 && (
                     <CredentialPanel
                       definition={definition}
@@ -406,6 +419,7 @@ export function IntegrationManager() {
                       onChanged={refresh}
                     />
                   )}
+
 
                   {definition.kind === "api_key" && isAdmin && (
                     <div className="mt-3 flex flex-wrap items-end gap-2">
