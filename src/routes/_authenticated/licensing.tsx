@@ -420,7 +420,7 @@ function LicensingPage() {
 
         {/* ---------- releases ---------- */}
         <Section title="Releases" description="Only signed packages that passed artifact inspection can be downloaded.">
-          {isStaff && (
+          {data?.isStaff && (
             <div className="mb-4 grid gap-2 md:grid-cols-4">
               <Input
                 placeholder="Version (1.0.0)"
