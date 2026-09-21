@@ -382,37 +382,73 @@ function ScansPage() {
                 </Section>
               ) : null}
 
-              <Section title="Scan health" description="Every source that was contacted, with what it returned.">
+              <Section title="Scan health" description="Every technical check that ran, with what it returned.">
                 <ul className="stagger grid gap-2 sm:grid-cols-2">
-                  {data.sources.map((source: any) => (
-                    <li
-                      key={source.source}
-                      className="card-interactive flex items-start gap-2 rounded-lg border border-border px-3 py-2 text-sm"
-                    >
-                      <span className="icon-tile mt-0.5">
-                        <SourceIcon status={source.status} />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 font-medium">
-                          <span className="truncate">{SOURCE_LABEL[source.source] ?? source.source}</span>
-                          {source.status === "completed" ? (
-                            <Badge variant="outline" className="h-4 shrink-0 px-1 text-[9px] uppercase">
-                              {source.freshness}
-                            </Badge>
-                          ) : null}
-                        </div>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {source.status === "not_configured"
-                            ? "Provider not configured"
-                            : source.error_message
+                  {data.sources
+                    .filter((source: any) => !String(source.source).startsWith("platform:"))
+                    .map((source: any) => (
+                      <li
+                        key={source.source}
+                        className="card-interactive flex items-start gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+                      >
+                        <span className="icon-tile mt-0.5">
+                          <SourceIcon status={source.status} />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 font-medium">
+                            <span className="truncate">{sourceLabel(source.source)}</span>
+                            {source.status === "completed" ? (
+                              <Badge variant="outline" className="h-4 shrink-0 px-1 text-[9px] uppercase">
+                                {source.freshness}
+                              </Badge>
+                            ) : null}
+                          </div>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {source.error_message
                               ? source.error_message
-                              : `Retrieved ${new Date(source.created_at).toLocaleString()}`}
-                        </p>
-                      </div>
-                    </li>
-                  ))}
+                              : source.status === "completed"
+                                ? `Retrieved ${new Date(source.created_at).toLocaleString()}`
+                                : (SOURCE_STATUS_LABEL[source.status] ?? source.status)}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
                 </ul>
               </Section>
+
+              {data.sources.some((source: any) => String(source.source).startsWith("platform:")) ? (
+                <Section
+                  title="Platforms checked"
+                  description="Which review and marketing platforms apply to this website, and whether this workspace can actually use them."
+                >
+                  <ul className="stagger grid gap-2 sm:grid-cols-2">
+                    {data.sources
+                      .filter((source: any) => String(source.source).startsWith("platform:"))
+                      .map((source: any) => (
+                        <li
+                          key={source.source}
+                          className="card-interactive flex items-start gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+                        >
+                          <span className="icon-tile mt-0.5">
+                            <SourceIcon status={source.status} />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 font-medium">
+                              <span className="truncate">{sourceLabel(source.source)}</span>
+                              <Badge variant="outline" className="h-4 shrink-0 px-1 text-[9px] uppercase">
+                                {SOURCE_STATUS_LABEL[source.status] ?? source.status}
+                              </Badge>
+                            </div>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {source.error_message ?? "Connection verified against the provider."}
+                            </p>
+                          </div>
+                        </li>
+                      ))}
+                  </ul>
+                </Section>
+              ) : null}
+
 
               {data.comparison ? (
                 <Section title="Compared with the previous scan" description={`Previous scan ${new Date(data.comparison.previousAt).toLocaleString()} · score ${data.comparison.previousScore ?? "unavailable"}`}>
