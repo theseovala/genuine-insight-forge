@@ -14,6 +14,93 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_mfa: {
+        Row: {
+          confirmed_at: string | null
+          created_at: string
+          failed_attempts: number
+          last_used_at: string | null
+          locked_until: string | null
+          recovery_hashes: string[]
+          secret_ciphertext: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          confirmed_at?: string | null
+          created_at?: string
+          failed_attempts?: number
+          last_used_at?: string | null
+          locked_until?: string | null
+          recovery_hashes?: string[]
+          secret_ciphertext: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          confirmed_at?: string | null
+          created_at?: string
+          failed_attempts?: number
+          last_used_at?: string | null
+          locked_until?: string | null
+          recovery_hashes?: string[]
+          secret_ciphertext?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      admin_roles: {
+        Row: {
+          created_at: string
+          granted_by: string | null
+          id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      admin_step_up: {
+        Row: {
+          action: string
+          expires_at: string
+          granted_at: string
+          id: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          expires_at: string
+          granted_at?: string
+          id?: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          expires_at?: string
+          granted_at?: string
+          id?: string
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_runs: {
         Row: {
           created_at: string
@@ -1196,6 +1283,761 @@ export type Database = {
           },
         ]
       }
+      license_activations: {
+        Row: {
+          correlation_id: string | null
+          created_at: string
+          domain: string | null
+          id: string
+          installation_id: string | null
+          license_id: string | null
+          reason: string | null
+          result: string
+        }
+        Insert: {
+          correlation_id?: string | null
+          created_at?: string
+          domain?: string | null
+          id?: string
+          installation_id?: string | null
+          license_id?: string | null
+          reason?: string | null
+          result: string
+        }
+        Update: {
+          correlation_id?: string | null
+          created_at?: string
+          domain?: string | null
+          id?: string
+          installation_id?: string | null
+          license_id?: string | null
+          reason?: string | null
+          result?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "license_activations_installation_id_fkey"
+            columns: ["installation_id"]
+            isOneToOne: false
+            referencedRelation: "license_installations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "license_activations_license_id_fkey"
+            columns: ["license_id"]
+            isOneToOne: false
+            referencedRelation: "licenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      license_client_users: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "license_client_users_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "license_clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      license_clients: {
+        Row: {
+          contact_email: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          notes: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          contact_email?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          contact_email?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      license_domains: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          domain: string
+          id: string
+          license_id: string
+          status: string
+          verified_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          domain: string
+          id?: string
+          license_id: string
+          status?: string
+          verified_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          domain?: string
+          id?: string
+          license_id?: string
+          status?: string
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "license_domains_license_id_fkey"
+            columns: ["license_id"]
+            isOneToOne: false
+            referencedRelation: "licenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      license_download_events: {
+        Row: {
+          actor: string | null
+          correlation_id: string | null
+          created_at: string
+          id: string
+          license_id: string | null
+          reason: string | null
+          release_id: string | null
+          result: string
+          token_id: string | null
+        }
+        Insert: {
+          actor?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          id?: string
+          license_id?: string | null
+          reason?: string | null
+          release_id?: string | null
+          result: string
+          token_id?: string | null
+        }
+        Update: {
+          actor?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          id?: string
+          license_id?: string | null
+          reason?: string | null
+          release_id?: string | null
+          result?: string
+          token_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "license_download_events_license_id_fkey"
+            columns: ["license_id"]
+            isOneToOne: false
+            referencedRelation: "licenses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "license_download_events_release_id_fkey"
+            columns: ["release_id"]
+            isOneToOne: false
+            referencedRelation: "license_releases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "license_download_events_token_id_fkey"
+            columns: ["token_id"]
+            isOneToOne: false
+            referencedRelation: "license_download_tokens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      license_download_tokens: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          ip_hash: string | null
+          issued_to: string | null
+          license_id: string
+          release_id: string
+          revoked_at: string | null
+          single_use: boolean
+          token_hash: string
+          used_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          ip_hash?: string | null
+          issued_to?: string | null
+          license_id: string
+          release_id: string
+          revoked_at?: string | null
+          single_use?: boolean
+          token_hash: string
+          used_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          ip_hash?: string | null
+          issued_to?: string | null
+          license_id?: string
+          release_id?: string
+          revoked_at?: string | null
+          single_use?: boolean
+          token_hash?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "license_download_tokens_license_id_fkey"
+            columns: ["license_id"]
+            isOneToOne: false
+            referencedRelation: "licenses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "license_download_tokens_release_id_fkey"
+            columns: ["release_id"]
+            isOneToOne: false
+            referencedRelation: "license_releases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      license_events: {
+        Row: {
+          actor: string | null
+          client_id: string | null
+          correlation_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          license_id: string | null
+          metadata: Json
+          resource: string | null
+          result: string
+        }
+        Insert: {
+          actor?: string | null
+          client_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          license_id?: string | null
+          metadata?: Json
+          resource?: string | null
+          result?: string
+        }
+        Update: {
+          actor?: string | null
+          client_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          license_id?: string | null
+          metadata?: Json
+          resource?: string | null
+          result?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "license_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "license_clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "license_events_license_id_fkey"
+            columns: ["license_id"]
+            isOneToOne: false
+            referencedRelation: "licenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      license_installations: {
+        Row: {
+          activated_at: string
+          client_id: string
+          created_at: string
+          domain: string
+          fingerprint_hash: string
+          id: string
+          installation_ref: string
+          last_seen_ip_hash: string | null
+          last_validated_at: string | null
+          license_id: string
+          status: string
+          updated_at: string
+          version: string | null
+        }
+        Insert: {
+          activated_at?: string
+          client_id: string
+          created_at?: string
+          domain: string
+          fingerprint_hash: string
+          id?: string
+          installation_ref: string
+          last_seen_ip_hash?: string | null
+          last_validated_at?: string | null
+          license_id: string
+          status?: string
+          updated_at?: string
+          version?: string | null
+        }
+        Update: {
+          activated_at?: string
+          client_id?: string
+          created_at?: string
+          domain?: string
+          fingerprint_hash?: string
+          id?: string
+          installation_ref?: string
+          last_seen_ip_hash?: string | null
+          last_validated_at?: string | null
+          license_id?: string
+          status?: string
+          updated_at?: string
+          version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "license_installations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "license_clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "license_installations_license_id_fkey"
+            columns: ["license_id"]
+            isOneToOne: false
+            referencedRelation: "licenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      license_plans: {
+        Row: {
+          code: string
+          created_at: string
+          features: string[]
+          id: string
+          max_domains: number
+          max_installations: number
+          name: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          features?: string[]
+          id?: string
+          max_domains?: number
+          max_installations?: number
+          name: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          features?: string[]
+          id?: string
+          max_domains?: number
+          max_installations?: number
+          name?: string
+        }
+        Relationships: []
+      }
+      license_releases: {
+        Row: {
+          artifact_bytes: number | null
+          artifact_path: string
+          build_id: string
+          channel: string
+          checksum_sha256: string
+          created_at: string
+          created_by: string | null
+          id: string
+          inspection_passed: boolean
+          inspection_report: Json
+          min_supported_version: string | null
+          notes: string | null
+          published_at: string | null
+          release_ref: string
+          signature: string | null
+          signing_key_id: string | null
+          status: string
+          version: string
+        }
+        Insert: {
+          artifact_bytes?: number | null
+          artifact_path: string
+          build_id: string
+          channel?: string
+          checksum_sha256: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          inspection_passed?: boolean
+          inspection_report?: Json
+          min_supported_version?: string | null
+          notes?: string | null
+          published_at?: string | null
+          release_ref: string
+          signature?: string | null
+          signing_key_id?: string | null
+          status?: string
+          version: string
+        }
+        Update: {
+          artifact_bytes?: number | null
+          artifact_path?: string
+          build_id?: string
+          channel?: string
+          checksum_sha256?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          inspection_passed?: boolean
+          inspection_report?: Json
+          min_supported_version?: string | null
+          notes?: string | null
+          published_at?: string | null
+          release_ref?: string
+          signature?: string | null
+          signing_key_id?: string | null
+          status?: string
+          version?: string
+        }
+        Relationships: []
+      }
+      license_revocations: {
+        Row: {
+          created_at: string
+          id: string
+          license_id: string
+          reason: string
+          revoked_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          license_id: string
+          reason: string
+          revoked_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          license_id?: string
+          reason?: string
+          revoked_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "license_revocations_license_id_fkey"
+            columns: ["license_id"]
+            isOneToOne: false
+            referencedRelation: "licenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      license_security_events: {
+        Row: {
+          actor: string | null
+          client_id: string | null
+          correlation_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          license_id: string | null
+          message: string
+          metadata: Json
+          resource: string | null
+          result: string
+          severity: string
+        }
+        Insert: {
+          actor?: string | null
+          client_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          license_id?: string | null
+          message: string
+          metadata?: Json
+          resource?: string | null
+          result?: string
+          severity?: string
+        }
+        Update: {
+          actor?: string | null
+          client_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          license_id?: string | null
+          message?: string
+          metadata?: Json
+          resource?: string | null
+          result?: string
+          severity?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "license_security_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "license_clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "license_security_events_license_id_fkey"
+            columns: ["license_id"]
+            isOneToOne: false
+            referencedRelation: "licenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      license_transfers: {
+        Row: {
+          approved_by: string | null
+          completed_at: string | null
+          created_at: string
+          from_client_id: string | null
+          id: string
+          license_id: string
+          requested_by: string | null
+          status: string
+          to_client_id: string | null
+        }
+        Insert: {
+          approved_by?: string | null
+          completed_at?: string | null
+          created_at?: string
+          from_client_id?: string | null
+          id?: string
+          license_id: string
+          requested_by?: string | null
+          status?: string
+          to_client_id?: string | null
+        }
+        Update: {
+          approved_by?: string | null
+          completed_at?: string | null
+          created_at?: string
+          from_client_id?: string | null
+          id?: string
+          license_id?: string
+          requested_by?: string | null
+          status?: string
+          to_client_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "license_transfers_from_client_id_fkey"
+            columns: ["from_client_id"]
+            isOneToOne: false
+            referencedRelation: "license_clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "license_transfers_license_id_fkey"
+            columns: ["license_id"]
+            isOneToOne: false
+            referencedRelation: "licenses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "license_transfers_to_client_id_fkey"
+            columns: ["to_client_id"]
+            isOneToOne: false
+            referencedRelation: "license_clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      license_validations: {
+        Row: {
+          correlation_id: string | null
+          created_at: string
+          domain: string | null
+          id: string
+          installation_id: string | null
+          license_id: string | null
+          reason: string | null
+          result: string
+        }
+        Insert: {
+          correlation_id?: string | null
+          created_at?: string
+          domain?: string | null
+          id?: string
+          installation_id?: string | null
+          license_id?: string | null
+          reason?: string | null
+          result: string
+        }
+        Update: {
+          correlation_id?: string | null
+          created_at?: string
+          domain?: string | null
+          id?: string
+          installation_id?: string | null
+          license_id?: string | null
+          reason?: string | null
+          result?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "license_validations_installation_id_fkey"
+            columns: ["installation_id"]
+            isOneToOne: false
+            referencedRelation: "license_installations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "license_validations_license_id_fkey"
+            columns: ["license_id"]
+            isOneToOne: false
+            referencedRelation: "licenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      licenses: {
+        Row: {
+          activated_at: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          current_version: string | null
+          expires_at: string | null
+          features: string[]
+          id: string
+          issued_at: string
+          last_download_at: string | null
+          last_validated_at: string | null
+          license_key: string
+          max_domains: number
+          max_installations: number
+          notes: string | null
+          plan_id: string | null
+          secret_hash: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          activated_at?: string | null
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          current_version?: string | null
+          expires_at?: string | null
+          features?: string[]
+          id?: string
+          issued_at?: string
+          last_download_at?: string | null
+          last_validated_at?: string | null
+          license_key: string
+          max_domains?: number
+          max_installations?: number
+          notes?: string | null
+          plan_id?: string | null
+          secret_hash: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          activated_at?: string | null
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          current_version?: string | null
+          expires_at?: string | null
+          features?: string[]
+          id?: string
+          issued_at?: string
+          last_download_at?: string | null
+          last_validated_at?: string | null
+          license_key?: string
+          max_domains?: number
+          max_installations?: number
+          notes?: string | null
+          plan_id?: string | null
+          secret_hash?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "licenses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "license_clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "licenses_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "license_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       locations: {
         Row: {
           city: string
@@ -2230,6 +3072,30 @@ export type Database = {
           },
         ]
       }
+      security_rate_limits: {
+        Row: {
+          bucket: string
+          count: number
+          id: string
+          key_hash: string
+          window_start: string
+        }
+        Insert: {
+          bucket: string
+          count?: number
+          id?: string
+          key_hash: string
+          window_start: string
+        }
+        Update: {
+          bucket?: string
+          count?: number
+          id?: string
+          key_hash?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       seo_backlinks: {
         Row: {
           anchor: string | null
@@ -2506,6 +3372,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_read_license: {
+        Args: { _license_id: string; _user_id: string }
+        Returns: boolean
+      }
       claim_google_oauth_state: {
         Args: { _state_hash: string }
         Returns: {
@@ -2546,6 +3416,14 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      has_admin_role: {
+        Args: { _roles: string[]; _user_id: string }
+        Returns: boolean
+      }
+      is_client_member: {
+        Args: { _client_id: string; _user_id: string }
+        Returns: boolean
       }
     }
     Enums: {
