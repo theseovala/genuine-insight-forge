@@ -407,10 +407,14 @@ export const setFindingStatus = createServerFn({ method: "POST" })
     if (!finding || finding.scans?.workspace_id !== member.workspace_id) {
       throw new Error("Finding not found.");
     }
-    const { error } = await context.supabase
+    // Findings are read-only for members under RLS, so the write happens with the
+    // service role only after the ownership check above has passed.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error, count } = await supabaseAdmin
       .from("scan_findings")
-      .update({ status: data.status })
+      .update({ status: data.status }, { count: "exact" })
       .eq("id", data.findingId);
     if (error) throw new Error(error.message);
+    if (!count) throw new Error("Finding could not be updated.");
     return { ok: true, status: data.status };
   });
