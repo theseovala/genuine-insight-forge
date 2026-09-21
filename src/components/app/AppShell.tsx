@@ -34,6 +34,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 export { navItems } from "./nav-items";
 import { navItems, navGroups } from "./nav-items";
+import { CommandPalette, useCommandPalette } from "./CommandPalette";
 
 function NavList({
   collapsed,
@@ -389,6 +390,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { data: reviews } = useLiveReviews();
   const { data: alerts } = useLiveAlerts();
+  const palette = useCommandPalette();
+
 
   // Restore the user's choice, and auto-collapse on narrow/half-screen laptops.
   useEffect(() => {
@@ -439,12 +442,21 @@ export function AppShell({ children }: { children: ReactNode }) {
         </Sheet>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <TopBar onMenu={() => setMobileOpen(true)} collapsed={collapsed} onToggle={toggleSidebar} />
+          <TopBar
+            onMenu={() => setMobileOpen(true)}
+            collapsed={collapsed}
+            onToggle={toggleSidebar}
+            onSearch={() => palette.setOpen(true)}
+          />
+          <CommandPalette open={palette.open} onOpenChange={palette.setOpen} />
           <main
             key={pathname}
             className="animate-fade flex-1 px-3 py-4 sm:px-4 md:px-5 md:py-5 lg:px-6 2xl:px-8"
           >
-            <div className="mx-auto w-full min-w-0 max-w-[1440px] 2xl:max-w-[1720px]">{children}</div>
+            <div className="mx-auto w-full min-w-0 max-w-[1440px] 2xl:max-w-[1720px]">
+              <Breadcrumbs pathname={pathname} />
+              {children}
+            </div>
           </main>
           <footer className="flex flex-col gap-1.5 border-t px-4 py-3 text-[11px] text-muted-foreground md:flex-row md:items-center md:justify-between md:px-6">
             <p>
