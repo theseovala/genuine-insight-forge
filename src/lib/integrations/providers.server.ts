@@ -123,6 +123,21 @@ export const OAUTH_PROVIDERS: Record<string, OAuthProviderConfig> = {
         return { label: item?.["snippet"]?.["title"] ?? null, ref: item?.["id"] ?? null };
       }),
   },
+  youtube_analytics: {
+    authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+    tokenUrl: "https://oauth2.googleapis.com/token",
+    clientIdEnv: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_BUSINESS_CLIENT_ID"],
+    clientSecretEnv: ["GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_BUSINESS_CLIENT_SECRET"],
+    usePkce: true,
+    tokenAuth: "body",
+    extraAuthParams: { access_type: "offline", prompt: "consent select_account", include_granted_scopes: "true" },
+    test: (token) =>
+      googleTest(
+        "https://youtubeanalytics.googleapis.com/v2/reports?ids=channel%3D%3DMINE&startDate=2024-01-01&endDate=2024-01-07&metrics=views",
+        token,
+        () => ({ label: "YouTube Analytics", ref: null }),
+      ),
+  },
   facebook: {
     authUrl: "https://www.facebook.com/v21.0/dialog/oauth",
     tokenUrl: "https://graph.facebook.com/v21.0/oauth/access_token",
