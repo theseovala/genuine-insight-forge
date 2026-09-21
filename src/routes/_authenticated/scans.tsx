@@ -118,6 +118,8 @@ function ScansPage() {
   const [url, setUrl] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [openFinding, setOpenFinding] = useState<string | null>(null);
+  const [findingFilter, setFindingFilter] = useState<(typeof FINDING_FILTERS)[number]>("all");
+
 
   const scans = useQuery({ queryKey: ["scans"], queryFn: () => listScans() });
   const detail = useQuery({
