@@ -86,7 +86,8 @@ export const deleteScan = createServerFn({ method: "POST" })
     const { data: scan, error } = await supabase.from("scans").select("id,workspace_id").eq("id", data.id).single();
     if (error) throw error;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    for (const table of ["scan_findings", "scan_metrics", "scan_sources", "scan_reports", "provider_raw_data"]) {
+    const derived = ["scan_findings", "scan_metrics", "scan_sources", "scan_reports", "provider_raw_data"] as const;
+    for (const table of derived) {
       await supabaseAdmin.from(table).delete().eq("scan_id", scan.id);
     }
     await supabaseAdmin.from("scans").delete().eq("id", scan.id);
