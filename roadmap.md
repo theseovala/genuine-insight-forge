@@ -100,3 +100,17 @@
 - [x] SERP provider (SerpApi) + YouTube Analytics OAuth provider
 - [x] Integration overview panel (connected / pending / auth errors / expiry / approval-required / 24h API errors + audit log) from real rows
 - [ ] Provider-sourced usage + rate-limit extraction during sync (needs configured provider keys)
+
+## Production Control Center + Observability (current)
+- [ ] Master system health dashboard (real checks: DB, queue, workers, AI, crawler, integrations, report/CSV engines)
+- [ ] Scan monitoring table with real View/Retry/Resume/Cancel/Re-run
+- [ ] Job queue monitoring + stuck/STALLED job detection and safe recovery
+- [ ] API monitoring + provider health (latency, failure rate, auth/rate-limit state)
+- [ ] AI health (provider, model, success/failure, latency, fallback, tokens)
+- [ ] Error center + separate security events feed
+- [ ] Audit log view with actor/action/resource
+- [ ] Log correlation IDs (request/scan/job/integration/workspace)
+- [ ] Circuit breaker + provider-aware rate limiting in the gateway
+- [ ] Data freshness monitoring; system performance timings
+- [ ] Admin debug view per scan (timeline, provider calls, errors, retries, AI, report)
+- [ ] Confirmation + server-side authorization on destructive operations
