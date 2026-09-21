@@ -50,6 +50,9 @@ export const Route = createFileRoute("/_authenticated/scans")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
+  validateSearch: (search: Record<string, unknown>) => ({
+    scan: typeof search["scan"] === "string" ? (search["scan"] as string) : undefined,
+  }),
   component: ScansPage,
 });
 

@@ -21,7 +21,9 @@ import { navItems } from "./nav-items";
 export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const navigate = useNavigate();
   const scans = useQuery({ queryKey: ["scans"], queryFn: () => listScans(), enabled: open });
-  const recentScans = useMemo(() => (scans.data ?? []).slice(0, 8), [scans.data]);
+  const recentScans = useMemo<
+    { id: string; target_domain: string; target_url: string; status: string }[]
+  >(() => ((scans.data as any[]) ?? []).slice(0, 8), [scans.data]);
 
   function go(fn: () => void) {
     onOpenChange(false);
@@ -29,7 +31,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
   }
 
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange} title="Search" description="Search pages and scans">
+    <CommandDialog open={open} onOpenChange={onOpenChange}>
       <CommandInput placeholder="Search pages, scans…" />
       <CommandList>
         <CommandEmpty>Nothing matched that search.</CommandEmpty>
