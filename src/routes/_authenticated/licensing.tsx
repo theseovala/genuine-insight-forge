@@ -22,6 +22,8 @@ import {
   changeLicenseDomain,
   resetInstallation,
   requestDownload,
+  publishRelease,
+  rollbackRelease,
 } from "@/lib/license.functions";
 
 export const Route = createFileRoute("/_authenticated/licensing")({
