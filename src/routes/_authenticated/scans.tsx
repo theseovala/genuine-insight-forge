@@ -81,17 +81,31 @@ function ScansPage() {
     },
   });
 
+  // The scan runs on the server; the browser is never blocked while it works.
+  // The detail query below polls until the stored status leaves queued/running.
   const start = useMutation({
     mutationFn: async (target: string) => {
       const created = await createScan({ data: { url: target } });
       setActiveId(created.id);
       await queryClient.invalidateQueries({ queryKey: ["scans"] });
-      return await runScanNow({ data: { id: created.id } });
+      runScanNow({ data: { id: created.id } })
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ["scans"] });
+          queryClient.invalidateQueries({ queryKey: ["scan"] });
+        })
+        .catch((error: Error) => toast.error(error.message));
+      return created;
     },
-    onSuccess: (result) => {
-      toast.success(result.status === "completed" ? "Scan complete" : "Scan finished with errors — see scan health");
+    onSuccess: () => toast.success("Scan started — results appear as each source answers"),
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const remove = useMutation({
+    mutationFn: (id: string) => deleteScan({ data: { id } }),
+    onSuccess: () => {
+      setActiveId(null);
+      toast.success("Scan deleted");
       queryClient.invalidateQueries({ queryKey: ["scans"] });
-      queryClient.invalidateQueries({ queryKey: ["scan"] });
     },
     onError: (error: Error) => toast.error(error.message),
   });
