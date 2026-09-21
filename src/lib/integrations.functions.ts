@@ -221,7 +221,11 @@ export const testIntegration = createServerFn({ method: "POST" })
         .select("access_token_ciphertext,refresh_token_ciphertext,token_expires_at,status")
         .eq("workspace_id", member.workspace_id)
         .maybeSingle();
-      if (!connection || connection.status !== "connected") throw new Error("Google Business Profile is not connected yet.");
+      if (!connection || connection.status !== "connected") {
+        const message = "Google Business Profile is not connected yet.";
+        await log("warning", message, null);
+        return { ok: false, status: 0, code: "NOT_CONFIGURED" as const, message };
+      }
       const { usableAccessToken } = await import("@/lib/google-business-sync.server");
       try {
         const token = await usableAccessToken(supabaseAdmin, member.workspace_id, connection as any);
@@ -250,7 +254,11 @@ export const testIntegration = createServerFn({ method: "POST" })
     if (definition.kind === "api_key") {
       result = await providers.testApiKeyProvider(definition.id, row?.account_ref ?? null, creds);
     } else {
-      if (!row?.access_token_ciphertext) throw new Error(`${definition.label} is not connected yet.`);
+      if (!row?.access_token_ciphertext) {
+        const message = `${definition.label} is not connected yet.`;
+        await log("warning", message, null);
+        return { ok: false, status: 0, code: "NOT_CONFIGURED" as const, message };
+      }
       const { decryptValue, encryptValue } = await import("@/lib/integrations/crypto.server");
       let accessToken = await decryptValue(row.access_token_ciphertext);
       const expiresSoon = row.token_expires_at ? Date.parse(row.token_expires_at) - Date.now() < 120_000 : false;
