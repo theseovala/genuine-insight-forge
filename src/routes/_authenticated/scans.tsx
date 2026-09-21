@@ -251,8 +251,8 @@ function ScansPage() {
         </form>
       </Section>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <Section title="Scan history" description="Completed scans are kept so results can be compared over time.">
+      <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <Section className="min-w-0" title="Scan history" description="Completed scans are kept so results can be compared over time.">
           {scans.isLoading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading
