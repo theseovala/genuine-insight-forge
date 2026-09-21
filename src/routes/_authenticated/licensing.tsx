@@ -89,7 +89,12 @@ function LicensingPage() {
     toast.error(error.message);
   };
 
+  // Sensitive licence actions are expensive and audited, so a second click
+  // while one is in flight is ignored rather than queued.
+  const [busy, setBusy] = useState(false);
   const run = <T,>(fn: () => Promise<T>, success: string) => {
+    if (busy) return;
+    setBusy(true);
     const attempt = () =>
       fn()
         .then(() => {
@@ -97,8 +102,12 @@ function LicensingPage() {
           setPendingAction(null);
           setStepUpCode("");
           refresh();
+          setBusy(false);
         })
-        .catch((error: Error) => handleError(error, attempt));
+        .catch((error: Error) => {
+          setBusy(false);
+          handleError(error, attempt);
+        });
     attempt();
   };
 
