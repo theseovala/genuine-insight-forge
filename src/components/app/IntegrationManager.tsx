@@ -21,6 +21,9 @@ import type { IntegrationDefinition } from "@/lib/integrations/registry";
 
 import { integrationStatusLabel as statusLabel, integrationStatusTone as statusTone } from "@/lib/integrations/status";
 import { GoogleBusinessSetupGuide, GoogleMapsSetupGuide } from "@/components/app/GoogleSetupGuide";
+import { ProviderSetupGuide } from "@/components/app/ProviderSetupGuide";
+
+const GUIDED_PROVIDERS = new Set(["facebook", "trustpilot", "semrush"]);
 
 function openAuthorization(url: string) {
   const popup = window.open(url, "_blank", "noopener,noreferrer");
