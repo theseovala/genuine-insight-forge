@@ -122,6 +122,12 @@ type CaseRow = {
   rationale: string;
   appeal_text: string | null;
   status: string;
+  /**
+   * The verified outcome, derived server-side from recheck evidence. The status
+   * is only what a person asserted, so removal is read from here and never from
+   * the status.
+   */
+  outcome: string | null;
   model: string | null;
   created_at: string;
   reviews: {
@@ -151,6 +157,37 @@ const statusTone: Record<string, string> = {
   dismissed: "bg-muted text-muted-foreground",
 };
 
+const outcomeLabels: Record<string, string> = {
+  removed: "Removed",
+  retained: "Retained",
+  unverified: "Unverified",
+};
+
+/**
+ * What a case may truthfully be called.
+ *
+ * A status of "approved" only records that a member marked the case closed; it is
+ * not evidence that the platform took the review down. So where the status would
+ * otherwise read as removal, the verified outcome is shown instead. Every other
+ * status keeps its existing representation, which is already truthful.
+ */
+function caseLabel(row: CaseRow): string {
+  if (row.status !== "approved") return row.status;
+  return outcomeLabels[row.outcome ?? ""] ?? "Unverified";
+}
+
+/**
+ * Tone for the label above, reusing the tones already defined for the statuses so
+ * no new styling is introduced: a verified removal keeps the positive tone, a
+ * review still published takes the negative one, and anything unverified is muted.
+ */
+function caseTone(row: CaseRow): string | undefined {
+  if (row.status !== "approved") return statusTone[row.status];
+  if (row.outcome === "removed") return statusTone["approved"];
+  if (row.outcome === "retained") return statusTone["rejected"];
+  return statusTone["dismissed"];
+}
+
 const tabs = ["Flagged", "Submitted", "Resolved", "All"] as const;
 
 function useRemovalCases() {
@@ -161,7 +198,7 @@ function useRemovalCases() {
       const { data, error } = await supabase
         .from("removal_cases")
         .select(
-          "id, review_id, violation_type, confidence, rationale, appeal_text, status, model, created_at, reviews(author, rating, body, platform, location_name)",
+          "id, review_id, violation_type, confidence, rationale, appeal_text, status, outcome, model, created_at, reviews(author, rating, body, platform, location_name)",
         )
         .eq("workspace_id", workspaceId)
         .order("created_at", { ascending: false });
@@ -372,7 +409,9 @@ function RemovalsPage() {
 
   const flagged = cases.filter((c) => c.status === "flagged").length;
   const submitted = cases.filter((c) => c.status === "submitted").length;
-  const approved = cases.filter((c) => c.status === "approved").length;
+  // Counted from the verified outcome, never from the status: a case a member
+  // marked closed is not a review the platform actually took down.
+  const removed = cases.filter((c) => c.outcome === "removed").length;
 
   return (
     <AppShell>
@@ -395,7 +434,7 @@ function RemovalsPage() {
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Flagged" value={String(flagged)} icon={ShieldX} />
         <StatCard label="Submitted" value={String(submitted)} icon={Send} />
-        <StatCard label="Removed" value={String(approved)} icon={CheckCircle2} />
+        <StatCard label="Removed" value={String(removed)} icon={CheckCircle2} />
         <StatCard
           label="Last scan"
           value={lastScan ? `${lastScan.reviews_checked} checked` : "—"}
@@ -454,10 +493,10 @@ function RemovalsPage() {
                   <span
                     className={cn(
                       "rounded-full px-2 py-0.5 text-[11px] font-bold capitalize",
-                      statusTone[c.status] ?? "bg-muted text-muted-foreground",
+                      caseTone(c) ?? "bg-muted text-muted-foreground",
                     )}
                   >
-                    {c.status}
+                    {caseLabel(c)}
                   </span>
                   <span className="text-[11px] text-muted-foreground">
                     {Math.round(Number(c.confidence) * 100)}% confidence
