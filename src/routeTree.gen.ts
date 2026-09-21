@@ -23,6 +23,7 @@ import { Route as AuthenticatedRemovalsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedResponsesRouteImport } from './routes/_authenticated/responses'
 import { Route as AuthenticatedReviewsRouteImport } from './routes/_authenticated/reviews'
+import { Route as AuthenticatedScansRouteImport } from './routes/_authenticated/scans'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as ApiPublicRemovalScanRouteImport } from './routes/api/public/removal-scan'
 import { Route as ApiPublicGoogleBusinessCallbackRouteImport } from './routes/api/public/google-business/callback'
@@ -100,6 +101,11 @@ const AuthenticatedReviewsRoute = AuthenticatedReviewsRouteImport.update({
   path: '/reviews',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedScansRoute = AuthenticatedScansRouteImport.update({
+  id: '/scans',
+  path: '/scans',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -149,6 +155,7 @@ export interface FileRoutesByFullPath {
   '/reports': typeof AuthenticatedReportsRoute
   '/responses': typeof AuthenticatedResponsesRoute
   '/reviews': typeof AuthenticatedReviewsRoute
+  '/scans': typeof AuthenticatedScansRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/api/public/removal-scan': typeof ApiPublicRemovalScanRoute
   '/api/public/google-business/callback': typeof ApiPublicGoogleBusinessCallbackRoute
@@ -170,6 +177,7 @@ export interface FileRoutesByTo {
   '/reports': typeof AuthenticatedReportsRoute
   '/responses': typeof AuthenticatedResponsesRoute
   '/reviews': typeof AuthenticatedReviewsRoute
+  '/scans': typeof AuthenticatedScansRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/api/public/removal-scan': typeof ApiPublicRemovalScanRoute
   '/api/public/google-business/callback': typeof ApiPublicGoogleBusinessCallbackRoute
@@ -193,6 +201,7 @@ export interface FileRoutesById {
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/responses': typeof AuthenticatedResponsesRoute
   '/_authenticated/reviews': typeof AuthenticatedReviewsRoute
+  '/_authenticated/scans': typeof AuthenticatedScansRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/api/public/removal-scan': typeof ApiPublicRemovalScanRoute
   '/api/public/google-business/callback': typeof ApiPublicGoogleBusinessCallbackRoute
@@ -216,6 +225,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/responses'
     | '/reviews'
+    | '/scans'
     | '/settings'
     | '/api/public/removal-scan'
     | '/api/public/google-business/callback'
@@ -237,6 +247,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/responses'
     | '/reviews'
+    | '/scans'
     | '/settings'
     | '/api/public/removal-scan'
     | '/api/public/google-business/callback'
@@ -259,6 +270,7 @@ export interface FileRouteTypes {
     | '/_authenticated/reports'
     | '/_authenticated/responses'
     | '/_authenticated/reviews'
+    | '/_authenticated/scans'
     | '/_authenticated/settings'
     | '/api/public/removal-scan'
     | '/api/public/google-business/callback'
@@ -379,6 +391,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedReviewsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/scans': {
+      id: '/_authenticated/scans'
+      path: '/scans'
+      fullPath: '/scans'
+      preLoaderRoute: typeof AuthenticatedScansRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
       path: '/settings'
@@ -435,6 +454,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedResponsesRoute: typeof AuthenticatedResponsesRoute
   AuthenticatedReviewsRoute: typeof AuthenticatedReviewsRoute
+  AuthenticatedScansRoute: typeof AuthenticatedScansRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
 }
 
@@ -449,6 +469,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedResponsesRoute: AuthenticatedResponsesRoute,
   AuthenticatedReviewsRoute: AuthenticatedReviewsRoute,
+  AuthenticatedScansRoute: AuthenticatedScansRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
 }
 
