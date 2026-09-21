@@ -289,7 +289,7 @@ function ScansPage() {
           )}
         </Section>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           {!activeId ? (
             <Section title="Scan result">
               <EmptyState icon={Radar} title="No scan selected" description="Start a scan or pick one from the history to see its findings and evidence." />
