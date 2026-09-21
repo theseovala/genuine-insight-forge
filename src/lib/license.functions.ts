@@ -44,11 +44,15 @@ export const getLicenseOverview = createServerFn({ method: "POST" })
             .select("id, installation_ref, license_id, domain, status, version, activated_at, last_validated_at")
             .in("license_id", licenseIds)
         : Promise.resolve({ data: [] }),
-      db
-        .from("license_releases")
-        .select("id, release_ref, version, build_id, channel, checksum_sha256, status, inspection_passed, inspection_report, created_at, published_at, signature")
-        .order("created_at", { ascending: false })
-        .limit(50),
+      // Releases are only visible to staff or to a user who belongs to a client
+      // company with at least one licence; nobody else learns a build exists.
+      isStaff || clientIds.length
+        ? db
+            .from("license_releases")
+            .select("id, release_ref, version, build_id, channel, checksum_sha256, status, inspection_passed, inspection_report, created_at, published_at, signature")
+            .order("created_at", { ascending: false })
+            .limit(50)
+        : Promise.resolve({ data: [] }),
       db.from("admin_mfa").select("confirmed_at").eq("user_id", ctx.userId).maybeSingle(),
     ]);
 
@@ -530,7 +534,17 @@ export const listAdminUsers = createServerFn({ method: "POST" })
     const db = await admin();
     const access = await import("@/lib/license/access.server");
     const roles = await access.listRoles(db, ctx.userId);
-    if (!roles.some((r) => ["owner", "super_admin", "security_admin"].includes(r))) return { entries: [], allowed: false };
+    if (!roles.some((r) => (access.SENSITIVE_ACTIONS.manage_access as readonly string[]).includes(r))) {
+      const authority = await import("@/lib/license/authority.server");
+      await authority.recordLicenseSecurityEvent(db, {
+        actor: ctx.userId,
+        eventType: "unauthorized_admin_list",
+        severity: "warning",
+        result: "denied",
+        message: "Account without an access-management role tried to list administrators.",
+      });
+      throw new Error("You do not have permission to perform this action.");
+    }
     const { data } = await db.from("admin_roles").select("id, user_id, role, created_at").order("created_at");
     const userIds = [...new Set((data ?? []).map((row: any) => row.user_id))];
     const { data: profiles } = userIds.length

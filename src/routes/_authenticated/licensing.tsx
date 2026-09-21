@@ -24,6 +24,8 @@ import {
   requestDownload,
   publishRelease,
   rollbackRelease,
+  listAdminUsers,
+  setAdminRole,
 } from "@/lib/license.functions";
 
 export const Route = createFileRoute("/_authenticated/licensing")({
@@ -70,6 +72,7 @@ function LicensingPage() {
   const [issued, setIssued] = useState<{ licenseKey: string; licenseSecret: string; domain: string } | null>(null);
   const [domainEdit, setDomainEdit] = useState<Record<string, string>>({});
   const [releaseForm, setReleaseForm] = useState({ version: "", buildId: "", artifactPath: "" });
+  const [roleForm, setRoleForm] = useState({ email: "", role: "developer" });
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["license-overview"] });
@@ -123,6 +126,13 @@ function LicensingPage() {
       refresh();
     },
     onError: (error: Error) => toast.error(error.message),
+  });
+
+  const admins = useQuery({
+    queryKey: ["license-admins"],
+    queryFn: () => listAdminUsers(),
+    retry: false,
+    enabled: Boolean(overview.data?.isStaff),
   });
 
   const data = overview.data;
@@ -518,6 +528,58 @@ function LicensingPage() {
             </div>
           )}
         </Section>
+
+        {data?.isStaff && admins.data?.allowed && (
+          <Section title="Access control" description="Who holds an administrative role. Granting or removing a role is recorded as a critical security event.">
+            <div className="space-y-1 text-sm">
+              {admins.data.entries.map((entry: any) => (
+                <div key={entry.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-border/50 px-3 py-1.5">
+                  <span className="font-medium">{entry.email ?? entry.user_id}</span>
+                  <Badge variant="outline">{entry.role.replace(/_/g, " ")}</Badge>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      run(() => setAdminRole({ data: { email: entry.email, role: entry.role, grant: false } }), "Role removed.")
+                    }
+                    disabled={!entry.email}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 flex flex-wrap items-end gap-2">
+              <div className="min-w-[220px] flex-1">
+                <Label htmlFor="role-email">Account email</Label>
+                <Input id="role-email" value={roleForm.email} onChange={(e) => setRoleForm((f) => ({ ...f, email: e.target.value }))} placeholder="person@company.com" />
+              </div>
+              <div>
+                <Label htmlFor="role-name">Role</Label>
+                <select
+                  id="role-name"
+                  className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                  value={roleForm.role}
+                  onChange={(e) => setRoleForm((f) => ({ ...f, role: e.target.value }))}
+                >
+                  {["owner", "super_admin", "security_admin", "tech_lead", "developer", "qa", "support"].map((r) => (
+                    <option key={r} value={r}>
+                      {r.replace(/_/g, " ")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <Button
+                onClick={() =>
+                  run(() => setAdminRole({ data: { email: roleForm.email.trim(), role: roleForm.role as any, grant: true } }), "Role granted.")
+                }
+                disabled={!roleForm.email.trim()}
+              >
+                Grant role
+              </Button>
+            </div>
+          </Section>
+        )}
 
         {data?.isStaff && (
           <Section title="Licence security events" description="Denied and suspicious attempts recorded by the licence authority.">
