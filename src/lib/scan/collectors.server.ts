@@ -138,7 +138,12 @@ async function request(url: string, init: RequestInit = {}) {
 export function normalizeTarget(input: string) {
   const trimmed = input.trim();
   const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-  const url = new URL(withScheme);
+  let url: URL;
+  try {
+    url = new URL(withScheme);
+  } catch {
+    throw new Error("Enter a valid website address, for example seovale.com");
+  }
   if (!url.hostname.includes(".")) throw new Error("Enter a valid website address, for example seovale.com");
   url.hash = "";
   return { url: url.toString(), domain: url.hostname.replace(/^www\./i, ""), origin: url.origin };
