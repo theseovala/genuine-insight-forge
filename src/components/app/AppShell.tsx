@@ -21,6 +21,7 @@ import {
   UserRound,
   PanelLeftClose,
   PanelLeftOpen,
+  Radar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApp, ALL_LOCATIONS } from "@/lib/app-context";
