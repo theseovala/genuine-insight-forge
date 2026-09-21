@@ -252,11 +252,18 @@ export async function validateLicense(db: Db, input: ValidationInput): Promise<V
 
   if (!license) return fail("license_not_found", "No license matches the supplied key.");
 
-  // Signature is mandatory when the caller supplies one path; deployments always sign.
+  // Deployments always sign their calls; the shared secret never leaves the server.
   if (input.signature !== undefined) {
-    const verified = verifyRequestSignature(input.body ?? {}, input.signature, input.timestamp ?? null, license.secret_hash);
+    let secret: string;
+    try {
+      secret = await decryptSecret(license.secret_hash);
+    } catch {
+      return fail("invalid_signature", "License secret could not be verified.", license.id, license.client_id);
+    }
+    const verified = verifyRequestSignature(input.body ?? {}, input.signature, input.timestamp ?? null, secret);
     if (!verified.ok) return fail("invalid_signature", `Request signature rejected (${verified.reason}).`, license.id, license.client_id);
   }
+
 
   let domain: string;
   try {
