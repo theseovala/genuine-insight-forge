@@ -59,6 +59,41 @@ export const listIntegrations = createServerFn({ method: "GET" })
     if (error) throw error;
     const rows = new Map((data ?? []).map((row: any) => [row.provider, row]));
 
+    // Live health + rate-limit state, read from the rows the adapters actually wrote.
+    const healthRows = await supabaseAdmin
+      .from("integration_health")
+      .select("provider,status,latency_ms,outcome_code,last_error,last_checked_at,last_ok_at")
+      .eq("workspace_id", member.workspace_id);
+    const health = new Map((healthRows.data ?? []).map((row: any) => [row.provider, row]));
+    const limitRows = await supabaseAdmin
+      .from("integration_rate_limits")
+      .select("provider,limit_value,remaining,reset_at,recorded_at")
+      .eq("workspace_id", member.workspace_id)
+      .order("recorded_at", { ascending: false });
+    const limits = new Map<string, any>();
+    for (const row of limitRows.data ?? []) if (!limits.has(row.provider)) limits.set(row.provider, row);
+    const syncRows = await supabaseAdmin
+      .from("provider_resources")
+      .select("provider,last_synced_at")
+      .eq("workspace_id", member.workspace_id)
+      .not("last_synced_at", "is", null)
+      .order("last_synced_at", { ascending: false });
+    const lastSync = new Map<string, string>();
+    for (const row of syncRows.data ?? []) if (!lastSync.has(row.provider)) lastSync.set(row.provider, row.last_synced_at);
+
+    const liveState = (providerId: string) => {
+      const h = health.get(providerId) as any;
+      const l = limits.get(providerId) as any;
+      return {
+        lastSyncAt: lastSync.get(providerId) ?? null,
+        lastSuccessAt: h?.last_ok_at ?? null,
+        lastCheckedAt: h?.last_checked_at ?? null,
+        latencyMs: h?.latency_ms ?? null,
+        outcomeCode: h?.outcome_code ?? null,
+        rateLimit: l ? { limit: l.limit_value, remaining: l.remaining, resetAt: l.reset_at, recordedAt: l.recorded_at } : null,
+      };
+    };
+
     const google = await supabaseAdmin
       .from("google_business_connections")
       .select("google_account_email,status,last_synced_at,last_error")
@@ -83,6 +118,7 @@ export const listIntegrations = createServerFn({ method: "GET" })
             lastTestedAt: row?.last_synced_at ?? null,
             lastTestOk: row?.status === "connected" ? true : null,
             lastError: row?.last_error ?? null,
+            ...liveState(definition.id),
           };
         }
         const row = rows.get(definition.id) as any;
@@ -106,6 +142,7 @@ export const listIntegrations = createServerFn({ method: "GET" })
           lastTestedAt: row?.last_tested_at ?? null,
           lastTestOk: row?.last_test_ok ?? null,
           lastError: row?.last_error ?? null,
+          ...liveState(definition.id),
         };
       }),
     };

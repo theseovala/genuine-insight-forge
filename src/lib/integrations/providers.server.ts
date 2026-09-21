@@ -535,6 +535,23 @@ export async function testApiKeyProvider(
       }
       return { ok: true, status: response.status, message: "Live DataForSEO API call succeeded.", label: "DataForSEO", accountRef: null, code: "CONNECTED" };
     }
+    case "lovable_ai": {
+      const key = envValue(["LOVABLE_API_KEY"], creds);
+      if (!key) return notConfigured("The Cloud AI gateway key is not available in this environment.");
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/models", {
+        headers: { Authorization: `Bearer ${key}` },
+      });
+      const ok = response.ok;
+      const body = ok ? "" : (await response.text()).slice(0, 200);
+      return {
+        ok,
+        status: response.status,
+        message: ok ? "Cloud AI gateway reachable." : `Cloud AI gateway returned HTTP ${response.status}. ${body}`.trim(),
+        label: ok ? "Cloud AI gateway" : null,
+        accountRef: null,
+        code: outcomeFor(ok, response.status, body),
+      };
+    }
     case "openai": {
       const key = envValue(["OPENAI_API_KEY"], creds);
       if (!key) return notConfigured("No OpenAI API key is configured.");

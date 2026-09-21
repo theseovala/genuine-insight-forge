@@ -503,6 +503,30 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     approvalRequired: "Indeed company-review API access requires an approved Indeed partner agreement.",
   },
   {
+    id: "meta_business",
+    group: "Meta",
+    label: "Meta Business Suite",
+    description: "Business-level asset and page management for the connected Meta app.",
+    kind: "manual",
+    requiredSecrets: [],
+    scopes: ["business_management"],
+    docsUrl: "https://developers.facebook.com/docs/marketing-api/business-asset-management",
+    manualReason:
+      "Meta Business Suite data is read through the Facebook and Instagram connections above. A separate Business Suite connection needs the business_management permission, which Meta grants only after App Review.",
+    approvalRequired: "business_management requires Meta App Review approval.",
+  },
+  {
+    id: "lovable_ai",
+    group: "AI",
+    label: "Cloud AI gateway",
+    description: "Built-in AI models used for scan analysis, reports and reply drafting.",
+    kind: "api_key",
+    requiredSecrets: ["LOVABLE_API_KEY"],
+    scopes: [],
+    docsUrl: "https://docs.lovable.dev/features/ai",
+    credentialGroup: "lovable_ai",
+  },
+  {
     id: "glassdoor",
     group: "Employer",
     label: "Glassdoor employer profile",
@@ -535,3 +559,89 @@ export type TestOutcomeCode =
   | "APPROVAL_REQUIRED"
   | "TOKEN_EXPIRED"
   | "UNAVAILABLE";
+
+/**
+ * Capability matrix — only capabilities the provider genuinely exposes to this
+ * workspace are listed. An empty list means the provider has no usable public
+ * capability here (partner-only or approval-gated).
+ */
+export const PROVIDER_CAPABILITIES: Record<string, string[]> = {
+  google_business: ["Locations", "Reviews", "Owner replies"],
+  google_maps: ["Place search", "Place details", "Ratings", "Review snippets"],
+  google_search_console: ["Search performance", "Indexing status"],
+  google_analytics: ["Traffic", "Audience", "Conversions"],
+  google_ads: ["Campaign performance"],
+  google_gmail: ["Send email"],
+  youtube: ["Channel data", "Videos", "Comments"],
+  youtube_analytics: ["Channel analytics"],
+  facebook: ["Page data", "Page reviews", "Posts"],
+  instagram: ["Profile data", "Media", "Comments"],
+  whatsapp: ["Message sending", "Templates"],
+  meta_business: [],
+  trustpilot: ["Business profile", "Reviews"],
+  tripadvisor: ["Location search", "Location details", "Review snippets"],
+  yelp: ["Business search", "Business details", "Review snippets"],
+  reddit: ["Brand mentions", "Comments"],
+  twitter: ["Brand mentions", "Profile data"],
+  pinterest: ["Profile data", "Pins"],
+  semrush: ["Domain overview", "Keywords", "Backlinks"],
+  ahrefs: ["Domain rating", "Backlinks"],
+  moz: ["Domain authority", "Link metrics"],
+  dataforseo: ["SERP data", "Keyword data"],
+  serpapi: ["Live SERP positions"],
+  openai: ["Text analysis", "Report writing"],
+  lovable_ai: ["Text analysis", "Report writing", "Reply drafting"],
+  resend_email: ["Transactional email"],
+  twilio_sms: ["SMS alerts"],
+  stripe: ["Account status"],
+  razorpay: ["Account status"],
+  web_crawler: ["Page crawling", "Content extraction", "Screenshots"],
+  pagespeed: ["Core Web Vitals", "Lighthouse scores"],
+  ssl_monitor: ["Certificate grade", "Expiry"],
+  dns_rdap: ["DNS records", "Registration", "Expiry"],
+  uptime_monitor: ["Availability", "Response time"],
+  url_reputation: ["Malware check", "Phishing check"],
+  indeed: [],
+  glassdoor: [],
+};
+
+/** Documented provider limits used for throttling and backoff. */
+export const PROVIDER_RATE_LIMITS: Record<string, string> = {
+  google_business: "Google quota per project (default 300 requests/min)",
+  google_maps: "Places API quota per key",
+  google_search_console: "1,200 queries/min per property",
+  google_analytics: "GA4 Data API tokens per property/day",
+  youtube: "10,000 quota units/day",
+  facebook: "Meta app-level rate limits (BUC)",
+  instagram: "200 calls/hour per user",
+  whatsapp: "Tier-based messaging limits",
+  trustpilot: "Plan-based API limits",
+  tripadvisor: "Key-based daily call cap",
+  yelp: "500 calls/day on the free tier",
+  reddit: "100 queries/min per client",
+  twitter: "Tier-based 15-minute windows",
+  semrush: "Unit-based API budget",
+  ahrefs: "Row-based API budget",
+  moz: "Plan-based monthly rows",
+  dataforseo: "2,000 calls/min",
+  serpapi: "Plan-based searches/month",
+  openai: "Account tier RPM/TPM",
+  lovable_ai: "Workspace AI gateway rate limit",
+  pagespeed: "25,000 requests/day per key",
+  url_reputation: "10,000 requests/day per key",
+  uptime_monitor: "10 requests/min",
+  ssl_monitor: "Qualys public assessment throttle",
+  dns_rdap: "Public RDAP fair-use throttle",
+  web_crawler: "Plan-based Firecrawl credits",
+};
+
+export const capabilitiesFor = (id: string) => PROVIDER_CAPABILITIES[id] ?? [];
+export const rateLimitFor = (id: string) => PROVIDER_RATE_LIMITS[id] ?? null;
+
+/** Human label for the authentication method shown in the integration centre. */
+export const authTypeLabel: Record<IntegrationKind, string> = {
+  oauth2: "OAuth 2.0",
+  api_key: "API key",
+  managed: "Managed",
+  manual: "Partner access",
+};
