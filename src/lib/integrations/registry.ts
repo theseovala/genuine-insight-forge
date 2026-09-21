@@ -446,9 +446,10 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     group: "Website intelligence",
     label: "SSL certificate monitoring",
     description: "Certificate grade and expiry checks via the public Qualys SSL Labs API.",
-    kind: "managed",
+    kind: "api_key",
     requiredSecrets: [],
     scopes: [],
+    accountField: { label: "Domain to monitor", hint: "e.g. seovale.com — scanned live by Qualys SSL Labs. No key required." },
     docsUrl: "https://github.com/ssllabs/ssllabs-scan/blob/master/ssllabs-api-docs-v3.md",
   },
   {
@@ -456,9 +457,10 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     group: "Website intelligence",
     label: "DNS / RDAP / WHOIS",
     description: "Domain registration, nameserver and expiry data from the public RDAP network.",
-    kind: "managed",
+    kind: "api_key",
     requiredSecrets: [],
     scopes: [],
+    accountField: { label: "Domain", hint: "e.g. seovale.com — looked up live over RDAP. No key required." },
     docsUrl: "https://about.rdap.org/",
   },
   {
