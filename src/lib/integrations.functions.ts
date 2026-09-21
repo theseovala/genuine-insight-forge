@@ -321,6 +321,17 @@ export const testIntegration = createServerFn({ method: "POST" })
       .eq("provider", data.provider)
       .maybeSingle();
 
+    // Circuit breaker: after repeated real failures we stop hammering the
+    // provider until the cooldown passes, and say so honestly.
+    const ops = await import("@/lib/ops.server");
+    const circuit = await ops.checkCircuit(supabaseAdmin, member.workspace_id, data.provider);
+    if (!circuit.allowed) {
+      const message = `Paused after repeated failures. The next attempt is allowed after ${circuit.cooldownUntil ? new Date(circuit.cooldownUntil).toLocaleString() : "the cooldown"}.`;
+      await log("warning", message, null, "circuit_open");
+      await recordHealth("RATE_LIMITED", message);
+      return { ok: false, status: 0, code: "RATE_LIMITED" as const, message };
+    }
+
     let result: TestResult;
 
     if (definition.kind === "api_key") {
@@ -376,6 +387,12 @@ export const testIntegration = createServerFn({ method: "POST" })
       const config = providers.OAUTH_PROVIDERS[data.provider];
       if (!config) throw new Error("Unknown integration.");
       result = await config.test(accessToken);
+    }
+
+    if (result.ok) {
+      await ops.recordCircuitSuccess(supabaseAdmin, member.workspace_id, data.provider);
+    } else {
+      await ops.recordCircuitFailure(supabaseAdmin, member.workspace_id, data.provider, result.message);
     }
 
     const status = result.ok ? "connected" : result.status === 401 || result.status === 403 ? "expired" : "error";
