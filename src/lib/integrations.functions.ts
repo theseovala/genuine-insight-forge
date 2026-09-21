@@ -240,6 +240,15 @@ export const testIntegration = createServerFn({ method: "POST" })
         http_status: httpStatus,
       });
 
+    if (definition.kind === "manual") {
+      // Partner-only APIs: reported honestly instead of pretending a test is possible.
+      const message = definition.manualReason ?? "This provider has no public API for this workspace.";
+      const code = definition.approvalRequired ? "APPROVAL_REQUIRED" : "UNAVAILABLE";
+      await log("warning", message, null);
+      await recordHealth(code, message);
+      return { ok: false, status: 0, code: code as "APPROVAL_REQUIRED" | "UNAVAILABLE", message };
+    }
+
     if (definition.id === "google_business") {
       const { data: connection } = await supabaseAdmin
         .from("google_business_connections")
