@@ -68,16 +68,7 @@ export const listIntegrations = createServerFn({ method: "GET" })
     return {
       role: member.role,
       items: INTEGRATIONS.map((definition) => {
-        if (definition.kind === "manual") {
-      // Partner-only APIs: reported honestly instead of pretending a test is possible.
-      const message = definition.manualReason ?? "This provider has no public API for this workspace.";
-      const code = definition.approvalRequired ? "APPROVAL_REQUIRED" : "UNAVAILABLE";
-      await log("warning", message, null);
-      await recordHealth(code, message);
-      return { ok: false, status: 0, code: code as "APPROVAL_REQUIRED" | "UNAVAILABLE", message };
-    }
-
-    if (definition.id === "google_business") {
+        if (definition.id === "google_business") {
           const row = google.data;
           return {
             provider: definition.id,
