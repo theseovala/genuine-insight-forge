@@ -189,6 +189,216 @@ export async function collectCrawlDirectives(origin: string): Promise<SourceResu
   return { source: "crawl_directives", provider: null, status: "completed", durationMs: run.durationMs, raw: run.value as Record<string, unknown> };
 }
 
+/** robots.txt Disallow rules that apply to our user-agent (or to *). */
+export function disallowedPaths(robotsText: string | null) {
+  if (!robotsText) return [] as string[];
+  const rules: string[] = [];
+  let applies = false;
+  for (const rawLine of robotsText.split(/\r?\n/)) {
+    const line = rawLine.replace(/#.*$/, "").trim();
+    if (!line) continue;
+    const [rawKey, ...rest] = line.split(":");
+    const key = (rawKey ?? "").trim().toLowerCase();
+    const value = rest.join(":").trim();
+    if (key === "user-agent") applies = value === "*" || value.toLowerCase().includes("seovale");
+    else if (key === "disallow" && applies && value) rules.push(value);
+  }
+  return rules;
+}
+
+/**
+ * Real multi-page crawl, bounded by page limit, same-domain rule, robots.txt
+ * disallow rules and a per-request timeout. Never recursive without a limit.
+ */
+export async function collectCrawl(
+  startUrl: string,
+  robotsText: string | null,
+  limit = 8,
+): Promise<SourceResult> {
+  const started = Date.now();
+  try {
+    const root = new URL(startUrl);
+    const blocked = disallowedPaths(robotsText);
+    const allowed = (url: URL) =>
+      url.hostname.replace(/^www\./i, "") === root.hostname.replace(/^www\./i, "") &&
+      !blocked.some((rule) => url.pathname.startsWith(rule));
+
+    const queue: string[] = [root.toString()];
+    const seen = new Set<string>([root.toString()]);
+    const pages: {
+      url: string;
+      finalUrl: string;
+      httpStatus: number;
+      redirected: boolean;
+      durationMs: number;
+      title: string | null;
+      description: string | null;
+      canonical: string | null;
+      h1Count: number;
+      noindex: boolean;
+      wordCount: number;
+      internalLinks: number;
+      externalLinks: number;
+      images: number;
+      imagesWithoutAlt: number;
+      structuredData: number;
+      hreflang: number;
+    }[] = [];
+    const outboundInternal = new Set<string>();
+
+    while (queue.length && pages.length < limit) {
+      const batch = queue.splice(0, 3);
+      const results = await Promise.all(
+        batch.map(async (pageUrl) => {
+          const pageStarted = Date.now();
+          try {
+            const response = await request(pageUrl);
+            const html = (await response.text()).slice(0, MAX_HTML_BYTES);
+            return { pageUrl, response, html, durationMs: Date.now() - pageStarted };
+          } catch {
+            return null;
+          }
+        }),
+      );
+      for (const item of results) {
+        if (!item) continue;
+        const { pageUrl, response, html, durationMs } = item;
+        const links = Array.from(html.matchAll(/href=["']([^"'#]+)["']/gi)).map((m) => m[1] as string);
+        let internal = 0;
+        let external = 0;
+        for (const href of links) {
+          let resolved: URL;
+          try {
+            resolved = new URL(href, pageUrl);
+          } catch {
+            continue;
+          }
+          if (!/^https?:$/.test(resolved.protocol)) continue;
+          resolved.hash = "";
+          if (allowed(resolved)) {
+            internal += 1;
+            outboundInternal.add(resolved.toString());
+            if (!seen.has(resolved.toString()) && seen.size < limit * 4) {
+              seen.add(resolved.toString());
+              queue.push(resolved.toString());
+            }
+          } else {
+            external += 1;
+          }
+        }
+        const imgs = Array.from(html.matchAll(/<img\b[^>]*>/gi)).map((m) => m[0] as string);
+        pages.push({
+          url: pageUrl,
+          finalUrl: response.url || pageUrl,
+          httpStatus: response.status,
+          redirected: Boolean(response.url) && response.url !== pageUrl,
+          durationMs,
+          title: html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() ?? null,
+          description: html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([\s\S]*?)["']/i)?.[1]?.trim() ?? null,
+          canonical: html.match(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i)?.[1] ?? null,
+          h1Count: (html.match(/<h1[\s>]/gi) ?? []).length,
+          noindex: /name=["']robots["'][^>]+content=["'][^"']*noindex/i.test(html),
+          wordCount: html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").split(/\s+/).filter((w) => w.length > 1).length,
+          internalLinks: internal,
+          externalLinks: external,
+          images: imgs.length,
+          imagesWithoutAlt: imgs.filter((tag) => !/\balt\s*=/.test(tag)).length,
+          structuredData: (html.match(/application\/ld\+json/gi) ?? []).length,
+          hreflang: (html.match(/rel=["']alternate["'][^>]+hreflang=/gi) ?? []).length,
+        });
+      }
+    }
+
+    // Broken-link check on a bounded sample of discovered internal URLs.
+    const sample = Array.from(outboundInternal)
+      .filter((url) => !pages.some((page) => page.url === url))
+      .slice(0, 15);
+    const linkChecks = await Promise.all(
+      sample.map(async (url) => {
+        try {
+          const response = await request(url, { method: "HEAD" });
+          return { url, httpStatus: response.status };
+        } catch (caught) {
+          return { url, httpStatus: 0, error: caught instanceof Error ? caught.message : String(caught) };
+        }
+      }),
+    );
+    const broken = linkChecks.filter((check) => check.httpStatus === 0 || check.httpStatus >= 400);
+
+    const titles = pages.map((page) => page.title ?? "").filter(Boolean);
+    const duplicateTitles = titles.length - new Set(titles).size;
+
+    return {
+      source: "crawl",
+      provider: null,
+      status: pages.length ? "completed" : "failed",
+      durationMs: Date.now() - started,
+      errorMessage: pages.length ? null : "No page of this site could be crawled.",
+      raw: {
+        pagesCrawled: pages.length,
+        limit,
+        discoveredInternalUrls: outboundInternal.size,
+        blockedByRobots: blocked,
+        duplicateTitles,
+        pages,
+        linkChecks,
+        brokenLinks: broken,
+      },
+    };
+  } catch (caught) {
+    return {
+      source: "crawl",
+      provider: null,
+      status: "failed",
+      durationMs: Date.now() - started,
+      errorMessage: caught instanceof Error ? caught.message : String(caught),
+      raw: {},
+    };
+  }
+}
+
+/** Business identity as published by the site itself (JSON-LD + visible contacts). */
+export function extractIdentity(html: string) {
+  const blocks = Array.from(html.matchAll(/<script[^>]+application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)).map((m) => m[1] as string);
+  let name: string | null = null;
+  let phone: string | null = null;
+  let address: string | null = null;
+  let website: string | null = null;
+  let category: string | null = null;
+  const sameAs: string[] = [];
+  for (const block of blocks) {
+    let parsed: any;
+    try {
+      parsed = JSON.parse(block.trim());
+    } catch {
+      continue;
+    }
+    const nodes: any[] = Array.isArray(parsed) ? parsed : parsed?.["@graph"] ? parsed["@graph"] : [parsed];
+    for (const node of nodes) {
+      if (!node || typeof node !== "object") continue;
+      const type = String(node["@type"] ?? "");
+      if (!/Organization|LocalBusiness|Store|Restaurant|Hotel|Corporation|WebSite/i.test(type)) continue;
+      name ??= typeof node.name === "string" ? node.name : null;
+      phone ??= typeof node.telephone === "string" ? node.telephone : null;
+      website ??= typeof node.url === "string" ? node.url : null;
+      category ??= /LocalBusiness|Store|Restaurant|Hotel/i.test(type) ? type : category;
+      if (node.address && typeof node.address === "object") {
+        const parts = [node.address.streetAddress, node.address.addressLocality, node.address.postalCode, node.address.addressCountry]
+          .filter((part: unknown) => typeof part === "string");
+        if (parts.length) address ??= parts.join(", ");
+      } else if (typeof node.address === "string") address ??= node.address;
+      const links = Array.isArray(node.sameAs) ? node.sameAs : typeof node.sameAs === "string" ? [node.sameAs] : [];
+      for (const link of links) if (typeof link === "string" && !sameAs.includes(link)) sameAs.push(link);
+    }
+  }
+  if (!phone) {
+    const tel = html.match(/href=["']tel:([^"']+)["']/i)?.[1];
+    if (tel) phone = tel.trim();
+  }
+  return { name, phone, address, website, category, sameAs };
+}
+
+
 /**
  * Google PageSpeed Insights (Lighthouse). Requires a real Google API key from
  * the credential vault or the server environment; otherwise reported honestly
