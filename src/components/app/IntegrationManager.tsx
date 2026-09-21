@@ -311,6 +311,8 @@ export function IntegrationManager() {
         </div>
       </Section>
 
+      <IntegrationOverview />
+
       {groups.map((group) => (
         <Section key={group} title={group} bodyClassName="p-0">
           <ul className="divide-y">
