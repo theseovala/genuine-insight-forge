@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useMutation } from "@tanstack/react-query";
-import { Search, Inbox, ChevronDown, Reply, Sparkles, Send, Copy, Check } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Search, Inbox, ChevronDown, Reply, Sparkles, Send, Copy, Check, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
 import {
@@ -25,6 +25,8 @@ import {
 } from "@/lib/seovale-db";
 import { useApp, ALL_LOCATIONS } from "@/lib/app-context";
 import { draftReply } from "@/lib/ai.functions";
+import { syncGoogleBusinessReviews } from "@/lib/google-business.functions";
+import { syncTrustpilotReviews } from "@/lib/trustpilot.functions";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/reviews")({
