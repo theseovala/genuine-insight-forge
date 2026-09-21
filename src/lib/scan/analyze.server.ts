@@ -258,8 +258,102 @@ export function analyze(sources: SourceResult[]) {
     }
   }
 
+  // ---------- Multi-page crawl (real pages fetched from this site) ----------
+  const crawled = by("crawl");
+  if (crawled?.status === "completed") {
+    const raw = crawled.raw as any;
+    const pages: any[] = Array.isArray(raw.pages) ? raw.pages : [];
+    metrics.push({ category: "crawl", metricKey: "pages_crawled", valueNumeric: pages.length, source: "crawl" });
+    metrics.push({ category: "crawl", metricKey: "internal_urls_discovered", valueNumeric: raw.discoveredInternalUrls ?? 0, source: "crawl" });
+    metrics.push({ category: "crawl", metricKey: "links_checked", valueNumeric: (raw.linkChecks ?? []).length, source: "crawl" });
+
+    const broken: any[] = raw.brokenLinks ?? [];
+    metrics.push({ category: "crawl", metricKey: "broken_links", valueNumeric: broken.length, source: "crawl" });
+    if (broken.length) {
+      findings.push({
+        category: "crawl",
+        code: "broken_links",
+        severity: broken.length > 3 ? "high" : "medium",
+        title: `${broken.length} broken link${broken.length === 1 ? "" : "s"} found`,
+        detail: "These addresses were checked and did not return a working page.",
+        recommendation: "Fix or remove the broken links so visitors and crawlers do not hit dead ends.",
+        impact: Math.min(10, broken.length * 2),
+        evidence: { brokenLinks: broken.slice(0, 10) },
+        source: "crawl",
+      });
+    }
+
+    const duplicates = Number(raw.duplicateTitles ?? 0);
+    metrics.push({ category: "crawl", metricKey: "duplicate_titles", valueNumeric: duplicates, source: "crawl" });
+    if (duplicates > 0) {
+      findings.push({
+        category: "crawl",
+        code: "duplicate_titles",
+        severity: "medium",
+        title: `${duplicates} crawled page${duplicates === 1 ? "" : "s"} share a title with another page`,
+        detail: "Duplicate titles make pages compete with each other in search results.",
+        recommendation: "Give every page a unique, descriptive title.",
+        impact: Math.min(6, duplicates * 2),
+        evidence: { pages: pages.map((p) => ({ url: p.url, title: p.title })).slice(0, 10) },
+        source: "crawl",
+      });
+    }
+
+    const noindexPages = pages.filter((page) => page.noindex);
+    if (noindexPages.length) {
+      findings.push({
+        category: "crawl",
+        code: "crawled_noindex_pages",
+        severity: "high",
+        title: `${noindexPages.length} crawled page${noindexPages.length === 1 ? " is" : "s are"} blocked from search`,
+        detail: "These pages tell search engines not to index them.",
+        recommendation: "Remove the noindex directive from pages that should appear in search.",
+        impact: Math.min(12, noindexPages.length * 4),
+        evidence: { pages: noindexPages.map((p) => p.url).slice(0, 10) },
+        source: "crawl",
+      });
+    }
+
+    const errorPages = pages.filter((page) => page.httpStatus >= 400);
+    if (errorPages.length) {
+      findings.push({
+        category: "crawl",
+        code: "crawl_error_pages",
+        severity: "high",
+        title: `${errorPages.length} crawled page${errorPages.length === 1 ? "" : "s"} returned an error`,
+        detail: "Pages linked from this site did not load successfully.",
+        recommendation: "Repair or remove the links to these pages.",
+        impact: Math.min(12, errorPages.length * 4),
+        evidence: { pages: errorPages.map((p) => ({ url: p.url, httpStatus: p.httpStatus })).slice(0, 10) },
+        source: "crawl",
+      });
+    }
+
+    const missingDescriptions = pages.filter((page) => !page.description);
+    if (missingDescriptions.length > 1) {
+      findings.push({
+        category: "crawl",
+        code: "crawl_missing_descriptions",
+        severity: "low",
+        title: `${missingDescriptions.length} crawled pages have no meta description`,
+        detail: "Search engines will write their own snippet for these pages.",
+        recommendation: "Add a unique meta description to each page.",
+        impact: 3,
+        evidence: { pages: missingDescriptions.map((p) => p.url).slice(0, 10) },
+        source: "crawl",
+      });
+    }
+
+    const slowest = pages.reduce((worst: any, page: any) => (worst && worst.durationMs > page.durationMs ? worst : page), null);
+    if (slowest) metrics.push({ category: "performance", metricKey: "slowest_crawled_page_ms", valueNumeric: slowest.durationMs, valueText: slowest.url, unit: "ms", source: "crawl" });
+    if (Array.isArray(raw.blockedByRobots) && raw.blockedByRobots.length) {
+      metrics.push({ category: "crawl", metricKey: "robots_disallow_rules", valueNumeric: raw.blockedByRobots.length, valueText: raw.blockedByRobots.slice(0, 5).join(", "), source: "crawl" });
+    }
+  }
+
   // ---------- Score: 100 minus the impact of what was actually found ----------
   const deductions = findings.reduce((total, finding) => total + finding.impact, 0);
+
   const measurable = sources.some((source) => source.status === "completed");
   const score = measurable ? Math.max(0, Math.min(100, 100 - deductions)) : null;
 
