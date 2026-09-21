@@ -173,15 +173,17 @@ function ScansPage() {
           ) : (scans.data ?? []).length === 0 ? (
             <p className="text-sm text-muted-foreground">No scans yet.</p>
           ) : (
-            <ul className="space-y-1">
+            <ul className="stagger space-y-1">
               {(scans.data as any[]).map((scan) => (
                 <li key={scan.id}>
                   <button
                     type="button"
                     onClick={() => setActiveId(scan.id)}
                     className={cn(
-                      "w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors",
-                      activeId === scan.id ? "border-primary/40 bg-primary/5" : "border-border hover:bg-muted/50",
+                      "press w-full rounded-lg border px-3 py-2 text-left text-sm transition-all",
+                      activeId === scan.id
+                        ? "edge-illuminate border-primary/40 bg-primary/5 shadow-[0_0_0_1px_color-mix(in_oklab,var(--primary)_22%,transparent)]"
+                        : "border-border hover:bg-muted/50 hover-glow",
                     )}
                   >
                     <span className="block truncate font-medium">{scan.target_domain}</span>
@@ -189,7 +191,7 @@ function ScansPage() {
                       <Badge variant="outline" className="h-5 px-1.5 text-[10px] uppercase">
                         {scan.status}
                       </Badge>
-                      {scan.score === null ? "No score" : `${scan.score}/100`}
+                      <span className="num">{scan.score === null ? "No score" : `${scan.score}/100`}</span>
                       <span>· {new Date(scan.created_at).toLocaleString()}</span>
                     </span>
                   </button>
