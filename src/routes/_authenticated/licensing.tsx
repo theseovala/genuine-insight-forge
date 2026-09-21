@@ -353,7 +353,7 @@ function LicensingPage() {
                         <Badge className={installation.status === "active" ? STATUS_TONE["active"] : STATUS_TONE["pending"]}>{installation.status}</Badge>
                         <span className="text-muted-foreground">validated {when(installation.last_validated_at)}</span>
                         {data.isStaff && installation.status === "active" && (
-                          <Button size="sm" variant="ghost" onClick={() => run(() => resetInstallation({ data: { installationId: installation.id } }), "Installation reset.")}>
+                          <Button size="sm" variant="ghost" onClick={() => run(() => resetInstallation({ data: { installationId: installation.id } }), "Installation reset.")} disabled={busy}>
                             Reset
                           </Button>
                         )}
@@ -363,12 +363,12 @@ function LicensingPage() {
 
                   <div className="mt-4 flex flex-wrap gap-2">
                     {data.isStaff && license.status !== "active" && license.status !== "revoked" && (
-                      <Button size="sm" onClick={() => run(() => setLicenseStatus({ data: { licenseId: license.id, status: "active" } }), "Licence activated.")}>
+                      <Button size="sm" onClick={() => run(() => setLicenseStatus({ data: { licenseId: license.id, status: "active" } }), "Licence activated.")} disabled={busy}>
                         Activate
                       </Button>
                     )}
                     {data.isStaff && license.status === "active" && (
-                      <Button size="sm" variant="outline" onClick={() => run(() => setLicenseStatus({ data: { licenseId: license.id, status: "suspended" } }), "Licence suspended.")}>
+                      <Button size="sm" variant="outline" onClick={() => run(() => setLicenseStatus({ data: { licenseId: license.id, status: "suspended" } }), "Licence suspended.")} disabled={busy}>
                         Suspend
                       </Button>
                     )}
@@ -377,7 +377,7 @@ function LicensingPage() {
                         size="sm"
                         variant="outline"
                         onClick={() => run(() => setLicenseStatus({ data: { licenseId: license.id, status: "revoked", reason: "Revoked from admin panel" } }), "Licence revoked.")}
-                      >
+                       disabled={busy}>
                         Revoke
                       </Button>
                     )}
@@ -407,11 +407,11 @@ function LicensingPage() {
                             "Download authorized.",
                           )
                         }
-                      >
+                       disabled={busy}>
                         <Download className="mr-2 h-4 w-4" /> Download package {publishedRelease.version}
                       </Button>
                     )}
-                  </div>
+                  </div disabled={busy}>
 
                   {data.isStaff && (
                     <div className="mt-3 flex flex-wrap gap-2">
@@ -497,7 +497,7 @@ function LicensingPage() {
                         Roll back
                       </Button>
                     )}
-                  </div>
+                  </div disabled={busy}>
                 </div>
               ))}
             </div>
