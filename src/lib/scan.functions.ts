@@ -192,11 +192,12 @@ export const getScan = createServerFn({ method: "GET" })
       .from("scans")
       .select("id,score,created_at")
       .eq("target_domain", scan.target_domain)
-      .eq("status", "completed")
+      .in("status", ["completed", "completed_with_warnings"])
       .lt("created_at", scan.created_at)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+
 
     let comparison: null | {
       previousScanId: string;

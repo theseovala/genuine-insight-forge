@@ -59,8 +59,41 @@ const SOURCE_LABEL: Record<string, string> = {
   dns: "DNS records",
   rdap: "Domain registration",
   crawl_directives: "robots.txt & sitemap",
+  crawl: "Website crawl",
   pagespeed: "Google PageSpeed",
   ai_analysis: "AI analysis",
+};
+
+/** Platform rows are stored as `platform:<provider>` — shown with a readable name. */
+function sourceLabel(source: string) {
+  if (source.startsWith("platform:")) {
+    const provider = source.slice("platform:".length);
+    return provider.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+  return SOURCE_LABEL[source] ?? source;
+}
+
+const SOURCE_STATUS_LABEL: Record<string, string> = {
+  completed: "Checked",
+  not_configured: "Not configured",
+  auth_required: "Sign-in needed",
+  approval_required: "Approval needed",
+  not_supported: "No public API",
+  unavailable: "Unavailable",
+  rate_limited: "Rate limited",
+  skipped: "Skipped",
+  failed: "Failed",
+};
+
+const SCAN_STATUS_LABEL: Record<string, string> = {
+  queued: "Queued",
+  running: "Running",
+  paused: "Paused",
+  retrying: "Retrying",
+  completed: "Completed",
+  completed_with_warnings: "Completed with warnings",
+  failed: "Failed",
+  cancelled: "Cancelled",
 };
 
 const SEVERITY_TONE: Record<string, string> = {
@@ -73,10 +106,12 @@ const SEVERITY_TONE: Record<string, string> = {
 
 function SourceIcon({ status }: { status: string }) {
   if (status === "completed") return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
-  if (status === "not_configured") return <Clock className="h-4 w-4 text-muted-foreground" />;
-  if (status === "skipped") return <Clock className="h-4 w-4 text-muted-foreground" />;
+  if (["not_configured", "skipped", "not_supported", "unavailable", "approval_required", "auth_required", "rate_limited"].includes(status)) {
+    return <Clock className="h-4 w-4 text-muted-foreground" />;
+  }
   return <XCircle className="h-4 w-4 text-destructive" />;
 }
+
 
 function ScansPage() {
   const queryClient = useQueryClient();
@@ -237,7 +272,8 @@ function ScansPage() {
                     <span className="block truncate font-medium">{scan.target_domain}</span>
                     <span className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
                       <Badge variant="outline" className="h-5 px-1.5 text-[10px] uppercase">
-                        {scan.status}
+                        {SCAN_STATUS_LABEL[scan.status] ?? scan.status}
+
                       </Badge>
                       <span className="num">{scan.score === null ? "No score" : `${scan.score}/100`}</span>
                       <span>· {new Date(scan.created_at).toLocaleString()}</span>
@@ -264,7 +300,7 @@ function ScansPage() {
             <>
               <Section
                 title={data.scan.target_domain}
-                description={`${data.scan.status} · ${data.scan.score === null ? "Score unavailable" : `Score ${data.scan.score}/100`}`}
+                description={`${SCAN_STATUS_LABEL[data.scan.status] ?? data.scan.status} · ${data.scan.score === null ? "Score unavailable" : `Score ${data.scan.score}/100`}`}
                 action={
                   <div className="flex flex-wrap gap-2">
                     {["queued", "running", "retrying"].includes(data.scan.status) ? (
@@ -346,37 +382,73 @@ function ScansPage() {
                 </Section>
               ) : null}
 
-              <Section title="Scan health" description="Every source that was contacted, with what it returned.">
+              <Section title="Scan health" description="Every technical check that ran, with what it returned.">
                 <ul className="stagger grid gap-2 sm:grid-cols-2">
-                  {data.sources.map((source: any) => (
-                    <li
-                      key={source.source}
-                      className="card-interactive flex items-start gap-2 rounded-lg border border-border px-3 py-2 text-sm"
-                    >
-                      <span className="icon-tile mt-0.5">
-                        <SourceIcon status={source.status} />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 font-medium">
-                          <span className="truncate">{SOURCE_LABEL[source.source] ?? source.source}</span>
-                          {source.status === "completed" ? (
-                            <Badge variant="outline" className="h-4 shrink-0 px-1 text-[9px] uppercase">
-                              {source.freshness}
-                            </Badge>
-                          ) : null}
-                        </div>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {source.status === "not_configured"
-                            ? "Provider not configured"
-                            : source.error_message
+                  {data.sources
+                    .filter((source: any) => !String(source.source).startsWith("platform:"))
+                    .map((source: any) => (
+                      <li
+                        key={source.source}
+                        className="card-interactive flex items-start gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+                      >
+                        <span className="icon-tile mt-0.5">
+                          <SourceIcon status={source.status} />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 font-medium">
+                            <span className="truncate">{sourceLabel(source.source)}</span>
+                            {source.status === "completed" ? (
+                              <Badge variant="outline" className="h-4 shrink-0 px-1 text-[9px] uppercase">
+                                {source.freshness}
+                              </Badge>
+                            ) : null}
+                          </div>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {source.error_message
                               ? source.error_message
-                              : `Retrieved ${new Date(source.created_at).toLocaleString()}`}
-                        </p>
-                      </div>
-                    </li>
-                  ))}
+                              : source.status === "completed"
+                                ? `Retrieved ${new Date(source.created_at).toLocaleString()}`
+                                : (SOURCE_STATUS_LABEL[source.status] ?? source.status)}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
                 </ul>
               </Section>
+
+              {data.sources.some((source: any) => String(source.source).startsWith("platform:")) ? (
+                <Section
+                  title="Platforms checked"
+                  description="Which review and marketing platforms apply to this website, and whether this workspace can actually use them."
+                >
+                  <ul className="stagger grid gap-2 sm:grid-cols-2">
+                    {data.sources
+                      .filter((source: any) => String(source.source).startsWith("platform:"))
+                      .map((source: any) => (
+                        <li
+                          key={source.source}
+                          className="card-interactive flex items-start gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+                        >
+                          <span className="icon-tile mt-0.5">
+                            <SourceIcon status={source.status} />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 font-medium">
+                              <span className="truncate">{sourceLabel(source.source)}</span>
+                              <Badge variant="outline" className="h-4 shrink-0 px-1 text-[9px] uppercase">
+                                {SOURCE_STATUS_LABEL[source.status] ?? source.status}
+                              </Badge>
+                            </div>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {source.error_message ?? "Connection verified against the provider."}
+                            </p>
+                          </div>
+                        </li>
+                      ))}
+                  </ul>
+                </Section>
+              ) : null}
+
 
               {data.comparison ? (
                 <Section title="Compared with the previous scan" description={`Previous scan ${new Date(data.comparison.previousAt).toLocaleString()} · score ${data.comparison.previousScore ?? "unavailable"}`}>
