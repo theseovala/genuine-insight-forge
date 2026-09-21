@@ -10,6 +10,7 @@ import {
   startGoogleBusinessConnection,
   syncGoogleBusinessReviews,
 } from "@/lib/google-business.functions";
+import { saveProviderCredentials, testIntegration } from "@/lib/integrations.functions";
 
 /** Opens Google authorization reliably, even inside a sandboxed preview frame. */
 function openAuthorization(url: string, authWindow: Window | null) {
