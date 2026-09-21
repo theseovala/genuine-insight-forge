@@ -132,3 +132,22 @@
 - [ ] Client Portal (own license/installation/version/updates/download history only)
 - [ ] Security test pass: wrong/expired/suspended/revoked license, wrong domain/installation, duplicate install, invalid/expired/replayed token, failed MFA, brute force, cross-client access, direct API access
 - [ ] Regression: Scan → Report → CSV unchanged
+
+## Master UI/UX + AI UX + Completion pass (queued)
+- [ ] Phase 1: full project discovery (routes, components, duplicate/dead code)
+- [ ] Phase 2: one global design system (tokens + shared primitives)
+- [ ] Phase 3: responsive audit 320 → 2560px
+- [ ] Phase 4: colour/contrast audit (palette locked)
+- [ ] Phase 5: navigation — every item a real destination, deep link/refresh/back
+- [ ] Phase 6: global command / search palette
+- [ ] Phase 7: first-use onboarding flow
+- [ ] Phase 8: dashboard real-data UX
+- [ ] Phase 9: scan UX states (queued/running/partial/paused/failed/retrying/completed/cancelled)
+- [ ] Phase 10: contextual AI UX (insights, explain, compare, action plan) + injection safety
+- [ ] Phase 11: report UX (search/filter/sort/expand/evidence/compare/export)
+- [ ] Phase 12: historical UX + data freshness
+- [ ] Phase 13: CSV validation
+- [ ] Phase 14: integration UX truthful statuses + real buttons
+- [ ] Phase 15: licence management dashboard sections + real KPIs
+- [ ] Phase 16: client portal scope
+- [ ] Phase 17-21: licence security, secure download, source protection, MFA, release/version UX (largely built — verify in this pass)
