@@ -44,6 +44,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 export const navItems = [
   { id: "dashboard", to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "scans", to: "/scans", label: "Website Scan", icon: Radar },
   { id: "reviews", to: "/reviews", label: "Review Center", icon: Inbox },
   { id: "responses", to: "/responses", label: "Response Center", icon: MessageSquareReply },
   { id: "analytics", to: "/analytics", label: "Analytics", icon: BarChart3 },
@@ -57,7 +58,7 @@ export const navItems = [
 ] as const;
 
 const navGroups = [
-  { label: "Overview", ids: ["dashboard", "analytics"] },
+  { label: "Overview", ids: ["dashboard", "scans", "analytics"] },
   { label: "Reputation", ids: ["reviews", "responses", "alerts", "removals"] },
   { label: "Growth", ids: ["locations", "competitors", "feedback"] },
   { label: "Workspace", ids: ["reports", "settings"] },
