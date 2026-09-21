@@ -416,6 +416,16 @@ export function IntegrationManager() {
                     />
                   )}
 
+                  {isAdmin && GUIDED_PROVIDERS.has(definition.id) && (
+                    <ProviderSetupGuide
+                      definition={definition}
+                      credentialsReady={(item?.credentials ?? []).some((c) => c.masked || c.fromEnvironment)}
+                      verified={status === "connected"}
+                      accountRef={item?.accountRef ?? null}
+                      onChanged={refresh}
+                    />
+                  )}
+
                   {isAdmin && (definition.credentialFields?.length ?? 0) > 0 && (
                     <CredentialPanel
                       definition={definition}
