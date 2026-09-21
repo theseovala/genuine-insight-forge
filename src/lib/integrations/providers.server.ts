@@ -582,6 +582,115 @@ export async function testApiKeyProvider(
         ref: null,
       }));
     }
+    case "serpapi": {
+      const key = envValue(["SERPAPI_API_KEY"], creds);
+      if (!key) return notConfigured("No SerpApi key is configured.");
+      return simpleFetchTest(`https://serpapi.com/account?api_key=${encodeURIComponent(key)}`, {}, (p) => ({
+        ok: Boolean(p["account_id"] ?? p["account_email"]),
+        message: String(p["error"] ?? "SerpApi rejected the key."),
+        label: p["account_email"] ?? "SerpApi",
+        ref: p["account_id"] ?? null,
+      }));
+    }
+    case "web_crawler": {
+      const key = envValue(["FIRECRAWL_API_KEY"], creds);
+      if (!key) return notConfigured("No Firecrawl API key is configured.");
+      return simpleFetchTest("https://api.firecrawl.dev/v2/team/credit-usage", { Authorization: `Bearer ${key}` }, (p) => ({
+        ok: p["success"] === true,
+        message: String(p["error"] ?? "Firecrawl rejected the key."),
+        label: "Firecrawl",
+        ref: null,
+      }));
+    }
+    case "pagespeed": {
+      const key = envValue(["PAGESPEED_API_KEY", "GOOGLE_API_KEY"], creds);
+      if (!key) return notConfigured("No PageSpeed Insights API key is configured.");
+      return simpleFetchTest(
+        `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent("https://example.com")}&strategy=mobile&key=${encodeURIComponent(key)}`,
+        {},
+        (p) => ({
+          ok: Boolean(p["lighthouseResult"]),
+          message: String(p["error"]?.["message"] ?? "PageSpeed returned no Lighthouse result."),
+          label: "PageSpeed Insights",
+          ref: null,
+        }),
+      );
+    }
+    case "url_reputation": {
+      const key = envValue(["SAFE_BROWSING_API_KEY", "GOOGLE_API_KEY"], creds);
+      if (!key) return notConfigured("No Safe Browsing API key is configured.");
+      const response = await fetch(`https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${encodeURIComponent(key)}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          client: { clientId: "seovale", clientVersion: "1.0.0" },
+          threatInfo: {
+            threatTypes: ["MALWARE", "SOCIAL_ENGINEERING"],
+            platformTypes: ["ANY_PLATFORM"],
+            threatEntryTypes: ["URL"],
+            threatEntries: [{ url: "https://example.com" }],
+          },
+        }),
+      });
+      const payload = await readJson(response);
+      if (!response.ok) return failure(response, payload);
+      return { ok: true, status: response.status, message: "Live API call succeeded.", label: "Google Safe Browsing", accountRef: null, code: "CONNECTED" };
+    }
+    case "uptime_monitor": {
+      const key = envValue(["UPTIMEROBOT_API_KEY"], creds);
+      if (!key) return notConfigured("No UptimeRobot API key is configured.");
+      const response = await fetch("https://api.uptimerobot.com/v2/getAccountDetails", {
+        method: "POST",
+        headers: { "content-type": "application/json", "cache-control": "no-cache" },
+        body: JSON.stringify({ api_key: key, format: "json" }),
+      });
+      const payload = await readJson(response);
+      if (!response.ok) return failure(response, payload);
+      if (payload["stat"] !== "ok") {
+        return {
+          ok: false,
+          status: response.status,
+          message: String(payload["error"]?.["message"] ?? "UptimeRobot rejected the key."),
+          code: "INVALID_CREDENTIALS",
+        };
+      }
+      return {
+        ok: true,
+        status: response.status,
+        message: "Live API call succeeded.",
+        label: payload["account"]?.["email"] ?? "UptimeRobot",
+        accountRef: payload["account"]?.["email"] ?? null,
+        code: "CONNECTED",
+      };
+    }
+    case "ssl_monitor": {
+      const host = accountRef?.replace(/^https?:\/\//, "").replace(/\/.*$/, "") ?? null;
+      const response = await fetch(
+        host
+          ? `https://api.ssllabs.com/api/v3/analyze?host=${encodeURIComponent(host)}&fromCache=on&maxAge=24`
+          : "https://api.ssllabs.com/api/v3/info",
+      );
+      const payload = await readJson(response);
+      if (!response.ok) return failure(response, payload);
+      return {
+        ok: true,
+        status: response.status,
+        message: host ? `SSL Labs scan status for ${host}: ${payload["status"] ?? "unknown"}.` : "Live API call succeeded.",
+        label: host ?? "Qualys SSL Labs",
+        accountRef: host,
+        code: "CONNECTED",
+      };
+    }
+    case "dns_rdap": {
+      const domain = accountRef?.replace(/^https?:\/\//, "").replace(/\/.*$/, "") ?? null;
+      if (!domain) return { ok: false, status: 0, message: "Add the domain you want monitored first.", code: "NOT_CONFIGURED" };
+      return simpleFetchTest(`https://rdap.org/domain/${encodeURIComponent(domain)}`, {}, (p) => ({
+        ok: Boolean(p["ldhName"] ?? p["handle"]),
+        message: "RDAP returned no registration record for that domain.",
+        label: p["ldhName"] ?? domain,
+        ref: p["handle"] ?? domain,
+      }));
+    }
     default:
       return { ok: false, status: 0, message: `No live test is defined for ${providerId}.`, code: "UNAVAILABLE" };
   }
