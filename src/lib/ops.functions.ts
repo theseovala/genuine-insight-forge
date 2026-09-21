@@ -268,8 +268,15 @@ export const listScanMonitor = createServerFn({ method: "POST" })
           currentStage: current?.label ?? (scan.status === "completed" || scan.status === "completed_with_warnings" ? "Finished" : scanStages.at(-1)?.label ?? "Not started"),
           progress: scanStages.length ? Math.round((done / scanStages.length) * 100) : 0,
           providersUsed: scanSources.length,
-          successfulSources: scanSources.filter((s: any) => s.status === "ok" || s.status === "success").map((s: any) => s.source),
-          failedSources: scanSources.filter((s: any) => s.status !== "ok" && s.status !== "success").map((s: any) => ({ source: s.source, status: s.status, httpStatus: s.http_status, error: s.error_message })),
+          successfulSources: scanSources
+            .filter((s: any) => s.status === "ok" || s.status === "success" || s.status === "completed")
+            .map((s: any) => s.source),
+          failedSources: scanSources
+            .filter((s: any) => s.status === "failed" || s.status === "error" || s.status === "timeout")
+            .map((s: any) => ({ source: s.source, status: s.status, httpStatus: s.http_status, error: s.error_message })),
+          skippedSources: scanSources
+            .filter((s: any) => !["ok", "success", "completed", "failed", "error", "timeout"].includes(s.status))
+            .map((s: any) => ({ source: s.source, status: s.status })),
           aiStatus: report?.ai_status ?? "not run",
           aiError: report?.ai_error ?? null,
           reportStatus: report ? (report.summary ? "ready" : "stored without summary") : "not generated",
