@@ -2,17 +2,6 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  LayoutDashboard,
-  Inbox,
-  MessageSquareReply,
-  BarChart3,
-  BellRing,
-  MapPin,
-  ShieldX,
-  Swords,
-  MessageCircleHeart,
-  FileText,
-  Settings,
   Search,
   Bell,
   ChevronsUpDown,
@@ -21,9 +10,7 @@ import {
   UserRound,
   PanelLeftClose,
   PanelLeftOpen,
-  Radar,
-  Activity,
-  KeyRound,
+  LifeBuoy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApp, ALL_LOCATIONS } from "@/lib/app-context";
@@ -45,29 +32,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-export const navItems = [
-  { id: "dashboard", to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "scans", to: "/scans", label: "Website Scan", icon: Radar },
-  { id: "reviews", to: "/reviews", label: "Review Center", icon: Inbox },
-  { id: "responses", to: "/responses", label: "Response Center", icon: MessageSquareReply },
-  { id: "analytics", to: "/analytics", label: "Analytics", icon: BarChart3 },
-  { id: "alerts", to: "/alerts", label: "Alerts", icon: BellRing },
-  { id: "removals", to: "/removals", label: "Review Removal", icon: ShieldX },
-  { id: "locations", to: "/locations", label: "Locations", icon: MapPin },
-  { id: "competitors", to: "/competitors", label: "Competitors", icon: Swords },
-  { id: "feedback", to: "/feedback", label: "Customer Feedback", icon: MessageCircleHeart },
-  { id: "reports", to: "/reports", label: "Reports", icon: FileText },
-  { id: "system", to: "/system", label: "System Health", icon: Activity },
-  { id: "licensing", to: "/licensing", label: "Licensing", icon: KeyRound },
-  { id: "settings", to: "/settings", label: "Settings", icon: Settings },
-] as const;
-
-const navGroups = [
-  { label: "Overview", ids: ["dashboard", "scans", "analytics"] },
-  { label: "Reputation", ids: ["reviews", "responses", "alerts", "removals"] },
-  { label: "Growth", ids: ["locations", "competitors", "feedback"] },
-  { label: "Workspace", ids: ["reports", "system", "licensing", "settings"] },
-] as const;
+export { navItems } from "./nav-items";
+import { navItems, navGroups } from "./nav-items";
+import { CommandPalette, useCommandPalette } from "./CommandPalette";
 
 function NavList({
   collapsed,
@@ -215,10 +182,12 @@ function TopBar({
   onMenu,
   collapsed,
   onToggle,
+  onSearch,
 }: {
   onMenu: () => void;
   collapsed: boolean;
   onToggle: () => void;
+  onSearch: () => void;
 }) {
   const { location, setLocation, locationNames, brandName } = useApp();
   const { data: alerts } = useLiveAlerts();
@@ -284,9 +253,31 @@ function TopBar({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <SearchBox />
+      <button
+        type="button"
+        onClick={onSearch}
+        className="press ml-auto hidden h-9 w-full max-w-sm items-center gap-2 rounded-lg border bg-card pl-3 pr-2 text-sm text-muted-foreground transition-colors hover:bg-accent md:flex"
+      >
+        <Search className="size-4 shrink-0" />
+        <span className="flex-1 truncate text-left">Search pages and scans…</span>
+        <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-semibold">⌘K</kbd>
+      </button>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="ml-auto md:hidden"
+        onClick={onSearch}
+        aria-label="Search"
+      >
+        <Search />
+      </Button>
 
       <div className="flex items-center gap-1 md:ml-2">
+        <Button variant="ghost" size="icon" asChild aria-label="Support and help">
+          <Link to="/support">
+            <LifeBuoy />
+          </Link>
+        </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
@@ -376,47 +367,18 @@ function TopBar({
   );
 }
 
-function SearchBox() {
-  const [q, setQ] = useState("");
-  const { data: reviews } = useLiveReviews();
-  const results =
-    q.trim().length < 2
-      ? []
-      : (reviews ?? [])
-          .filter((r) =>
-            `${r.author} ${r.body} ${r.location} ${r.tags.join(" ")}`
-              .toLowerCase()
-              .includes(q.trim().toLowerCase()),
-          )
-          .slice(0, 6);
-
+/** Breadcrumb trail built from the real route table — never a decorative label. */
+function Breadcrumbs({ pathname }: { pathname: string }) {
+  const item = navItems.find((n) => pathname.startsWith(n.to));
+  if (!item) return null;
   return (
-    <div className="relative ml-auto hidden w-full max-w-sm md:block">
-      <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-      <input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder="Search reviews, locations, customers…"
-        className="h-9 w-full rounded-lg border bg-card pl-9 pr-4 text-sm outline-none transition-shadow placeholder:text-muted-foreground focus:ring-2 focus:ring-ring/40"
-      />
-      {results.length > 0 && (
-        <div className="absolute left-0 right-0 top-11 z-40 overflow-hidden rounded-lg border bg-popover shadow-lg">
-          {results.map((r) => (
-            <Link
-              key={r.id}
-              to="/reviews"
-              onClick={() => setQ("")}
-              className="block border-b px-3 py-2 last:border-0 hover:bg-accent/60"
-            >
-              <p className="truncate text-sm font-semibold">
-                {r.author} · {r.rating}★
-              </p>
-              <p className="truncate text-xs text-muted-foreground">{r.body}</p>
-            </Link>
-          ))}
-        </div>
-      )}
-    </div>
+    <nav aria-label="Breadcrumb" className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+      <Link to="/dashboard" className="transition-colors hover:text-foreground">
+        Home
+      </Link>
+      <span aria-hidden>/</span>
+      <span className="font-medium text-foreground">{item.label}</span>
+    </nav>
   );
 }
 
@@ -428,6 +390,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { data: reviews } = useLiveReviews();
   const { data: alerts } = useLiveAlerts();
+  const palette = useCommandPalette();
+
 
   // Restore the user's choice, and auto-collapse on narrow/half-screen laptops.
   useEffect(() => {
@@ -478,12 +442,21 @@ export function AppShell({ children }: { children: ReactNode }) {
         </Sheet>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <TopBar onMenu={() => setMobileOpen(true)} collapsed={collapsed} onToggle={toggleSidebar} />
+          <TopBar
+            onMenu={() => setMobileOpen(true)}
+            collapsed={collapsed}
+            onToggle={toggleSidebar}
+            onSearch={() => palette.setOpen(true)}
+          />
+          <CommandPalette open={palette.open} onOpenChange={palette.setOpen} />
           <main
             key={pathname}
             className="animate-fade flex-1 px-3 py-4 sm:px-4 md:px-5 md:py-5 lg:px-6 2xl:px-8"
           >
-            <div className="mx-auto w-full min-w-0 max-w-[1440px] 2xl:max-w-[1720px]">{children}</div>
+            <div className="mx-auto w-full min-w-0 max-w-[1440px] 2xl:max-w-[1720px]">
+              <Breadcrumbs pathname={pathname} />
+              {children}
+            </div>
           </main>
           <footer className="flex flex-col gap-1.5 border-t px-4 py-3 text-[11px] text-muted-foreground md:flex-row md:items-center md:justify-between md:px-6">
             <p>

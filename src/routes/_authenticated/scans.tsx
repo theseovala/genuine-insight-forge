@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Radar,
@@ -50,6 +50,8 @@ export const Route = createFileRoute("/_authenticated/scans")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
+  validateSearch: (search: Record<string, unknown>): { scan?: string } =>
+    typeof search["scan"] === "string" ? { scan: search["scan"] as string } : {},
   component: ScansPage,
 });
 
@@ -118,7 +120,11 @@ const FINDING_FILTERS = ["all", "critical", "high", "medium", "low", "open", "re
 function ScansPage() {
   const queryClient = useQueryClient();
   const [url, setUrl] = useState("");
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
+  const activeId = search.scan ?? null;
+  const setActiveId = (id: string | null) =>
+    void navigate({ search: id ? { scan: id } : {}, replace: true });
   const [openFinding, setOpenFinding] = useState<string | null>(null);
   const [findingFilter, setFindingFilter] = useState<(typeof FINDING_FILTERS)[number]>("all");
 

@@ -1,7 +1,7 @@
 import { type ReactNode } from "react";
 import { Star, TrendingUp, TrendingDown, Minus, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { platforms, type PlatformId, type Sentiment, type ReviewStatus } from "@/lib/domain";
+import { BRAND, platforms, type PlatformId, type Sentiment, type ReviewStatus } from "@/lib/domain";
 
 /* ---------- Page header ---------- */
 export function PageHeader({
@@ -263,7 +263,7 @@ export function BrandMark({ size = "md", light = false }: { size?: "sm" | "md" |
   const s = { sm: "size-7 rounded-lg text-xs", md: "size-9 rounded-xl text-sm", lg: "size-14 rounded-2xl text-xl" }[size];
   return (
     <span className={cn("grid shrink-0 place-items-center bg-gradient-brand font-display font-extrabold text-primary-foreground shadow-glow", s, light && "shadow-none")}>
-      R
+      {BRAND.name.charAt(0)}
     </span>
   );
 }
