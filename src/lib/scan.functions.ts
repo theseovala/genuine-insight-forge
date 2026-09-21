@@ -179,8 +179,9 @@ export const getScan = createServerFn({ method: "GET" })
     const [sources, metrics, findings, report, stages] = await Promise.all([
       supabase.from("scan_sources").select("source,provider,status,http_status,duration_ms,error_message,created_at").eq("scan_id", data.id).order("source"),
       supabase.from("scan_metrics").select("category,metric_key,value_numeric,value_text,unit,source").eq("scan_id", data.id).order("category"),
-      supabase.from("scan_findings").select("category,code,severity,title,detail,recommendation,impact,evidence,source,created_at").eq("scan_id", data.id),
-      supabase.from("scan_reports").select("score,category_scores,summary,model,created_at").eq("scan_id", data.id).maybeSingle(),
+      supabase.from("scan_findings").select("category,code,severity,title,detail,recommendation,impact,evidence,source,created_at,confidence,priority_score,priority_rank,status,change_state").eq("scan_id", data.id).order("priority_rank", { ascending: true, nullsFirst: false }),
+      supabase.from("scan_reports").select("score,category_scores,summary,model,created_at,sections,action_plan,historical,ai_status,ai_error,ai_latency_ms").eq("scan_id", data.id).maybeSingle(),
+
       supabase.from("scan_stages").select("stage,label,position,status,detail,started_at,completed_at").eq("scan_id", data.id).order("position"),
     ]);
 
@@ -246,43 +247,91 @@ export const exportScanCsv = createServerFn({ method: "POST" })
     const { data: scan, error } = await supabase.from("scans").select("target_url,target_domain,status,score,created_at,completed_at").eq("id", data.id).single();
     if (error) throw error;
     const [findings, metrics, sources] = await Promise.all([
-      supabase.from("scan_findings").select("category,code,severity,title,detail,recommendation,impact,evidence,source,created_at").eq("scan_id", data.id),
+      supabase
+        .from("scan_findings")
+        .select("category,code,severity,title,detail,recommendation,impact,evidence,source,created_at,confidence,priority_rank,priority_score,status,change_state")
+        .eq("scan_id", data.id)
+        .order("priority_rank", { ascending: true, nullsFirst: false }),
       supabase.from("scan_metrics").select("category,metric_key,value_numeric,value_text,unit,source").eq("scan_id", data.id),
       supabase.from("scan_sources").select("source,provider,status,http_status,duration_ms,error_message,created_at").eq("scan_id", data.id),
     ]);
 
     const lines: string[] = [];
-    lines.push(["Section", "Category", "Key", "Severity", "Value", "Detail", "Recommendation", "Source", "Retrieved at"].map(csvCell).join(","));
-    lines.push(["Scan", "target", "url", "", scan.target_url, `Status: ${scan.status}`, "", "scan", scan.created_at].map(csvCell).join(","));
-    lines.push(["Scan", "target", "score", "", scan.score ?? "", "0-100, derived from measured findings", "", "scan", scan.completed_at ?? ""].map(csvCell).join(","));
+    const header = [
+      "Section",
+      "Category",
+      "Key",
+      "Severity",
+      "Priority",
+      "Confidence",
+      "Status",
+      "Change",
+      "Value",
+      "Detail",
+      "Recommendation",
+      "Evidence",
+      "Source",
+      "Retrieved at",
+    ];
+    const row = (cells: unknown[]) => lines.push(cells.map(csvCell).join(","));
+
+    lines.push(header.map(csvCell).join(","));
+    row(["Scan", "target", "url", "", "", "", scan.status, "", scan.target_url, `Status: ${scan.status}`, "", "", "scan", scan.created_at]);
+    row(["Scan", "target", "score", "", "", "", "", "", scan.score ?? "", "0-100, derived from measured findings", "", "", "scan", scan.completed_at ?? ""]);
     for (const source of sources.data ?? []) {
-      lines.push(
-        ["Source", "health", source.source, "", source.status, source.error_message ?? `HTTP ${source.http_status ?? ""} in ${source.duration_ms ?? ""}ms`, "", source.provider ?? "website", source.created_at]
-          .map(csvCell)
-          .join(","),
-      );
+      row([
+        "Source",
+        "health",
+        source.source,
+        "",
+        "",
+        "",
+        source.status,
+        "",
+        source.status,
+        source.error_message ?? `HTTP ${source.http_status ?? ""} in ${source.duration_ms ?? ""}ms`,
+        "",
+        "",
+        source.provider ?? "website",
+        source.created_at,
+      ]);
     }
     for (const metric of metrics.data ?? []) {
-      lines.push(
-        ["Measurement", metric.category, metric.metric_key, "", metric.value_numeric ?? metric.value_text, metric.unit ?? "", "", metric.source, scan.completed_at ?? ""].map(csvCell).join(","),
-      );
+      row([
+        "Measurement",
+        metric.category,
+        metric.metric_key,
+        "",
+        "",
+        "",
+        "",
+        "",
+        metric.value_numeric ?? metric.value_text,
+        metric.unit ?? "",
+        "",
+        "",
+        metric.source,
+        scan.completed_at ?? "",
+      ]);
     }
     for (const finding of findings.data ?? []) {
-      lines.push(
-        [
-          "Finding",
-          finding.category,
-          finding.code,
-          finding.severity,
-          finding.title,
-          finding.detail,
-          finding.recommendation ?? "",
-          finding.source,
-          (finding.evidence as any)?.collectedAt ?? finding.created_at,
-        ]
-          .map(csvCell)
-          .join(","),
-      );
+      row([
+        "Finding",
+        finding.category,
+        finding.code,
+        finding.severity,
+        finding.priority_rank ?? "",
+        finding.confidence ?? "",
+        finding.status ?? "",
+        finding.change_state ?? "",
+        finding.title,
+        finding.detail,
+        finding.recommendation ?? "",
+        JSON.stringify(finding.evidence ?? {}),
+        finding.source,
+        (finding.evidence as any)?.collectedAt ?? finding.created_at,
+      ]);
     }
     return { filename: `seovale-scan-${scan.target_domain}-${new Date(scan.created_at).toISOString().slice(0, 10)}.csv`, csv: lines.join("\n") };
   });
+
