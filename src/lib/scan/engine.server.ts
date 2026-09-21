@@ -61,6 +61,48 @@ export interface RunScanResult {
   sources: { source: string; status: string; reused: boolean }[];
 }
 
+/** Stage plan — each entry is a real unit of work the engine performs. */
+const STAGE_PLAN: { stage: string; label: string }[] = [
+  { stage: "validate", label: "URL validated" },
+  { stage: "collect", label: "Website + platform data collected" },
+  { stage: "normalize", label: "Data normalized and stored" },
+  { stage: "analyze", label: "Technical checks and findings generated" },
+  { stage: "ai", label: "AI analysis completed" },
+  { stage: "report", label: "Report generated and stored" },
+];
+
+async function seedStages(admin: SupabaseClient, scanId: string, workspaceId: string) {
+  await admin.from("scan_stages").upsert(
+    STAGE_PLAN.map((item, index) => ({
+      scan_id: scanId,
+      workspace_id: workspaceId,
+      stage: item.stage,
+      label: item.label,
+      position: index,
+    })),
+    { onConflict: "scan_id,stage" },
+  );
+}
+
+async function stage(
+  admin: SupabaseClient,
+  scanId: string,
+  name: string,
+  status: "running" | "completed" | "failed" | "skipped",
+  detail?: string | null,
+) {
+  const patch: Record<string, unknown> = { status, detail: detail ?? null };
+  if (status === "running") patch["started_at"] = new Date().toISOString();
+  else patch["completed_at"] = new Date().toISOString();
+  await admin.from("scan_stages").update(patch).eq("scan_id", scanId).eq("stage", name);
+}
+
+/** Cooperative stop: the engine checks the stored status between stages. */
+async function stopRequested(admin: SupabaseClient, scanId: string) {
+  const { data } = await admin.from("scans").select("status").eq("id", scanId).maybeSingle();
+  return data?.status === "paused" || data?.status === "cancelled" ? (data.status as string) : null;
+}
+
 export async function runScan(admin: SupabaseClient, scanId: string): Promise<RunScanResult> {
   const { data: scan, error } = await admin
     .from("scans")
@@ -79,8 +121,12 @@ export async function runScan(admin: SupabaseClient, scanId: string): Promise<Ru
     .update({ status: "running", started_at: new Date().toISOString(), attempts: (scan.attempts ?? 0) + 1, error_message: null })
     .eq("id", scanId);
   await audit(admin, scan.workspace_id, "scan.started", scanId, { url: scan.target_url });
+  await seedStages(admin, scanId, scan.workspace_id);
 
+  await stage(admin, scanId, "validate", "running");
   const target = normalizeTarget(scan.target_url);
+  await stage(admin, scanId, "validate", "completed", target.url);
+  await stage(admin, scanId, "collect", "running");
   const key = await pagespeedKey(admin, scan.workspace_id);
 
   // Resume/incremental: sources already completed for this scan are not repeated.
@@ -120,6 +166,9 @@ export async function runScan(admin: SupabaseClient, scanId: string): Promise<Ru
       }
     }),
   );
+
+  await stage(admin, scanId, "collect", "completed", `${collected.length} checked, ${reused.length} reused`);
+  await stage(admin, scanId, "normalize", "running");
 
   for (const result of collected) {
     await admin.from("scan_sources").upsert(
@@ -175,6 +224,15 @@ export async function runScan(admin: SupabaseClient, scanId: string): Promise<Ru
     raw: row.raw ?? {},
   }));
 
+  await stage(admin, scanId, "normalize", "completed", `${sourceResults.length} sources stored`);
+
+  const halt = await stopRequested(admin, scanId);
+  if (halt) {
+    await audit(admin, scan.workspace_id, `scan.${halt}`, scanId, {});
+    return { status: "failed", score: null, findings: 0, sources: [] };
+  }
+
+  await stage(admin, scanId, "analyze", "running");
   const pageFailed = sourceResults.find((s) => s.source === "http")?.status !== "completed";
   const { metrics, findings, score, categoryScores } = analyze(sourceResults);
 
@@ -211,6 +269,9 @@ export async function runScan(admin: SupabaseClient, scanId: string): Promise<Ru
       { onConflict: "scan_id,code" },
     );
   }
+
+  await stage(admin, scanId, "analyze", "completed", `${findings.length} findings`);
+  await stage(admin, scanId, "ai", "running");
 
   // ---------- AI analysis over verified findings only ----------
   let summary: string | null = null;
@@ -260,8 +321,11 @@ export async function runScan(admin: SupabaseClient, scanId: string): Promise<Ru
       },
       { onConflict: "scan_id,source" },
     );
+    await stage(admin, scanId, "ai", "failed", message.slice(0, 300));
   }
+  if (summary) await stage(admin, scanId, "ai", "completed", model);
 
+  await stage(admin, scanId, "report", "running");
   await admin.from("scan_reports").upsert(
     {
       scan_id: scanId,
@@ -273,6 +337,8 @@ export async function runScan(admin: SupabaseClient, scanId: string): Promise<Ru
     },
     { onConflict: "scan_id" },
   );
+
+  await stage(admin, scanId, "report", "completed", score === null ? "Report stored without a score" : `Score ${score}`);
 
   const failedEverything = sourceResults.every((s) => s.status !== "completed");
   const status = failedEverything ? "failed" : "completed";

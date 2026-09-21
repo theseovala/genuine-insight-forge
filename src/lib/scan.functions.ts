@@ -26,6 +26,16 @@ export const createScan = createServerFn({ method: "POST" })
     const member = await workspace(context as Ctx);
     const { normalizeTarget } = await import("@/lib/scan/collectors.server");
     const target = normalizeTarget(data.url);
+    // Double-click guard: an active scan for the same address is reused instead of duplicated.
+    const { data: active } = await (context as Ctx).supabase
+      .from("scans")
+      .select("id,target_url,target_domain")
+      .eq("target_domain", target.domain)
+      .in("status", ["queued", "running", "retrying"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (active) return { id: active.id as string, url: active.target_url as string, domain: active.target_domain as string, reused: true };
     const { data: row, error } = await (context as Ctx).supabase
       .from("scans")
       .insert({
@@ -38,7 +48,7 @@ export const createScan = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error) throw error;
-    return { id: row.id as string, url: target.url, domain: target.domain };
+    return { id: row.id as string, url: target.url, domain: target.domain, reused: false };
   });
 
 /** Runs a queued scan. Long-running, so the UI starts it and then polls. */
@@ -77,6 +87,47 @@ export const cancelScan = createServerFn({ method: "POST" })
  * Data lifecycle: removes one scan and everything derived from it. Related
  * layers are deleted explicitly so nothing unrelated is touched.
  */
+/** Pause: the engine checks the stored status between stages and stops cooperatively. */
+export const pauseScan = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: rows, error } = await (context as Ctx).supabase
+      .from("scans")
+      .update({ status: "paused" })
+      .eq("id", data.id)
+      .in("status", ["queued", "running", "retrying"])
+      .select("id");
+    if (error) throw error;
+    if (!rows?.length) throw new Error("This scan is not running, so it cannot be paused.");
+    return { ok: true };
+  });
+
+/** Resume/retry both re-enter the engine, which skips sources already collected. */
+export const resumeScan = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const supabase = (context as Ctx).supabase;
+    const { data: scan, error } = await supabase.from("scans").select("id,status,attempts,max_attempts").eq("id", data.id).single();
+    if (error) throw error;
+    if (!["paused", "failed", "cancelled"].includes(scan.status)) throw new Error("Only a paused, failed or cancelled scan can be resumed.");
+    if (scan.max_attempts && scan.attempts >= scan.max_attempts) throw new Error("This scan reached its maximum number of attempts.");
+    await supabase.from("scans").update({ status: "retrying", error_message: null, completed_at: null }).eq("id", data.id);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { runScan } = await import("@/lib/scan/engine.server");
+    try {
+      return await runScan(supabaseAdmin, data.id);
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : String(caught);
+      await supabaseAdmin
+        .from("scans")
+        .update({ status: "failed", error_message: message.slice(0, 500), completed_at: new Date().toISOString() })
+        .eq("id", data.id);
+      throw caught;
+    }
+  });
+
 export const deleteScan = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
@@ -125,11 +176,12 @@ export const getScan = createServerFn({ method: "GET" })
       .single();
     if (error) throw error;
 
-    const [sources, metrics, findings, report] = await Promise.all([
+    const [sources, metrics, findings, report, stages] = await Promise.all([
       supabase.from("scan_sources").select("source,provider,status,http_status,duration_ms,error_message,created_at").eq("scan_id", data.id).order("source"),
       supabase.from("scan_metrics").select("category,metric_key,value_numeric,value_text,unit,source").eq("scan_id", data.id).order("category"),
       supabase.from("scan_findings").select("category,code,severity,title,detail,recommendation,impact,evidence,source,created_at").eq("scan_id", data.id),
       supabase.from("scan_reports").select("score,category_scores,summary,model,created_at").eq("scan_id", data.id).maybeSingle(),
+      supabase.from("scan_stages").select("stage,label,position,status,detail,started_at,completed_at").eq("scan_id", data.id).order("position"),
     ]);
 
     const { freshnessOf } = await import("@/lib/scan/engine.server");
@@ -174,6 +226,7 @@ export const getScan = createServerFn({ method: "GET" })
       metrics: metrics.data ?? [],
       findings: findings.data ?? [],
       report: report.data ?? null,
+      stages: stages.data ?? [],
       comparison,
     };
   });
