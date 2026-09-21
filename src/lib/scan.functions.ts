@@ -73,6 +73,33 @@ export const cancelScan = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/**
+ * Data lifecycle: removes one scan and everything derived from it. Related
+ * layers are deleted explicitly so nothing unrelated is touched.
+ */
+export const deleteScan = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const supabase = (context as Ctx).supabase;
+    // RLS check first: the caller must be able to see this scan.
+    const { data: scan, error } = await supabase.from("scans").select("id,workspace_id").eq("id", data.id).single();
+    if (error) throw error;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    for (const table of ["scan_findings", "scan_metrics", "scan_sources", "scan_reports", "provider_raw_data"]) {
+      await supabaseAdmin.from(table).delete().eq("scan_id", scan.id);
+    }
+    await supabaseAdmin.from("scans").delete().eq("id", scan.id);
+    await supabaseAdmin.from("audit_logs").insert({
+      workspace_id: scan.workspace_id,
+      action: "scan.deleted",
+      target_type: "scan",
+      target_id: scan.id,
+      metadata: { requested_by: (context as Ctx).userId },
+    });
+    return { ok: true };
+  });
+
 export const listScans = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
