@@ -25,9 +25,10 @@ export const Route = createFileRoute("/api/public/license/update-check")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const raw = await request.text();
         let parsed: unknown;
         try {
-          parsed = await request.json();
+          parsed = JSON.parse(raw);
         } catch {
           return Response.json({ ok: false, result: "bad_request" }, { status: 400 });
         }
