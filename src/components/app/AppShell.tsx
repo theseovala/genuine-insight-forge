@@ -181,10 +181,12 @@ function TopBar({
   onMenu,
   collapsed,
   onToggle,
+  onSearch,
 }: {
   onMenu: () => void;
   collapsed: boolean;
   onToggle: () => void;
+  onSearch: () => void;
 }) {
   const { location, setLocation, locationNames, brandName } = useApp();
   const { data: alerts } = useLiveAlerts();
@@ -250,9 +252,31 @@ function TopBar({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <SearchBox />
+      <button
+        type="button"
+        onClick={onSearch}
+        className="press ml-auto hidden h-9 w-full max-w-sm items-center gap-2 rounded-lg border bg-card pl-3 pr-2 text-sm text-muted-foreground transition-colors hover:bg-accent md:flex"
+      >
+        <Search className="size-4 shrink-0" />
+        <span className="flex-1 truncate text-left">Search pages and scans…</span>
+        <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-semibold">⌘K</kbd>
+      </button>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="ml-auto md:hidden"
+        onClick={onSearch}
+        aria-label="Search"
+      >
+        <Search />
+      </Button>
 
       <div className="flex items-center gap-1 md:ml-2">
+        <Button variant="ghost" size="icon" asChild aria-label="Support and help">
+          <Link to="/support">
+            <LifeBuoy />
+          </Link>
+        </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
