@@ -151,3 +151,16 @@
 - [ ] Phase 15: licence management dashboard sections + real KPIs
 - [ ] Phase 16: client portal scope
 - [ ] Phase 17-21: licence security, secure download, source protection, MFA, release/version UX (largely built — verify in this pass)
+
+## Licence system QA — verified 2026-09-21
+- [x] MFA enrolment + step-up on every sensitive action
+- [x] Licence issue, activation, domain lock, installation limit
+- [x] Suspend -> blocked, reactivate -> allowed, revoke -> blocked, renew -> allowed
+- [x] Expiry enforced server-side (license_expired)
+- [x] Rate limiting on validation (429 after 120 requests / 5 min)
+- [x] Installation reset -> re-activation -> validation recovers
+- [x] Tampered release rejected on download; genuine release downloads (302 + checksum)
+- [x] Single-use download token; replay 403; bad token 404
+- [x] Non-admin account: no clients, no licences, no releases, admin list denied, create denied
+- [x] Scan -> report -> CSV regression passed (basecamp.com 83/100, 8 findings, 23 evidence, 82-line CSV)
+- [ ] Backup/restore drill (needs owner decision on backup target)
