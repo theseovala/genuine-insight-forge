@@ -150,30 +150,28 @@ export function normalizeDomain(value: string) {
 /* ---------------- signed request verification ---------------- */
 
 /**
- * Deployments authenticate with an HMAC over the request body using their
- * license secret. The secret itself is never transmitted.
+ * Deployments authenticate each call with an HMAC over `timestamp.body`
+ * keyed by their license secret. The secret itself is never transmitted.
  */
+export function buildRequestSignature(body: Record<string, unknown>, timestamp: string, licenseSecret: string) {
+  return createHmac("sha256", licenseSecret).update(`${timestamp}.${JSON.stringify(body)}`).digest("base64url");
+}
+
 export function verifyRequestSignature(
   body: Record<string, unknown>,
   signature: string | null,
   timestamp: string | null,
-  licenseSecretHash: string,
+  licenseSecret: string,
 ) {
   if (!signature || !timestamp) return { ok: false as const, reason: "missing_signature" };
   const ts = Number(timestamp);
   if (!Number.isFinite(ts) || Math.abs(Date.now() - ts) > VALIDATION_LEEWAY_MS) {
     return { ok: false as const, reason: "stale_request" };
   }
-  const expected = signPayload({ body: JSON.stringify(body), timestamp, secret: licenseSecretHash });
+  const expected = buildRequestSignature(body, timestamp, licenseSecret);
   return safeEqual(expected, signature) ? { ok: true as const } : { ok: false as const, reason: "invalid_signature" };
 }
 
-/** Same computation, exposed so a licensed deployment can sign its own calls. */
-export function buildRequestSignature(body: Record<string, unknown>, timestamp: string, licenseSecretHash: string) {
-  return signPayload({ body: JSON.stringify(body), timestamp, secret: licenseSecretHash });
-}
-
-export const licenseSecretHash = (licenseKey: string, salt: string) => sha256Hex(`${licenseKey}:${salt}`);
 
 /* ---------------- validation ---------------- */
 
