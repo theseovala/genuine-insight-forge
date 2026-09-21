@@ -10,6 +10,7 @@ import {
   startGoogleBusinessConnection,
   syncGoogleBusinessReviews,
 } from "@/lib/google-business.functions";
+import { saveProviderCredentials, testIntegration } from "@/lib/integrations.functions";
 
 /** Opens Google authorization reliably, even inside a sandboxed preview frame. */
 function openAuthorization(url: string, authWindow: Window | null) {
@@ -245,8 +246,52 @@ export function GoogleBusinessSetupGuide({ credentialsReady }: { credentialsRead
   );
 }
 
-/** Google Maps Platform: project + billing → enable APIs → server key → verify. */
-export function GoogleMapsSetupGuide({ credentialsReady, verified }: { credentialsReady: boolean; verified: boolean }) {
+/** Google Maps Platform: project + billing → enable APIs → server key → save + real verify. */
+export function GoogleMapsSetupGuide({
+  credentialsReady,
+  verified,
+  onChanged,
+}: {
+  credentialsReady: boolean;
+  verified: boolean;
+  onChanged?: () => void;
+}) {
+  const [apiKey, setApiKey] = useState("");
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const saveFn = useServerFn(saveProviderCredentials);
+  const testFn = useServerFn(testIntegration);
+
+  const saveAndTest = useMutation({
+    mutationFn: async (key: string) => {
+      await saveFn({ data: { provider: "google_maps", values: { GOOGLE_MAPS_API_KEY: key } } });
+      return testFn({ data: { provider: "google_maps" } });
+    },
+    onSuccess: (test) => {
+      setApiKey("");
+      setResult({ ok: test.ok, message: test.message });
+      if (test.ok) toast.success(test.message);
+      else toast.error(test.message);
+      onChanged?.();
+    },
+    onError: (error: Error) => {
+      setResult({ ok: false, message: error.message });
+      toast.error(error.message);
+    },
+  });
+
+  const retest = useMutation({
+    mutationFn: () => testFn({ data: { provider: "google_maps" } }),
+    onSuccess: (test) => {
+      setResult({ ok: test.ok, message: test.message });
+      if (test.ok) toast.success(test.message);
+      else toast.error(test.message);
+      onChanged?.();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const busy = saveAndTest.isPending || retest.isPending;
+
   const steps: Step[] = [
     {
       title: "Create a Google Cloud project with billing",
@@ -262,18 +307,48 @@ export function GoogleMapsSetupGuide({ credentialsReady, verified }: { credentia
     },
     {
       title: "Create an API key for server use",
-      detail: "Credentials → Create credentials → API key. Under Application restrictions choose None or IP addresses (never website restrictions — this key is used by the server). Under API restrictions select only the two APIs above.",
+      detail:
+        "Credentials → Create credentials → API key. Under Application restrictions choose None or IP addresses (never website restrictions — this key is used by the server). Under API restrictions select only the two APIs above.",
       done: credentialsReady,
       link: { href: "https://console.cloud.google.com/apis/credentials", label: "Open credentials" },
     },
     {
-      title: "Save the key here and verify",
+      title: "Paste the key here and verify",
       detail: verified
         ? "Key saved and confirmed working against the live Google API."
         : credentialsReady
-          ? "Key saved — press Test connection to confirm it works."
-          : "Paste the key in the Provider credentials panel below and press Save & verify.",
+          ? "A key is saved but not confirmed yet. Press Test again, or paste a new key to replace it."
+          : "Paste the key below. It is encrypted on the server and checked immediately with a real Google request.",
       done: verified,
+      action: (
+        <div className="w-full space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="password"
+              autoComplete="off"
+              spellCheck={false}
+              value={apiKey}
+              placeholder={credentialsReady ? "Enter a new key to replace the saved one" : "AIza..."}
+              onChange={(e) => setApiKey(e.target.value)}
+              className="h-9 min-w-[220px] flex-1 rounded-lg border bg-background px-3 text-xs outline-none focus:ring-2 focus:ring-ring/40"
+            />
+            <Button size="sm" disabled={busy || !apiKey.trim()} onClick={() => saveAndTest.mutate(apiKey.trim())}>
+              {saveAndTest.isPending && <Loader2 className="animate-spin" />} Save &amp; verify
+            </Button>
+            {credentialsReady && (
+              <Button size="sm" variant="outline" disabled={busy} onClick={() => retest.mutate()}>
+                {retest.isPending ? <Loader2 className="animate-spin" /> : <RefreshCw />} Test again
+              </Button>
+            )}
+          </div>
+          {result && (
+            <p className={`text-[11px] ${result.ok ? "text-positive" : "text-negative"}`}>{result.message}</p>
+          )}
+          <p className="text-[11px] text-muted-foreground">
+            The key never comes back to this page — only the live test result is shown.
+          </p>
+        </div>
+      ),
     },
   ];
 
