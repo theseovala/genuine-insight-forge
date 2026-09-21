@@ -59,8 +59,41 @@ const SOURCE_LABEL: Record<string, string> = {
   dns: "DNS records",
   rdap: "Domain registration",
   crawl_directives: "robots.txt & sitemap",
+  crawl: "Website crawl",
   pagespeed: "Google PageSpeed",
   ai_analysis: "AI analysis",
+};
+
+/** Platform rows are stored as `platform:<provider>` — shown with a readable name. */
+function sourceLabel(source: string) {
+  if (source.startsWith("platform:")) {
+    const provider = source.slice("platform:".length);
+    return provider.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+  return SOURCE_LABEL[source] ?? source;
+}
+
+const SOURCE_STATUS_LABEL: Record<string, string> = {
+  completed: "Checked",
+  not_configured: "Not configured",
+  auth_required: "Sign-in needed",
+  approval_required: "Approval needed",
+  not_supported: "No public API",
+  unavailable: "Unavailable",
+  rate_limited: "Rate limited",
+  skipped: "Skipped",
+  failed: "Failed",
+};
+
+const SCAN_STATUS_LABEL: Record<string, string> = {
+  queued: "Queued",
+  running: "Running",
+  paused: "Paused",
+  retrying: "Retrying",
+  completed: "Completed",
+  completed_with_warnings: "Completed with warnings",
+  failed: "Failed",
+  cancelled: "Cancelled",
 };
 
 const SEVERITY_TONE: Record<string, string> = {
@@ -73,10 +106,12 @@ const SEVERITY_TONE: Record<string, string> = {
 
 function SourceIcon({ status }: { status: string }) {
   if (status === "completed") return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
-  if (status === "not_configured") return <Clock className="h-4 w-4 text-muted-foreground" />;
-  if (status === "skipped") return <Clock className="h-4 w-4 text-muted-foreground" />;
+  if (["not_configured", "skipped", "not_supported", "unavailable", "approval_required", "auth_required", "rate_limited"].includes(status)) {
+    return <Clock className="h-4 w-4 text-muted-foreground" />;
+  }
   return <XCircle className="h-4 w-4 text-destructive" />;
 }
+
 
 function ScansPage() {
   const queryClient = useQueryClient();
