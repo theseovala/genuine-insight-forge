@@ -366,47 +366,18 @@ function TopBar({
   );
 }
 
-function SearchBox() {
-  const [q, setQ] = useState("");
-  const { data: reviews } = useLiveReviews();
-  const results =
-    q.trim().length < 2
-      ? []
-      : (reviews ?? [])
-          .filter((r) =>
-            `${r.author} ${r.body} ${r.location} ${r.tags.join(" ")}`
-              .toLowerCase()
-              .includes(q.trim().toLowerCase()),
-          )
-          .slice(0, 6);
-
+/** Breadcrumb trail built from the real route table — never a decorative label. */
+function Breadcrumbs({ pathname }: { pathname: string }) {
+  const item = navItems.find((n) => pathname.startsWith(n.to));
+  if (!item) return null;
   return (
-    <div className="relative ml-auto hidden w-full max-w-sm md:block">
-      <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-      <input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder="Search reviews, locations, customers…"
-        className="h-9 w-full rounded-lg border bg-card pl-9 pr-4 text-sm outline-none transition-shadow placeholder:text-muted-foreground focus:ring-2 focus:ring-ring/40"
-      />
-      {results.length > 0 && (
-        <div className="absolute left-0 right-0 top-11 z-40 overflow-hidden rounded-lg border bg-popover shadow-lg">
-          {results.map((r) => (
-            <Link
-              key={r.id}
-              to="/reviews"
-              onClick={() => setQ("")}
-              className="block border-b px-3 py-2 last:border-0 hover:bg-accent/60"
-            >
-              <p className="truncate text-sm font-semibold">
-                {r.author} · {r.rating}★
-              </p>
-              <p className="truncate text-xs text-muted-foreground">{r.body}</p>
-            </Link>
-          ))}
-        </div>
-      )}
-    </div>
+    <nav aria-label="Breadcrumb" className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+      <Link to="/dashboard" className="transition-colors hover:text-foreground">
+        Home
+      </Link>
+      <span aria-hidden>/</span>
+      <span className="font-medium text-foreground">{item.label}</span>
+    </nav>
   );
 }
 
