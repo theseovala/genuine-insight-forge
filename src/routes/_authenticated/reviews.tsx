@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useMutation } from "@tanstack/react-query";
-import { Search, Inbox, ChevronDown, Reply, Sparkles, Send, Copy, Check } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Search, Inbox, ChevronDown, Reply, Sparkles, Send, Copy, Check, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
 import {
@@ -25,6 +25,8 @@ import {
 } from "@/lib/seovale-db";
 import { useApp, ALL_LOCATIONS } from "@/lib/app-context";
 import { draftReply } from "@/lib/ai.functions";
+import { syncGoogleBusinessReviews } from "@/lib/google-business.functions";
+import { syncTrustpilotReviews } from "@/lib/trustpilot.functions";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/reviews")({
@@ -131,12 +133,44 @@ function ReviewCenter() {
     window.setTimeout(() => setCopied(false), 1800);
   };
 
+  const queryClient = useQueryClient();
+  const syncGoogleFn = useServerFn(syncGoogleBusinessReviews);
+  const syncTrustpilotFn = useServerFn(syncTrustpilotReviews);
+  const syncAll = useMutation({
+    mutationFn: async () => {
+      const results: string[] = [];
+      if (connectedIds.has("google")) {
+        const r = await syncGoogleFn();
+        results.push(`Google: ${r.reviewsFound} reviews (${r.reviewsCreated} new)`);
+      }
+      if (connectedIds.has("trustpilot")) {
+        const r = await syncTrustpilotFn();
+        results.push(`Trustpilot: ${r.reviewsFound} reviews (${r.reviewsCreated} new)`);
+      }
+      return results;
+    },
+    onSuccess: (results) => {
+      queryClient.invalidateQueries({ queryKey: ["reviews"] });
+      queryClient.invalidateQueries({ queryKey: ["alerts"] });
+      toast.success("Live sync complete", { description: results.join(" · ") || "Nothing to sync" });
+    },
+    onError: (e) => toast.error("Sync failed", { description: (e as Error).message }),
+  });
+
   return (
     <AppShell>
       <PageHeader
         eyebrow="Unified inbox"
         title="Review Center"
         description="Every review from every connected platform, in one place. Filter, triage and open a review to see full context."
+        actions={
+          (connectedIds.has("google") || connectedIds.has("trustpilot")) ? (
+            <Button onClick={() => syncAll.mutate()} disabled={syncAll.isPending}>
+              {syncAll.isPending ? <RefreshCw className="animate-spin" /> : <RefreshCw />}
+              Sync live reviews
+            </Button>
+          ) : undefined
+        }
       />
 
       {/* Filter bar */}

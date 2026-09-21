@@ -1,5 +1,6 @@
 // Live data layer for Seovale — reviews, alerts, platforms, locations,
 // competitors, reports and brand settings. All data is stored in the backend.
+import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type {
@@ -163,7 +164,28 @@ function toAlert(row: AlertRow): Alert {
   };
 }
 
+/** Subscribes to a table's Realtime changes and refetches the given query keys live. */
+function useRealtimeTable(table: string, queryKeys: string[]) {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    // Unique channel per mount: reusing a name can race with an async
+    // removeChannel from a prior unmount and throw "cannot add callbacks
+    // after subscribe()".
+    const channel = supabase
+      .channel(`live-${table}-${Math.random().toString(36).slice(2)}`)
+      .on("postgres_changes", { event: "*", schema: "public", table }, () => {
+        for (const key of queryKeys) queryClient.invalidateQueries({ queryKey: [key] });
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [table, queryKeys.join(",")]);
+}
+
 export function useLiveReviews() {
+  useRealtimeTable("reviews", ["reviews"]);
   return useQuery({
     queryKey: ["reviews"],
     queryFn: async (): Promise<LiveReview[]> => {
@@ -183,6 +205,7 @@ export function useLiveReviews() {
 }
 
 export function useLiveAlerts() {
+  useRealtimeTable("alerts", ["alerts"]);
   return useQuery({
     queryKey: ["alerts"],
     queryFn: async (): Promise<Alert[]> => {

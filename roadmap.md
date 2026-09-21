@@ -79,3 +79,4 @@
 
 ## In progress (added 20:11 UTC)
 - [x] Ultra Premium UI enhancement (done 20:2x UTC — depth tokens, bg-ambient, edge illumination, sidebar active glow, premium gradient buttons, dark-mode depth; verified desktop, 0 overflow, 0 console errors) — keep palette/fonts/layout/spacing; add depth layers, glow, card sheen, premium buttons, sidebar active glow, density, micro-animations, reduced-motion support. Inspect every major screen after.
+- [x] Review Center: real-time sync (Realtime on reviews/alerts + Trustpilot sync fn + Sync live reviews button) — live reviews appear once Google OAuth approved and Trustpilot key saved (user action pending)
