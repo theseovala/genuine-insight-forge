@@ -129,6 +129,7 @@ export async function runAiText(system: string, prompt: string): Promise<AiTextR
         model: openai.responses(FALLBACK_MODEL),
         system,
         prompt,
+        abortSignal: AbortSignal.timeout(AI_TIMEOUT_MS),
         providerOptions: { openai: { store: false } },
       });
       return await finish(result, FALLBACK_MODEL, "openai", started);
