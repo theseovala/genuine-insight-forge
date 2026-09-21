@@ -55,6 +55,7 @@ export const navItems = [
   { id: "competitors", to: "/competitors", label: "Competitors", icon: Swords },
   { id: "feedback", to: "/feedback", label: "Customer Feedback", icon: MessageCircleHeart },
   { id: "reports", to: "/reports", label: "Reports", icon: FileText },
+  { id: "system", to: "/system", label: "System Health", icon: Activity },
   { id: "settings", to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
@@ -62,7 +63,7 @@ const navGroups = [
   { label: "Overview", ids: ["dashboard", "scans", "analytics"] },
   { label: "Reputation", ids: ["reviews", "responses", "alerts", "removals"] },
   { label: "Growth", ids: ["locations", "competitors", "feedback"] },
-  { label: "Workspace", ids: ["reports", "settings"] },
+  { label: "Workspace", ids: ["reports", "system", "settings"] },
 ] as const;
 
 function NavList({
