@@ -140,7 +140,10 @@ export const deleteScan = createServerFn({ method: "POST" })
     const { data: scan, error } = await supabase.from("scans").select("id,workspace_id").eq("id", data.id).single();
     if (error) throw error;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const derived = ["scan_findings", "scan_metrics", "scan_sources", "scan_reports", "provider_raw_data"] as const;
+    // finding_evidence cascades with its finding; business_facts and
+    // data_conflicts survive on purpose — they belong to the business, not to
+    // one scan, and their scan link is cleared by the foreign key.
+    const derived = ["finding_evidence", "scan_findings", "scan_metrics", "scan_sources", "scan_reports", "provider_raw_data"] as const;
     for (const table of derived) {
       await supabaseAdmin.from(table).delete().eq("scan_id", scan.id);
     }
@@ -179,14 +182,37 @@ export const getScan = createServerFn({ method: "GET" })
       .single();
     if (error) throw error;
 
-    const [sources, metrics, findings, report, stages] = await Promise.all([
+    const [sources, metrics, findings, report, stages, facts, conflicts, evidence] = await Promise.all([
       supabase.from("scan_sources").select("source,provider,status,http_status,duration_ms,error_message,created_at").eq("scan_id", data.id).order("source"),
       supabase.from("scan_metrics").select("category,metric_key,value_numeric,value_text,unit,source").eq("scan_id", data.id).order("category"),
       supabase.from("scan_findings").select("category,code,severity,title,detail,recommendation,impact,evidence,source,created_at,confidence,priority_score,priority_rank,status,change_state").eq("scan_id", data.id).order("priority_rank", { ascending: true, nullsFirst: false }),
       supabase.from("scan_reports").select("score,category_scores,summary,model,created_at,sections,action_plan,historical,ai_status,ai_error,ai_latency_ms").eq("scan_id", data.id).maybeSingle(),
 
       supabase.from("scan_stages").select("stage,label,position,status,detail,started_at,completed_at").eq("scan_id", data.id).order("position"),
+      supabase
+        .from("business_facts")
+        .select("field_key,value_normalized,value_raw,source_provider,source_type,source_url,confidence,retrieved_at,last_verified_at,previous_value,changed_at")
+        .eq("domain", scan.target_domain)
+        .order("field_key"),
+      supabase
+        .from("data_conflicts")
+        .select("field_key,source_a,value_a,observed_a_at,source_b,value_b,observed_b_at,status,detected_at,resolved_at")
+        .eq("domain", scan.target_domain)
+        .order("detected_at", { ascending: false }),
+      supabase
+        .from("finding_evidence")
+        .select("finding_id,source,source_type,reference,value,observed_at")
+        .eq("scan_id", data.id)
+        .order("observed_at"),
     ]);
+
+    // Evidence is keyed by finding code so screen, report and CSV read the same rows.
+    const evidenceByCode = new Map<string, { source: string; sourceType: string; reference: string | null; value: string; observedAt: string }[]>();
+    for (const row of (evidence.data ?? []) as any[]) {
+      const list = evidenceByCode.get(row.reference) ?? [];
+      list.push({ source: row.source, sourceType: row.source_type, reference: row.reference, value: row.value, observedAt: row.observed_at });
+      evidenceByCode.set(row.reference, list);
+    }
 
     const { freshnessOf } = await import("@/lib/scan/engine.server");
     const sourceRows = (sources.data ?? []).map((row: any) => ({ ...row, freshness: freshnessOf(row.source, row.created_at) }));
@@ -229,7 +255,9 @@ export const getScan = createServerFn({ method: "GET" })
       scan,
       sources: sourceRows,
       metrics: metrics.data ?? [],
-      findings: findings.data ?? [],
+      findings: (findings.data ?? []).map((row: any) => ({ ...row, evidenceRecords: evidenceByCode.get(row.code) ?? [] })),
+      facts: facts.data ?? [],
+      conflicts: conflicts.data ?? [],
       report: report.data ?? null,
       stages: stages.data ?? [],
       comparison,
