@@ -473,7 +473,8 @@ export async function runScan(admin: SupabaseClient, scanId: string): Promise<Ru
     phone: identity.phone,
     address: identity.address,
     industry: identity.category,
-    sslStatus: (tlsRaw?.["issuer"] as string | undefined) ? "valid" : null,
+    sslStatus:
+      tlsRaw && "httpsReachable" in tlsRaw ? (tlsRaw["httpsReachable"] ? "valid" : "unreachable") : null,
     reachable: Boolean(httpRow),
     observedAt,
   });
