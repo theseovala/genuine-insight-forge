@@ -2,17 +2,6 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  LayoutDashboard,
-  Inbox,
-  MessageSquareReply,
-  BarChart3,
-  BellRing,
-  MapPin,
-  ShieldX,
-  Swords,
-  MessageCircleHeart,
-  FileText,
-  Settings,
   Search,
   Bell,
   ChevronsUpDown,
@@ -21,9 +10,7 @@ import {
   UserRound,
   PanelLeftClose,
   PanelLeftOpen,
-  Radar,
-  Activity,
-  KeyRound,
+  LifeBuoy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useApp, ALL_LOCATIONS } from "@/lib/app-context";
