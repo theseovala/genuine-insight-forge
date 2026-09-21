@@ -131,7 +131,6 @@ function ScansPage() {
       <PageHeader
         title="Website Scan Engine"
         description="Paste a website address. Seovale checks it live and reports only what it actually measured."
-        icon={Radar}
       />
 
       <Section title="New scan" description="One address per scan. Everything measured is stored with its evidence and timestamp.">
@@ -150,7 +149,7 @@ function ScansPage() {
         </form>
       </Section>
 
-      <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="mt-4 grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
         <Section title="Scan history" description="Completed scans are kept so results can be compared over time.">
           {scans.isLoading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
