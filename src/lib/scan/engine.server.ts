@@ -799,7 +799,7 @@ export async function runScan(admin: SupabaseClient, scanId: string): Promise<Ru
   // unless the scan reached one of these terminal states.
   await admin.from("notifications").insert({
     workspace_id: scan.workspace_id,
-    user_id: scan.requested_by ?? null,
+    user_id: requestedBy,
     type: status === "failed" ? "scan_failed" : "scan_completed",
     severity: status === "failed" ? "critical" : status === "completed_with_warnings" ? "warning" : "success",
     title:
