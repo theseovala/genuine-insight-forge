@@ -401,6 +401,39 @@ export function IntegrationManager() {
                               ? "Not connected yet."
                               : `Add ${definition.requiredSecrets.join(" and ")} before connecting.`}
                       </p>
+                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+                        <span>Auth: {authTypeLabel[definition.kind]}</span>
+                        <span>
+                          Last verified:{" "}
+                          {item?.lastCheckedAt ? relativeTime(item.lastCheckedAt) : item?.lastTestedAt ? relativeTime(item.lastTestedAt) : "never"}
+                        </span>
+                        <span>Last sync: {item?.lastSyncAt ? relativeTime(item.lastSyncAt) : "never"}</span>
+                        {item?.latencyMs != null && <span>Latency: {item.latencyMs} ms</span>}
+                        <span>
+                          Rate limit:{" "}
+                          {item?.rateLimit
+                            ? `${item.rateLimit.remaining ?? "?"}/${item.rateLimit.limit ?? "?"} left${item.rateLimit.resetAt ? ` · resets ${relativeTime(item.rateLimit.resetAt)}` : ""}`
+                            : (rateLimitFor(definition.id) ?? "not published")}
+                        </span>
+                      </div>
+                      {capabilitiesFor(definition.id).length > 0 ? (
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          {capabilitiesFor(definition.id).map((capability) => (
+                            <span
+                              key={capability}
+                              className={`rounded-full border px-2 py-0.5 text-[10px] ${status === "connected" ? "border-border text-foreground" : "border-dashed border-border text-muted-foreground"}`}
+                            >
+                              {status === "connected" ? "✓ " : ""}
+                              {capability}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="mt-1.5 text-[11px] text-muted-foreground">No capability is available without provider approval.</p>
+                      )}
+                      {definition.scopes.length > 0 && (
+                        <p className="mt-1 text-[11px] text-muted-foreground">Scopes: {definition.scopes.join(", ")}</p>
+                      )}
                       {item?.lastError && <p className="mt-1 text-xs text-negative">{item.lastError}</p>}
                       {item?.tokenExpiresAt && status === "connected" && (
                         <p className="mt-1 text-[11px] text-muted-foreground">Access renews automatically · expires {relativeTime(item.tokenExpiresAt)}</p>
