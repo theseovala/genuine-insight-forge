@@ -579,3 +579,112 @@ export const setAdminRole = createServerFn({ method: "POST" })
     });
     return { ok: true };
   });
+
+/* ---------------- releases ---------------- */
+
+/**
+ * Publishes an artifact that was already uploaded to the private release
+ * bucket. The server re-hashes the artifact itself, re-runs artifact
+ * inspection from the uploaded manifest and signs the release.
+ */
+export const publishRelease = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (input: { version: string; buildId: string; artifactPath: string; channel?: "stable" | "beta"; minSupportedVersion?: string | null; notes?: string }) =>
+      z
+        .object({
+          version: z.string().min(1).max(40),
+          buildId: z.string().min(1).max(80),
+          artifactPath: z.string().min(3).max(300),
+          channel: z.enum(["stable", "beta"]).optional(),
+          minSupportedVersion: z.string().max(40).nullable().optional(),
+          notes: z.string().max(500).optional(),
+        })
+        .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const ctx = context as Ctx;
+    const db = await admin();
+    await guard(db, ctx.userId, "publish_release");
+    const operations = await import("@/lib/license/operations.server");
+    const crypto = await import("@/lib/license/crypto.server");
+    const authority = await import("@/lib/license/authority.server");
+
+    const { data: file, error: downloadError } = await db.storage.from(operations.RELEASE_BUCKET).download(data.artifactPath);
+    if (downloadError || !file) throw new Error("That artifact was not found in the release storage.");
+    const bytes = Buffer.from(await file.arrayBuffer());
+    const checksum = crypto.sha256Hex(bytes.toString("base64"));
+
+    // Artifact inspection: the packaging step uploads a manifest of every entry.
+    const { data: manifestFile } = await db.storage.from(operations.RELEASE_BUCKET).download(`${data.artifactPath}.manifest.json`);
+    if (!manifestFile) throw new Error("No manifest was uploaded next to this artifact — inspection cannot run.");
+    const manifest = JSON.parse(await manifestFile.text()) as { entries?: string[] };
+    const inspection = operations.inspectArtifactEntries(manifest.entries ?? []);
+
+    const releaseRef = crypto.generateReleaseRef();
+    const signature = operations.releaseSignature({
+      release_ref: releaseRef,
+      version: data.version,
+      build_id: data.buildId,
+      checksum_sha256: checksum,
+    });
+
+    const { data: release, error } = await db
+      .from("license_releases")
+      .insert({
+        release_ref: releaseRef,
+        version: data.version,
+        build_id: data.buildId,
+        channel: data.channel ?? "stable",
+        checksum_sha256: checksum,
+        signature,
+        signing_key_id: operations.currentSigningKeyId(),
+        artifact_path: data.artifactPath,
+        artifact_bytes: bytes.byteLength,
+        status: inspection.passed ? "published" : "draft",
+        inspection_passed: inspection.passed,
+        inspection_report: inspection,
+        min_supported_version: data.minSupportedVersion ?? null,
+        notes: data.notes ?? null,
+        created_by: ctx.userId,
+        published_at: inspection.passed ? new Date().toISOString() : null,
+      })
+      .select("id, release_ref, status")
+      .single();
+    if (error) throw new Error(error.message);
+
+    await authority.recordLicenseEvent(db, {
+      eventType: inspection.passed ? "release_published" : "release_blocked_by_inspection",
+      actor: ctx.userId,
+      resource: releaseRef,
+      result: inspection.passed ? "success" : "blocked",
+      metadata: { version: data.version, violations: inspection.violations.slice(0, 20) },
+    });
+    if (!inspection.passed) {
+      await authority.recordLicenseSecurityEvent(db, {
+        actor: ctx.userId,
+        eventType: "release_inspection_failed",
+        severity: "critical",
+        resource: releaseRef,
+        message: `Artifact inspection blocked ${data.version}: ${inspection.violations.slice(0, 5).join(", ")}`,
+      });
+    }
+    return { release, inspection, checksum };
+  });
+
+export const rollbackRelease = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { releaseId: string }) => z.object({ releaseId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const ctx = context as Ctx;
+    const db = await admin();
+    await guard(db, ctx.userId, "publish_release");
+    const authority = await import("@/lib/license/authority.server");
+    const { data: release } = await db.from("license_releases").select("id, release_ref").eq("id", data.releaseId).maybeSingle();
+    if (!release) throw new Error("Release not found.");
+    await db.from("license_releases").update({ status: "rolled_back" }).eq("id", release.id);
+    await db.from("license_download_tokens").update({ revoked_at: new Date().toISOString() }).eq("release_id", release.id).is("used_at", null);
+    await authority.recordLicenseEvent(db, { eventType: "release_rolled_back", actor: ctx.userId, resource: release.release_ref });
+    return { ok: true };
+  });
+
