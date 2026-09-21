@@ -357,14 +357,14 @@ function ScansPage() {
                         <SourceIcon status={source.status} />
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="flex items-center gap-2 font-medium">
+                        <div className="flex items-center gap-2 font-medium">
                           <span className="truncate">{SOURCE_LABEL[source.source] ?? source.source}</span>
                           {source.status === "completed" ? (
                             <Badge variant="outline" className="h-4 shrink-0 px-1 text-[9px] uppercase">
                               {source.freshness}
                             </Badge>
                           ) : null}
-                        </p>
+                        </div>
                         <p className="truncate text-xs text-muted-foreground">
                           {source.status === "not_configured"
                             ? "Provider not configured"
