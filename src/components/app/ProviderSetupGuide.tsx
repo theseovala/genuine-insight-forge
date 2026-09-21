@@ -109,7 +109,7 @@ export function ProviderSetupGuide({
   const testFn = useServerFn(testIntegration);
   const startFn = useServerFn(startIntegrationOAuth);
 
-  const consoleSteps = CONSOLE_STEPS[definition.id] ?? [];
+  const consoleSteps = CONSOLE_STEPS[definition.id] ?? genericSteps(definition);
   const redirectUri =
     typeof window === "undefined" ? "" : `${window.location.origin}/api/public/integrations/callback`;
   const savedAccount = (accountRef ?? "").trim();
