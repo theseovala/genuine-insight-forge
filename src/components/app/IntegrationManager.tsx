@@ -20,6 +20,7 @@ import {
 import type { IntegrationDefinition } from "@/lib/integrations/registry";
 
 import { integrationStatusLabel as statusLabel, integrationStatusTone as statusTone } from "@/lib/integrations/status";
+import { GoogleBusinessSetupGuide, GoogleMapsSetupGuide } from "@/components/app/GoogleSetupGuide";
 
 function openAuthorization(url: string) {
   const popup = window.open(url, "_blank", "noopener,noreferrer");
@@ -398,6 +399,19 @@ export function IntegrationManager() {
                     </div>
                   </div>
 
+                  {isAdmin && definition.id === "google_business" && (
+                    <GoogleBusinessSetupGuide
+                      credentialsReady={(item?.credentials ?? []).some((c) => c.masked || c.fromEnvironment)}
+                    />
+                  )}
+
+                  {isAdmin && definition.id === "google_maps" && (
+                    <GoogleMapsSetupGuide
+                      credentialsReady={(item?.credentials ?? []).some((c) => c.masked || c.fromEnvironment)}
+                      verified={status === "connected"}
+                    />
+                  )}
+
                   {isAdmin && (definition.credentialFields?.length ?? 0) > 0 && (
                     <CredentialPanel
                       definition={definition}
@@ -405,6 +419,7 @@ export function IntegrationManager() {
                       onChanged={refresh}
                     />
                   )}
+
 
                   {definition.kind === "api_key" && isAdmin && (
                     <div className="mt-3 flex flex-wrap items-end gap-2">
