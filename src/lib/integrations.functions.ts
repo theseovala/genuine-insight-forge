@@ -662,7 +662,7 @@ export const getIntegrationOverview = createServerFn({ method: "GET" })
         .gte("status_code", 400),
       supabaseAdmin
         .from("audit_logs")
-        .select("id,action,entity,actor_id,created_at,metadata")
+        .select("id,action,target_type,target_id,created_at")
         .eq("workspace_id", member.workspace_id)
         .order("created_at", { ascending: false })
         .limit(10),
@@ -680,14 +680,19 @@ export const getIntegrationOverview = createServerFn({ method: "GET" })
       pendingConfiguration: INTEGRATIONS.length - manual.length - rows.filter((r) => r.status === "connected").length,
       approvalRequired: manual.length,
       errors24h: (errors.data ?? []).length,
-      auditLog: (audits.data ?? []) as Array<{
+      auditLog: ((audits.data ?? []) as Array<{
         id: string;
         action: string;
-        entity: string | null;
-        actor_id: string | null;
+        target_type: string | null;
+        target_id: string | null;
         created_at: string;
-        metadata: Record<string, unknown> | null;
-      }>,
+      }>).map((row) => ({
+        id: row.id,
+        action: row.action,
+        target: row.target_type ?? null,
+        targetId: row.target_id ?? null,
+        createdAt: row.created_at,
+      })),
       generatedAt: new Date().toISOString(),
     };
   });
