@@ -141,6 +141,18 @@ function ScansPage() {
     },
   });
 
+  // Finding triage writes straight to the stored finding row, then the detail
+  // query is refetched so filters, report and CSV all show the same status.
+  const triage = useMutation({
+    mutationFn: (input: { findingId: string; status: "open" | "resolved" | "ignored" }) =>
+      setFindingStatus({ data: input }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["scan"] });
+      toast.success("Finding updated.");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   // The scan runs on the server; the browser is never blocked while it works.
   // The detail query below polls until the stored status leaves queued/running.
   const start = useMutation({
