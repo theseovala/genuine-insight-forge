@@ -138,7 +138,7 @@ export const getSystemHealth = createServerFn({ method: "POST" })
             ? "failed"
             : "healthy",
       detail: lastCompleted
-        ? `Last job finished ${new Date(lastCompleted.completed_at).toLocaleString()}.${oldestQueued ? ` Oldest waiting job queued ${new Date(oldestQueued).toLocaleString()}.` : ""}`
+        ? `Last job finished ${new Date(String(lastCompleted.completed_at)).toLocaleString()}.${oldestQueued ? ` Oldest waiting job queued ${new Date(oldestQueued).toLocaleString()}.` : ""}`
         : "No job has been processed yet.",
       latencyMs: null,
       checkedAt: now(),
