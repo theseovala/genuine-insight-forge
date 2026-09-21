@@ -33,6 +33,7 @@ import {
   pauseScan,
   resumeScan,
   cancelScan,
+  setFindingStatus,
 } from "@/lib/scan.functions";
 
 export const Route = createFileRoute("/_authenticated/scans")({
