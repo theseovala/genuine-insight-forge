@@ -469,6 +469,15 @@ function LicensingPage() {
                     </Badge>
                     <Badge className={release.signed ? STATUS_TONE["active"] : STATUS_TONE["pending"]}>{release.signed ? "Signed" : "Unsigned"}</Badge>
                     <Badge className={release.status === "published" ? STATUS_TONE["active"] : STATUS_TONE["pending"]}>{release.status}</Badge>
+                    {data?.isStaff && release.status === "published" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => run(() => rollbackRelease({ data: { releaseId: release.id } }), "Release rolled back.")}
+                      >
+                        Roll back
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
