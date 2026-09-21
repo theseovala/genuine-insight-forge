@@ -133,7 +133,7 @@ export async function collectDns(domain: string): Promise<SourceResult> {
     return records;
   });
   if (run.error || !run.value) {
-    return { source: "dns", provider: "cloudflare-doh", status: "failed", durationMs: run.durationMs, errorMessage: run.error?.message, raw: {} };
+    return { source: "dns", provider: "cloudflare-doh", status: "failed", durationMs: run.durationMs, errorMessage: run.error?.message ?? null, raw: {} };
   }
   return { source: "dns", provider: "cloudflare-doh", status: "completed", durationMs: run.durationMs, raw: run.value };
 }
@@ -148,7 +148,7 @@ export async function collectRdap(domain: string): Promise<SourceResult> {
     return { found: true, httpStatus: response.status, body };
   });
   if (run.error || !run.value) {
-    return { source: "rdap", provider: "rdap.org", status: "failed", durationMs: run.durationMs, errorMessage: run.error?.message, raw: {} };
+    return { source: "rdap", provider: "rdap.org", status: "failed", durationMs: run.durationMs, errorMessage: run.error?.message ?? null, raw: {} };
   }
   return {
     source: "rdap",
@@ -184,7 +184,7 @@ export async function collectCrawlDirectives(origin: string): Promise<SourceResu
     return { robotsStatus: robots.status, robotsFound: robots.ok, robotsText, declaredSitemaps: declared, sitemap };
   });
   if (run.error || !run.value) {
-    return { source: "crawl_directives", provider: null, status: "failed", durationMs: run.durationMs, errorMessage: run.error?.message, raw: {} };
+    return { source: "crawl_directives", provider: null, status: "failed", durationMs: run.durationMs, errorMessage: run.error?.message ?? null, raw: {} };
   }
   return { source: "crawl_directives", provider: null, status: "completed", durationMs: run.durationMs, raw: run.value as Record<string, unknown> };
 }
@@ -227,7 +227,7 @@ export async function collectPageSpeed(url: string, apiKey: string | null): Prom
     };
   });
   if (run.error || !run.value) {
-    return { source: "pagespeed", provider: "google_pagespeed", status: "failed", durationMs: run.durationMs, errorMessage: run.error?.message, raw: {} };
+    return { source: "pagespeed", provider: "google_pagespeed", status: "failed", durationMs: run.durationMs, errorMessage: run.error?.message ?? null, raw: {} };
   }
   return {
     source: "pagespeed",
