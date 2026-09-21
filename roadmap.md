@@ -93,3 +93,4 @@
 - [x] Architecture documentation for the scan flow in docs/ARCHITECTURE.md
 - [ ] Cross-source verification + duplicate detection (needs Google Business / Meta access — blocked on provider approval)
 - [ ] Provider-sourced usage/rate-limit extraction during sync
+- [ ] Ultra Premium pass 3: apply the existing depth/glow/density language to the new Scan Engine screen (palette, fonts, layout unchanged)
