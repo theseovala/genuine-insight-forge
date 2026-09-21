@@ -1,22 +1,27 @@
-// Scan orchestrator. Collects real data in parallel, stores the raw provider
-// payload, normalizes it, analyses it, runs the existing AI stack over the
-// verified findings only, and writes the report layer.
+// Scan orchestrator. Owns the complete lifecycle of one scan:
+//
+//   validate → platform discovery → parallel collection → website crawl →
+//   normalization → cross-source validation → analysis → AI → report
 //
 // Layers stay separated: scan_sources (RAW) → scan_metrics (NORMALIZED) →
 // scan_findings (ANALYSIS) → scan_reports (REPORT). Nothing is invented: a
-// source that fails or is not configured is recorded as such.
+// source that fails, is not configured or needs sign-in is recorded as such,
+// and one provider failing never fails the whole scan.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  collectCrawl,
   collectCrawlDirectives,
   collectDns,
   collectPage,
   collectPageSpeed,
   collectRdap,
   collectTls,
+  extractIdentity,
   normalizeTarget,
   type SourceResult,
 } from "./collectors.server";
 import { analyze } from "./analyze.server";
+import { discoverPlatforms, type PlatformDiscovery } from "./discovery.server";
 
 /** How long a collected source stays valid for incremental re-use, per source. */
 export const FRESHNESS_MINUTES: Record<string, number> = {
@@ -26,6 +31,7 @@ export const FRESHNESS_MINUTES: Record<string, number> = {
   rdap: 1440,
   crawl_directives: 720,
   pagespeed: 720,
+  crawl: 360,
 };
 
 export function freshnessOf(source: string, collectedAt: string | null) {
@@ -55,7 +61,7 @@ async function pagespeedKey(admin: SupabaseClient, workspaceId: string) {
 }
 
 export interface RunScanResult {
-  status: "completed" | "failed";
+  status: "completed" | "completed_with_warnings" | "failed";
   score: number | null;
   findings: number;
   sources: { source: string; status: string; reused: boolean }[];
@@ -63,9 +69,12 @@ export interface RunScanResult {
 
 /** Stage plan — each entry is a real unit of work the engine performs. */
 const STAGE_PLAN: { stage: string; label: string }[] = [
-  { stage: "validate", label: "URL validated" },
-  { stage: "collect", label: "Website + platform data collected" },
+  { stage: "validate", label: "Address validated" },
+  { stage: "discover", label: "Platforms discovered and connections verified" },
+  { stage: "collect", label: "Website and technical data collected" },
+  { stage: "crawl", label: "Website pages crawled" },
   { stage: "normalize", label: "Data normalized and stored" },
+  { stage: "cross_validate", label: "Business details compared across sources" },
   { stage: "analyze", label: "Technical checks and findings generated" },
   { stage: "ai", label: "AI analysis completed" },
   { stage: "report", label: "Report generated and stored" },
@@ -103,6 +112,142 @@ async function stopRequested(admin: SupabaseClient, scanId: string) {
   return data?.status === "paused" || data?.status === "cancelled" ? (data.status as string) : null;
 }
 
+async function storeSource(admin: SupabaseClient, scanId: string, workspaceId: string, result: SourceResult, domain: string) {
+  await admin.from("scan_sources").upsert(
+    {
+      scan_id: scanId,
+      workspace_id: workspaceId,
+      source: result.source,
+      provider: result.provider ?? null,
+      status: result.status,
+      http_status: result.httpStatus ?? null,
+      duration_ms: result.durationMs,
+      error_message: result.errorMessage ?? null,
+      raw: result.raw as any,
+      created_at: new Date().toISOString(),
+    },
+    { onConflict: "scan_id,source" },
+  );
+  if (result.provider) {
+    await admin.from("provider_raw_data").insert({
+      workspace_id: workspaceId,
+      provider: result.provider,
+      resource_type: result.source,
+      external_id: domain,
+      scan_id: scanId,
+      payload: result.raw as any,
+    });
+  }
+  await admin.from("integration_api_logs").insert({
+    workspace_id: workspaceId,
+    provider: result.provider ?? "website",
+    operation: `scan.${result.source}`,
+    method: "GET",
+    endpoint: domain,
+    http_status: result.httpStatus ?? null,
+    duration_ms: result.durationMs,
+    outcome_code:
+      result.status === "completed" ? "CONNECTED" : result.status === "not_configured" ? "NOT_CONFIGURED" : "PROVIDER_ERROR",
+    error_message: result.errorMessage ?? null,
+  });
+}
+
+/** Discovery outcome → the honest scan_sources status for that platform. */
+function discoveryStatus(item: PlatformDiscovery): SourceResult["status"] | "auth_required" | "not_supported" | "unavailable" | "approval_required" {
+  switch (item.status) {
+    case "connected":
+      return "completed";
+    case "auth_required":
+      return "auth_required";
+    case "approval_required":
+      return "approval_required";
+    case "not_supported":
+      return "not_supported";
+    case "unavailable":
+      return "unavailable";
+    case "failed":
+      return "failed";
+    default:
+      return "not_configured";
+  }
+}
+
+/** Compares what the website publishes with what connected platforms confirm. */
+function crossValidate(identity: ReturnType<typeof extractIdentity>, discovery: PlatformDiscovery[]) {
+  const findings: {
+    category: string;
+    code: string;
+    severity: "critical" | "high" | "medium" | "low" | "info";
+    title: string;
+    detail: string;
+    recommendation: string | null;
+    impact: number;
+    evidence: Record<string, unknown>;
+    source: string;
+  }[] = [];
+
+  const fields: { key: string; label: string; value: string | null }[] = [
+    { key: "name", label: "Business name", value: identity.name },
+    { key: "phone", label: "Phone number", value: identity.phone },
+    { key: "address", label: "Address", value: identity.address },
+    { key: "category", label: "Business category", value: identity.category },
+  ];
+  for (const field of fields) {
+    if (!field.value) {
+      findings.push({
+        category: "consistency",
+        code: `identity_missing_${field.key}`,
+        severity: field.key === "name" ? "medium" : "low",
+        title: `${field.label} is not published on the website`,
+        detail: `MISSING — the website does not state its ${field.label.toLowerCase()} in a machine-readable way, so search engines and directories cannot verify it.`,
+        recommendation: `Add the ${field.label.toLowerCase()} to the site's structured data (schema.org).`,
+        impact: field.key === "name" ? 4 : 2,
+        evidence: { status: "MISSING", field: field.key },
+        source: "crawl",
+      });
+    }
+  }
+
+  const linked = discovery.filter((item) => Array.isArray((item.evidence as any).profileLinks));
+  for (const item of linked) {
+    const profileLinks = (item.evidence as any).profileLinks as string[];
+    const declaredInSchema = profileLinks.some((link) => identity.sameAs.some((same) => same.includes(new URL(link).hostname)));
+    const verified = item.status === "connected";
+    findings.push({
+      category: "consistency",
+      code: `cross_source_${item.provider}`,
+      severity: verified ? "info" : "low",
+      title: `${item.label} profile linked from the website`,
+      detail: verified
+        ? `MATCH — the website links to ${item.label} and the connected account confirms access.`
+        : `UNVERIFIED — the website links to ${item.label}, but that account is not connected here, so its details cannot be compared. ${item.detail}`,
+      recommendation: verified ? null : `Connect ${item.label} in the integration manager to verify these details automatically.`,
+      impact: verified ? 0 : 1,
+      evidence: { status: verified ? "MATCH" : "UNVERIFIED", profileLinks, declaredInSchema, connection: item.status },
+      source: "cross_source",
+    });
+  }
+
+  const connectedNotLinked = discovery.filter(
+    (item) => item.status === "connected" && !Array.isArray((item.evidence as any).profileLinks),
+  );
+  for (const item of connectedNotLinked) {
+    findings.push({
+      category: "consistency",
+      code: `cross_source_unlinked_${item.provider}`,
+      severity: "low",
+      title: `${item.label} is connected but not linked from the website`,
+      detail: `MISMATCH — the ${item.label} account is connected here, but the website does not link to that profile, so visitors and search engines cannot connect the two.`,
+      recommendation: `Add the ${item.label} profile link to the website footer and to the site's structured data.`,
+      impact: 2,
+      evidence: { status: "MISMATCH", connection: item.status },
+      source: "cross_source",
+    });
+  }
+
+  return findings;
+}
+
 export async function runScan(admin: SupabaseClient, scanId: string): Promise<RunScanResult> {
   const { data: scan, error } = await admin
     .from("scans")
@@ -111,7 +256,7 @@ export async function runScan(admin: SupabaseClient, scanId: string): Promise<Ru
     .single();
   if (error) throw error;
   if (!scan) throw new Error("Scan not found.");
-  if (scan.status === "completed" || scan.status === "cancelled") {
+  if (scan.status === "completed" || scan.status === "completed_with_warnings" || scan.status === "cancelled") {
     return { status: "completed", score: null, findings: 0, sources: [] };
   }
 
@@ -126,6 +271,7 @@ export async function runScan(admin: SupabaseClient, scanId: string): Promise<Ru
   await stage(admin, scanId, "validate", "running");
   const target = normalizeTarget(scan.target_url);
   await stage(admin, scanId, "validate", "completed", target.url);
+
   await stage(admin, scanId, "collect", "running");
   const key = await pagespeedKey(admin, scan.workspace_id);
 
@@ -166,48 +312,68 @@ export async function runScan(admin: SupabaseClient, scanId: string): Promise<Ru
       }
     }),
   );
-
+  for (const result of collected) await storeSource(admin, scanId, scan.workspace_id, result, target.domain);
   await stage(admin, scanId, "collect", "completed", `${collected.length} checked, ${reused.length} reused`);
-  await stage(admin, scanId, "normalize", "running");
 
-  for (const result of collected) {
-    await admin.from("scan_sources").upsert(
-      {
-        scan_id: scanId,
-        workspace_id: scan.workspace_id,
-        source: result.source,
-        provider: result.provider ?? null,
-        status: result.status,
-        http_status: result.httpStatus ?? null,
-        duration_ms: result.durationMs,
-        error_message: result.errorMessage ?? null,
-        raw: result.raw as any,
-        created_at: new Date().toISOString(),
-      },
-      { onConflict: "scan_id,source" },
-    );
-    if (result.provider) {
-      await admin.from("provider_raw_data").insert({
-        workspace_id: scan.workspace_id,
-        provider: result.provider,
-        resource_type: result.source,
-        external_id: target.domain,
-        scan_id: scanId,
-        payload: result.raw as any,
-      });
+  // ---------- HTML available from this run or from a reused row ----------
+  const { data: httpRow } = await admin.from("scan_sources").select("raw").eq("scan_id", scanId).eq("source", "http").maybeSingle();
+  const html = String((httpRow?.raw as any)?.html ?? "");
+  const { data: directivesRow } = await admin
+    .from("scan_sources")
+    .select("raw")
+    .eq("scan_id", scanId)
+    .eq("source", "crawl_directives")
+    .maybeSingle();
+  const robotsText = ((directivesRow?.raw as any)?.robotsText ?? null) as string | null;
+
+  // ---------- Platform discovery + connection verification ----------
+  await stage(admin, scanId, "discover", "running");
+  let discovery: PlatformDiscovery[] = [];
+  try {
+    discovery = await discoverPlatforms(admin, scan.workspace_id, html);
+    for (const item of discovery) {
+      await admin.from("scan_sources").upsert(
+        {
+          scan_id: scanId,
+          workspace_id: scan.workspace_id,
+          source: `platform:${item.provider}`,
+          provider: item.provider,
+          status: discoveryStatus(item),
+          duration_ms: 0,
+          error_message: item.status === "connected" ? null : item.detail.slice(0, 500),
+          raw: { relevant: item.relevant, label: item.label, group: item.group, ...item.evidence } as any,
+          created_at: new Date().toISOString(),
+        },
+        { onConflict: "scan_id,source" },
+      );
     }
-    await admin.from("integration_api_logs").insert({
-      workspace_id: scan.workspace_id,
-      provider: result.provider ?? "website",
-      operation: `scan.${result.source}`,
-      method: "GET",
-      endpoint: target.domain,
-      http_status: result.httpStatus ?? null,
-      duration_ms: result.durationMs,
-      outcome_code: result.status === "completed" ? "CONNECTED" : result.status === "not_configured" ? "NOT_CONFIGURED" : "PROVIDER_ERROR",
-      error_message: result.errorMessage ?? null,
-    });
+    const usable = discovery.filter((item) => item.status === "connected").length;
+    const relevant = discovery.filter((item) => item.relevant).length;
+    await stage(admin, scanId, "discover", "completed", `${discovery.length} platforms checked · ${relevant} relevant · ${usable} usable`);
+  } catch (caught) {
+    await stage(admin, scanId, "discover", "failed", caught instanceof Error ? caught.message.slice(0, 300) : String(caught));
   }
+
+  // ---------- Website crawl ----------
+  await stage(admin, scanId, "crawl", "running");
+  if (reusable("crawl")) {
+    reused.push("crawl");
+    await stage(admin, scanId, "crawl", "completed", "Reused a fresh crawl from this scan");
+  } else if (!html) {
+    await stage(admin, scanId, "crawl", "skipped", "The start page could not be loaded, so no crawl was attempted.");
+  } else {
+    const crawl = await collectCrawl(target.url, robotsText);
+    await storeSource(admin, scanId, scan.workspace_id, crawl, target.domain);
+    await stage(
+      admin,
+      scanId,
+      "crawl",
+      crawl.status === "completed" ? "completed" : "failed",
+      crawl.status === "completed" ? `${(crawl.raw as any).pagesCrawled} pages crawled` : crawl.errorMessage ?? null,
+    );
+  }
+
+  await stage(admin, scanId, "normalize", "running");
 
   // Analysis runs over everything stored for this scan, reused rows included.
   const { data: allSources } = await admin
@@ -232,13 +398,25 @@ export async function runScan(admin: SupabaseClient, scanId: string): Promise<Ru
     return { status: "failed", score: null, findings: 0, sources: [] };
   }
 
+  // ---------- Cross-source validation ----------
+  await stage(admin, scanId, "cross_validate", "running");
+  const identity = html ? extractIdentity(html) : { name: null, phone: null, address: null, website: null, category: null, sameAs: [] };
+  const crossFindings = crossValidate(identity, discovery);
+  await stage(admin, scanId, "cross_validate", "completed", `${crossFindings.length} consistency checks`);
+
   await stage(admin, scanId, "analyze", "running");
   const pageFailed = sourceResults.find((s) => s.source === "http")?.status !== "completed";
   const { metrics, findings, score, categoryScores } = analyze(sourceResults);
+  const allFindings = [...findings, ...crossFindings];
 
-  if (metrics.length) {
+  const identityMetrics = Object.entries(identity)
+    .filter(([, value]) => typeof value === "string" && value)
+    .map(([metricKey, value]) => ({ category: "business", metricKey, valueText: String(value), source: "crawl" as const }));
+  const normalizedMetrics = [...metrics, ...identityMetrics.map((m) => ({ ...m, valueNumeric: null, unit: null }))];
+
+  if (normalizedMetrics.length) {
     await admin.from("scan_metrics").upsert(
-      metrics.map((metric) => ({
+      normalizedMetrics.map((metric) => ({
         scan_id: scanId,
         workspace_id: scan.workspace_id,
         category: metric.category,
@@ -251,9 +429,9 @@ export async function runScan(admin: SupabaseClient, scanId: string): Promise<Ru
       { onConflict: "scan_id,category,metric_key" },
     );
   }
-  if (findings.length) {
+  if (allFindings.length) {
     await admin.from("scan_findings").upsert(
-      findings.map((finding) => ({
+      allFindings.map((finding) => ({
         scan_id: scanId,
         workspace_id: scan.workspace_id,
         category: finding.category,
@@ -263,14 +441,20 @@ export async function runScan(admin: SupabaseClient, scanId: string): Promise<Ru
         detail: finding.detail,
         recommendation: finding.recommendation ?? null,
         impact: finding.impact,
-        evidence: { ...(finding.evidence ?? {}), source: finding.source, collectedAt: new Date().toISOString(), confidence: "high", verification: "measured" },
+        evidence: {
+          ...(finding.evidence ?? {}),
+          source: finding.source,
+          collectedAt: new Date().toISOString(),
+          confidence: finding.source === "cross_source" ? "reported" : "high",
+          verification: finding.source === "cross_source" ? "compared" : "measured",
+        },
         source: finding.source,
       })),
       { onConflict: "scan_id,code" },
     );
   }
 
-  await stage(admin, scanId, "analyze", "completed", `${findings.length} findings`);
+  await stage(admin, scanId, "analyze", "completed", `${allFindings.length} findings`);
   await stage(admin, scanId, "ai", "running");
 
   // ---------- AI analysis over verified findings only ----------
@@ -282,13 +466,15 @@ export async function runScan(admin: SupabaseClient, scanId: string): Promise<Ru
     const evidence = {
       url: target.url,
       score,
+      business: identity,
+      platforms: discovery.map((item) => ({ provider: item.provider, relevant: item.relevant, status: item.status })),
       sources: sourceResults.map((s) => ({ source: s.source, status: s.status, error: s.errorMessage ?? null })),
-      measurements: metrics.map((m) => ({ category: m.category, key: m.metricKey, value: m.valueNumeric ?? m.valueText, unit: m.unit ?? null })),
-      findings: findings.map((f) => ({ code: f.code, severity: f.severity, title: f.title, detail: f.detail, impact: f.impact })),
+      measurements: normalizedMetrics.map((m) => ({ category: m.category, key: m.metricKey, value: m.valueNumeric ?? m.valueText, unit: m.unit ?? null })),
+      findings: allFindings.map((f) => ({ code: f.code, severity: f.severity, title: f.title, detail: f.detail, impact: f.impact })),
     };
     const result = await runAiText(
       "You are a technical SEO and web reputation analyst. Use ONLY the supplied measurements and findings. " +
-        "Never invent data, numbers, rankings or provider results. If something was not measured, write 'Data unavailable'. " +
+        "Never invent data, numbers, rankings, reviews or provider results. If something was not measured, write 'Data unavailable'. " +
         "Reply in plain text with: a two-sentence executive summary, then 'Priority actions:' followed by at most five numbered actions, " +
         "each naming the business impact and the finding code it is based on.",
       JSON.stringify(evidence),
@@ -340,8 +526,13 @@ export async function runScan(admin: SupabaseClient, scanId: string): Promise<Ru
 
   await stage(admin, scanId, "report", "completed", score === null ? "Report stored without a score" : `Score ${score}`);
 
-  const failedEverything = sourceResults.every((s) => s.status !== "completed");
-  const status = failedEverything ? "failed" : "completed";
+  // ---------- Failure isolation ----------
+  // Technical checks decide the outcome; a platform that is simply not
+  // connected is information, not a failure.
+  const technical = sourceResults.filter((s) => !s.source.startsWith("platform:"));
+  const failedEverything = technical.every((s) => s.status !== "completed");
+  const warnings = technical.filter((s) => s.status === "failed").map((s) => s.source);
+  const status = failedEverything ? "failed" : warnings.length ? "completed_with_warnings" : "completed";
   await admin
     .from("scans")
     .update({
@@ -349,16 +540,22 @@ export async function runScan(admin: SupabaseClient, scanId: string): Promise<Ru
       score,
       duration_ms: Date.now() - started,
       completed_at: new Date().toISOString(),
-      error_message: failedEverything ? "No data source could be reached for this address." : pageFailed ? "The website itself could not be loaded; other checks completed." : null,
+      error_message: failedEverything
+        ? "No data source could be reached for this address."
+        : pageFailed
+          ? "The website itself could not be loaded; other checks completed."
+          : warnings.length
+            ? `Completed, but these checks failed: ${warnings.join(", ")}.`
+            : null,
     })
     .eq("id", scanId);
 
-  await audit(admin, scan.workspace_id, `scan.${status}`, scanId, { score, findings: findings.length, reused });
+  await audit(admin, scan.workspace_id, `scan.${status}`, scanId, { score, findings: allFindings.length, reused, warnings });
 
   return {
     status,
     score,
-    findings: findings.length,
+    findings: allFindings.length,
     sources: sourceResults.map((s) => ({ source: s.source, status: s.status, reused: reused.includes(s.source) })),
   };
 }
