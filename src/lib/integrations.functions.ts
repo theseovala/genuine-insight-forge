@@ -529,7 +529,7 @@ export const getIntegrationHealth = createServerFn({ method: "GET" })
     const healthBy = new Map((health.data ?? []).map((r: any) => [r.provider, r]));
     const syncBy = new Map<string, string>();
     for (const row of syncJobs.data ?? []) {
-      if (!syncBy.has(row.provider)) syncBy.set(row.provider, row.completed_at);
+      if (row.completed_at && !syncBy.has(row.provider)) syncBy.set(row.provider, row.completed_at);
     }
     const limitBy = new Map<string, any>();
     for (const row of rateLimits.data ?? []) {
