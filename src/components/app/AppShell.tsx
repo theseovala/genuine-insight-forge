@@ -35,6 +35,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 export { navItems } from "./nav-items";
 import { navItems, navGroups } from "./nav-items";
 import { CommandPalette, useCommandPalette } from "./CommandPalette";
+import { NotificationBell } from "./NotificationBell";
 
 function NavList({
   collapsed,
