@@ -153,9 +153,14 @@ function SystemPage() {
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Stage: {scan.currentStage} ({scan.progress}%) · Sources used {scan.providersUsed} · succeeded {scan.successfulSources.length} · failed {scan.failedSources.length} · AI {scan.aiStatus} · report {scan.reportStatus} · CSV {scan.csvStatus}
+                  Stage: {scan.currentStage} ({scan.progress}%) · Sources used {scan.providersUsed} · succeeded {scan.successfulSources.length} · failed {scan.failedSources.length} · not available {scan.skippedSources.length} · AI {scan.aiStatus} · report {scan.reportStatus} · CSV {scan.csvStatus}
                 </p>
                 {scan.error_message ? <p className="mt-1 break-words text-xs text-rating-foreground">{scan.error_message}</p> : null}
+                {scan.skippedSources.length ? (
+                  <p className="mt-1 break-words text-[11px] text-muted-foreground">
+                    Not available: {scan.skippedSources.map((s: any) => `${s.source} (${s.status.replace(/_/g, " ")})`).join(", ")}
+                  </p>
+                ) : null}
                 {scan.failedSources.length ? (
                   <p className="mt-1 break-words text-[11px] text-muted-foreground">
                     Failed sources: {scan.failedSources.map((s: any) => `${s.source} (${s.status}${s.httpStatus ? ` ${s.httpStatus}` : ""})`).join(", ")}
