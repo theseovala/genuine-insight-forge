@@ -202,6 +202,7 @@ export function useLiveReviews() {
 }
 
 export function useLiveAlerts() {
+  useRealtimeTable("alerts", ["alerts"]);
   return useQuery({
     queryKey: ["alerts"],
     queryFn: async (): Promise<Alert[]> => {
