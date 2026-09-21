@@ -231,8 +231,8 @@ export function Section({
   return (
     <section className={cn("card-elevated surface-sheen overflow-hidden", className)}>
       {title && (
-        <header className="flex items-start justify-between gap-3 border-b px-4 py-3 sm:px-5">
-          <div>
+        <header className="flex flex-wrap items-start justify-between gap-3 border-b px-4 py-3 sm:px-5">
+          <div className="min-w-0 flex-1">
             <h3 className="font-display text-sm font-bold text-foreground">{title}</h3>
             {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}
           </div>
