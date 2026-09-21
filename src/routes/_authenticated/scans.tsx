@@ -223,6 +223,15 @@ function ScansPage() {
                     <Button variant="outline" size="sm" onClick={() => download.mutate(data.scan.id)} disabled={download.isPending}>
                       <Download className="h-4 w-4" /> CSV
                     </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => remove.mutate(data.scan.id)}
+                      disabled={remove.isPending}
+                      aria-label="Delete this scan and its stored data"
+                    >
+                      {remove.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Delete
+                    </Button>
                   </div>
                 }
               >
