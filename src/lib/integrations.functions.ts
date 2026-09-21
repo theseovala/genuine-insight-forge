@@ -636,3 +636,58 @@ export const getIntegrationHealthDetail = createServerFn({ method: "GET" })
       calls24h: (logs.data ?? []).length,
     };
   });
+
+/**
+ * Integration overview: every number comes from real rows (connections, health,
+ * API logs, audit log). Nothing here is generated or estimated.
+ */
+export const getIntegrationOverview = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const member = await workspace(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const soon = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const [connections, errors, audits] = await Promise.all([
+      supabaseAdmin
+        .from("integration_connections")
+        .select("provider,status,token_expires_at")
+        .eq("workspace_id", member.workspace_id),
+      supabaseAdmin
+        .from("integration_api_logs")
+        .select("provider,created_at,status_code")
+        .eq("workspace_id", member.workspace_id)
+        .gte("created_at", since)
+        .gte("status_code", 400),
+      supabaseAdmin
+        .from("audit_logs")
+        .select("id,action,entity,actor_id,created_at,metadata")
+        .eq("workspace_id", member.workspace_id)
+        .order("created_at", { ascending: false })
+        .limit(10),
+    ]);
+
+    const rows = (connections.data ?? []) as Array<{ provider: string; status: string; token_expires_at: string | null }>;
+    const manual = INTEGRATIONS.filter((d) => d.kind === "manual");
+
+    return {
+      totalProviders: INTEGRATIONS.length,
+      connected: rows.filter((r) => r.status === "connected").length,
+      authErrors: rows.filter((r) => r.status === "error").length,
+      expired: rows.filter((r) => r.status === "expired").length,
+      expiringSoon: rows.filter((r) => r.token_expires_at && r.token_expires_at < soon && r.status === "connected").length,
+      pendingConfiguration: INTEGRATIONS.length - manual.length - rows.filter((r) => r.status === "connected").length,
+      approvalRequired: manual.length,
+      errors24h: (errors.data ?? []).length,
+      auditLog: (audits.data ?? []) as Array<{
+        id: string;
+        action: string;
+        entity: string | null;
+        actor_id: string | null;
+        created_at: string;
+        metadata: Record<string, unknown> | null;
+      }>,
+      generatedAt: new Date().toISOString(),
+    };
+  });
