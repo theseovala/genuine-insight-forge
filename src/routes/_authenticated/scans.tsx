@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   XCircle,
   Clock,
+  Trash2,
 } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { PageHeader, Section, EmptyState } from "@/components/app/primitives";
@@ -19,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { createScan, runScanNow, listScans, getScan, exportScanCsv } from "@/lib/scan.functions";
+import { createScan, runScanNow, listScans, getScan, exportScanCsv, deleteScan } from "@/lib/scan.functions";
 
 export const Route = createFileRoute("/_authenticated/scans")({
   head: () => ({
