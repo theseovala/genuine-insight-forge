@@ -1318,6 +1318,59 @@ export type Database = {
         }
         Relationships: []
       }
+      provider_circuits: {
+        Row: {
+          cooldown_until: string | null
+          created_at: string
+          failure_count: number
+          id: string
+          last_error: string | null
+          last_failure_at: string | null
+          last_success_at: string | null
+          opened_at: string | null
+          provider: string
+          state: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          cooldown_until?: string | null
+          created_at?: string
+          failure_count?: number
+          id?: string
+          last_error?: string | null
+          last_failure_at?: string | null
+          last_success_at?: string | null
+          opened_at?: string | null
+          provider: string
+          state?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          cooldown_until?: string | null
+          created_at?: string
+          failure_count?: number
+          id?: string
+          last_error?: string | null
+          last_failure_at?: string | null
+          last_success_at?: string | null
+          opened_at?: string | null
+          provider?: string
+          state?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_circuits_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       provider_raw_data: {
         Row: {
           external_id: string | null
@@ -2116,6 +2169,66 @@ export type Database = {
           token?: string
         }
         Relationships: []
+      }
+      security_events: {
+        Row: {
+          actor: string | null
+          category: string
+          created_at: string
+          event_type: string
+          id: string
+          message: string
+          metadata: Json
+          provider: string | null
+          request_id: string | null
+          scan_id: string | null
+          severity: string
+          workspace_id: string | null
+        }
+        Insert: {
+          actor?: string | null
+          category: string
+          created_at?: string
+          event_type: string
+          id?: string
+          message: string
+          metadata?: Json
+          provider?: string | null
+          request_id?: string | null
+          scan_id?: string | null
+          severity?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          actor?: string | null
+          category?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          message?: string
+          metadata?: Json
+          provider?: string | null
+          request_id?: string | null
+          scan_id?: string | null
+          severity?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "security_events_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       seo_backlinks: {
         Row: {
