@@ -168,8 +168,11 @@ function toAlert(row: AlertRow): Alert {
 function useRealtimeTable(table: string, queryKeys: string[]) {
   const queryClient = useQueryClient();
   useEffect(() => {
+    // Unique channel per mount: reusing a name can race with an async
+    // removeChannel from a prior unmount and throw "cannot add callbacks
+    // after subscribe()".
     const channel = supabase
-      .channel(`live-${table}`)
+      .channel(`live-${table}-${Math.random().toString(36).slice(2)}`)
       .on("postgres_changes", { event: "*", schema: "public", table }, () => {
         for (const key of queryKeys) queryClient.invalidateQueries({ queryKey: [key] });
       })
