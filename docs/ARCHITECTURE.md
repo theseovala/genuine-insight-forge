@@ -106,3 +106,44 @@ Every provider call maps failure to a meaningful, user-visible state: timeout/ne
 - Where credentials are missing, flows are tested up to the provider boundary and reported `NOT_CONFIGURED`.
 - Queue behavior (idempotency, retry, dead-letter) is verifiable via `integration_sync_jobs`; webhook security via `integration_webhook_events`.
 - Status reporting always separates: REAL + VERIFIED / NOT CONFIGURED / REQUIRES APPROVAL / FAILED / NOT TESTABLE.
+
+## 11. Scan engine (current core product)
+
+Flow: URL → `scans` row (queued) → `runScan` → parallel real collectors → RAW `scan_sources`
+(+ `provider_raw_data` when a named provider answered) → NORMALIZED `scan_metrics` →
+ANALYSIS `scan_findings` → AI analysis over verified findings only → REPORT `scan_reports` → CSV export.
+
+Layers are never mixed: raw provider payloads, normalized measurements, analysis findings and report
+output live in separate tables and are always traceable back to the source that produced them.
+
+Collectors (all real network calls, documented public endpoints):
+
+| Source | Provider | Freshness TTL |
+| --- | --- | --- |
+| `http` | site itself | 60 min |
+| `tls` | site itself | 12 h |
+| `dns` | Cloudflare DoH | 6 h |
+| `rdap` | rdap.org | 24 h |
+| `crawl_directives` | site robots.txt/sitemap | 12 h |
+| `pagespeed` | Google PageSpeed Insights (API key required) | 12 h |
+
+- **Scan health**: every contacted source is listed with status, error text and freshness
+  (`fresh`/`stale`/`expired`/`unavailable`). A missing key reads `NOT_CONFIGURED`, never a guess.
+  One failed source never stops the scan.
+- **Incremental + resume**: a source already completed and still fresh for the same scan is reused
+  instead of refetched; an interrupted scan resumes from its stored sources. Statuses:
+  `queued`, `running`, `completed`, `failed`, `cancelled`.
+- **Recovery**: the hourly queue runner picks up scans stuck in queued/running for over 15 minutes,
+  respects `attempts`/`max_attempts` and dead-letters beyond the limit.
+- **Evidence engine**: every finding stores category, code, severity, impact, recommendation,
+  source and an evidence object with the measurement and collection timestamp; the UI exposes it
+  under each finding.
+- **Historical comparison**: the previous completed scan of the same domain produces
+  resolved / new / unchanged finding sets from stored data only.
+- **AI**: runs through the existing provider-independent AI layer over verified findings only, and
+  is instructed to write "Data unavailable" for anything not measured. A failed AI call is recorded
+  as a failed `ai_analysis` source — output is never fabricated.
+- **Score**: 100 minus the impact of findings that were actually measured; `null` when nothing could
+  be measured (the UI shows "Score unavailable", never a placeholder number).
+- **Retention**: `deleteScan` removes the scan and its derived findings, metrics, sources, report and
+  raw provider payloads, and writes a `scan.deleted` audit record. Unrelated records are untouched.

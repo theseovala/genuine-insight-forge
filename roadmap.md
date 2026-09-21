@@ -80,3 +80,17 @@
 ## In progress (added 20:11 UTC)
 - [x] Ultra Premium UI enhancement (done 20:2x UTC — depth tokens, bg-ambient, edge illumination, sidebar active glow, premium gradient buttons, dark-mode depth; verified desktop, 0 overflow, 0 console errors) — keep palette/fonts/layout/spacing; add depth layers, glow, card sheen, premium buttons, sidebar active glow, density, micro-animations, reduced-motion support. Inspect every major screen after.
 - [x] Review Center: real-time sync (Realtime on reviews/alerts + Trustpilot sync fn + Sync live reviews button) — live reviews appear once Google OAuth approved and Trustpilot key saved (user action pending)
+
+## Integration foundation lock + AI scan intelligence (requested 2026-09-21)
+- [x] Scan engine layer separation: raw (scan_sources/provider_raw_data) → normalized (scan_metrics) → analysis (scan_findings) → report (scan_reports) → CSV
+- [x] Evidence engine: every finding carries severity, impact, recommendation, source, evidence object and timestamp
+- [x] Scan health panel: every source with status, honest NOT_CONFIGURED and freshness (fresh/stale/expired/unavailable)
+- [x] Incremental scanning + resume from stored sources; hourly backstop recovers stuck scans with attempt limits
+- [x] Historical comparison against the previous completed scan (resolved / new / unchanged)
+- [x] One-click Re-scan reusing the stored URL without duplicating the business record
+- [x] Non-blocking scans: the browser polls stored status instead of waiting on the request
+- [x] Data lifecycle: delete a scan and all derived layers, with an audit record
+- [x] Architecture documentation for the scan flow in docs/ARCHITECTURE.md
+- [ ] Cross-source verification + duplicate detection (needs Google Business / Meta access — blocked on provider approval)
+- [ ] Provider-sourced usage/rate-limit extraction during sync
+- [ ] Ultra Premium pass 3: apply the existing depth/glow/density language to the new Scan Engine screen (palette, fonts, layout unchanged)

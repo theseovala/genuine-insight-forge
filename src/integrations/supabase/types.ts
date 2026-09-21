@@ -1080,6 +1080,117 @@ export type Database = {
         }
         Relationships: []
       }
+      provider_raw_data: {
+        Row: {
+          external_id: string | null
+          fetched_at: string
+          id: string
+          payload: Json
+          provider: string
+          resource_type: string
+          scan_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          external_id?: string | null
+          fetched_at?: string
+          id?: string
+          payload: Json
+          provider: string
+          resource_type: string
+          scan_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          external_id?: string | null
+          fetched_at?: string
+          id?: string
+          payload?: Json
+          provider?: string
+          resource_type?: string
+          scan_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_raw_data_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_raw_data_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      provider_resources: {
+        Row: {
+          connection_id: string | null
+          created_at: string
+          external_id: string
+          id: string
+          last_synced_at: string | null
+          metadata: Json
+          name: string | null
+          parent_external_id: string | null
+          provider: string
+          resource_type: string
+          updated_at: string
+          url: string | null
+          workspace_id: string
+        }
+        Insert: {
+          connection_id?: string | null
+          created_at?: string
+          external_id: string
+          id?: string
+          last_synced_at?: string | null
+          metadata?: Json
+          name?: string | null
+          parent_external_id?: string | null
+          provider: string
+          resource_type: string
+          updated_at?: string
+          url?: string | null
+          workspace_id: string
+        }
+        Update: {
+          connection_id?: string | null
+          created_at?: string
+          external_id?: string
+          id?: string
+          last_synced_at?: string | null
+          metadata?: Json
+          name?: string | null
+          parent_external_id?: string | null
+          provider?: string
+          resource_type?: string
+          updated_at?: string
+          url?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_resources_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "integration_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_resources_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       removal_cases: {
         Row: {
           appeal_text: string | null
@@ -1367,6 +1478,296 @@ export type Database = {
           },
         ]
       }
+      scan_findings: {
+        Row: {
+          category: string
+          code: string
+          created_at: string
+          detail: string
+          evidence: Json
+          id: string
+          impact: number
+          recommendation: string | null
+          scan_id: string
+          severity: string
+          source: string
+          title: string
+          workspace_id: string
+        }
+        Insert: {
+          category: string
+          code: string
+          created_at?: string
+          detail: string
+          evidence?: Json
+          id?: string
+          impact?: number
+          recommendation?: string | null
+          scan_id: string
+          severity: string
+          source: string
+          title: string
+          workspace_id: string
+        }
+        Update: {
+          category?: string
+          code?: string
+          created_at?: string
+          detail?: string
+          evidence?: Json
+          id?: string
+          impact?: number
+          recommendation?: string | null
+          scan_id?: string
+          severity?: string
+          source?: string
+          title?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scan_findings_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scan_findings_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scan_metrics: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          metric_key: string
+          scan_id: string
+          source: string
+          unit: string | null
+          value_numeric: number | null
+          value_text: string | null
+          workspace_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          metric_key: string
+          scan_id: string
+          source: string
+          unit?: string | null
+          value_numeric?: number | null
+          value_text?: string | null
+          workspace_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          metric_key?: string
+          scan_id?: string
+          source?: string
+          unit?: string | null
+          value_numeric?: number | null
+          value_text?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scan_metrics_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scan_metrics_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scan_reports: {
+        Row: {
+          category_scores: Json
+          created_at: string
+          generated_by: string | null
+          id: string
+          model: string | null
+          scan_id: string
+          score: number | null
+          summary: string | null
+          workspace_id: string
+        }
+        Insert: {
+          category_scores?: Json
+          created_at?: string
+          generated_by?: string | null
+          id?: string
+          model?: string | null
+          scan_id: string
+          score?: number | null
+          summary?: string | null
+          workspace_id: string
+        }
+        Update: {
+          category_scores?: Json
+          created_at?: string
+          generated_by?: string | null
+          id?: string
+          model?: string | null
+          scan_id?: string
+          score?: number | null
+          summary?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scan_reports_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: true
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scan_reports_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scan_sources: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          error_message: string | null
+          http_status: number | null
+          id: string
+          provider: string | null
+          raw: Json
+          scan_id: string
+          source: string
+          status: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          http_status?: number | null
+          id?: string
+          provider?: string | null
+          raw?: Json
+          scan_id: string
+          source: string
+          status: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          http_status?: number | null
+          id?: string
+          provider?: string | null
+          raw?: Json
+          scan_id?: string
+          source?: string
+          status?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scan_sources_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scan_sources_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scans: {
+        Row: {
+          attempts: number
+          completed_at: string | null
+          created_at: string
+          duration_ms: number | null
+          error_message: string | null
+          id: string
+          max_attempts: number
+          requested_by: string | null
+          scan_type: string
+          score: number | null
+          started_at: string | null
+          status: string
+          target_domain: string
+          target_url: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          max_attempts?: number
+          requested_by?: string | null
+          scan_type?: string
+          score?: number | null
+          started_at?: string | null
+          status?: string
+          target_domain: string
+          target_url: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          max_attempts?: number
+          requested_by?: string | null
+          scan_type?: string
+          score?: number | null
+          started_at?: string | null
+          status?: string
+          target_domain?: string
+          target_url?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scans_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scheduler_tokens: {
         Row: {
           created_at: string
@@ -1384,6 +1785,151 @@ export type Database = {
           token?: string
         }
         Relationships: []
+      }
+      seo_backlinks: {
+        Row: {
+          anchor: string | null
+          authority: number | null
+          created_at: string
+          domain: string
+          first_seen: string | null
+          id: string
+          is_nofollow: boolean | null
+          last_seen: string | null
+          provider: string
+          source_url: string
+          target_url: string | null
+          workspace_id: string
+        }
+        Insert: {
+          anchor?: string | null
+          authority?: number | null
+          created_at?: string
+          domain: string
+          first_seen?: string | null
+          id?: string
+          is_nofollow?: boolean | null
+          last_seen?: string | null
+          provider: string
+          source_url: string
+          target_url?: string | null
+          workspace_id: string
+        }
+        Update: {
+          anchor?: string | null
+          authority?: number | null
+          created_at?: string
+          domain?: string
+          first_seen?: string | null
+          id?: string
+          is_nofollow?: boolean | null
+          last_seen?: string | null
+          provider?: string
+          source_url?: string
+          target_url?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seo_backlinks_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seo_keywords: {
+        Row: {
+          created_at: string
+          domain: string
+          id: string
+          keyword: string
+          language: string | null
+          location: string | null
+          search_engine: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          domain: string
+          id?: string
+          keyword: string
+          language?: string | null
+          location?: string | null
+          search_engine?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          domain?: string
+          id?: string
+          keyword?: string
+          language?: string | null
+          location?: string | null
+          search_engine?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seo_keywords_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seo_rankings: {
+        Row: {
+          checked_at: string
+          id: string
+          keyword_id: string
+          position: number | null
+          provider: string
+          serp_features: Json
+          url: string | null
+          workspace_id: string
+        }
+        Insert: {
+          checked_at?: string
+          id?: string
+          keyword_id: string
+          position?: number | null
+          provider: string
+          serp_features?: Json
+          url?: string | null
+          workspace_id: string
+        }
+        Update: {
+          checked_at?: string
+          id?: string
+          keyword_id?: string
+          position?: number | null
+          provider?: string
+          serp_features?: Json
+          url?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seo_rankings_keyword_id_fkey"
+            columns: ["keyword_id"]
+            isOneToOne: false
+            referencedRelation: "seo_keywords"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seo_rankings_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sync_runs: {
         Row: {

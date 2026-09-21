@@ -59,7 +59,39 @@ export const Route = createFileRoute("/api/public/integrations/jobs-run")({
             failed += 1;
           }
         }
-        return Response.json({ ok: true, claimed: claimed.length, processed, failed });
+
+        // Backstop for scans that were never started or died mid-run. Resumes
+        // from the sources already stored — completed sources are not re-fetched.
+        const staleBefore = new Date(Date.now() - 15 * 60_000).toISOString();
+        const { data: stuck } = await supabaseAdmin
+          .from("scans")
+          .select("id,status,created_at,started_at,attempts,max_attempts")
+          .in("status", ["queued", "running"])
+          .lt("created_at", staleBefore)
+          .order("created_at")
+          .limit(3);
+        let scansResumed = 0;
+        for (const scan of stuck ?? []) {
+          if ((scan.attempts ?? 0) >= (scan.max_attempts ?? 3)) {
+            await supabaseAdmin
+              .from("scans")
+              .update({ status: "failed", error_message: "Scan stopped after the maximum number of attempts.", completed_at: new Date().toISOString() })
+              .eq("id", scan.id);
+            continue;
+          }
+          try {
+            const { runScan } = await import("@/lib/scan/engine.server");
+            await runScan(supabaseAdmin, scan.id);
+            scansResumed += 1;
+          } catch (caught) {
+            await supabaseAdmin
+              .from("scans")
+              .update({ status: "failed", error_message: (caught instanceof Error ? caught.message : String(caught)).slice(0, 500), completed_at: new Date().toISOString() })
+              .eq("id", scan.id);
+          }
+        }
+
+        return Response.json({ ok: true, claimed: claimed.length, processed, failed, scansResumed });
       },
     },
   },
