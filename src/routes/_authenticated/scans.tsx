@@ -344,10 +344,22 @@ function ScansPage() {
                 {data.scan.error_message ? (
                   <p className="mb-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{data.scan.error_message}</p>
                 ) : null}
+                {data.report?.ai_status === "failed" ? (
+                  <p className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+                    AI analysis failed for this scan, so no interpretation is shown. The measured findings below are unaffected.
+                    {data.report?.ai_error ? <span className="mt-1 block text-xs opacity-80">{data.report.ai_error}</span> : null}
+                  </p>
+                ) : null}
                 <p className="text-sm text-muted-foreground">
                   {data.report?.summary ? data.report.summary : "AI summary unavailable for this scan."}
                 </p>
-                {data.report?.model ? <p className="mt-2 text-xs text-muted-foreground">Analysed by {data.report.model}</p> : null}
+                {data.report?.model ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Analysed by {data.report.model}
+                    {data.report?.ai_latency_ms ? ` in ${(data.report.ai_latency_ms / 1000).toFixed(1)}s` : ""}
+                  </p>
+                ) : null}
+
               </Section>
 
               {(data.stages ?? []).length > 0 ? (
