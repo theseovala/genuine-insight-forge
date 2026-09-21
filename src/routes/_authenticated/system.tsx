@@ -90,7 +90,7 @@ function SystemPage() {
   const loading = health.isLoading || monitor.isLoading || obs.isLoading;
 
   return (
-    <AppShell active="system">
+    <AppShell>
       <PageHeader
         title="System health & observability"
         description="Every status on this page comes from a live check or a stored operational record. Nothing is marked healthy without a real result."

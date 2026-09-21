@@ -26,6 +26,7 @@ import { Route as AuthenticatedResponsesRouteImport } from './routes/_authentica
 import { Route as AuthenticatedReviewsRouteImport } from './routes/_authenticated/reviews'
 import { Route as AuthenticatedScansRouteImport } from './routes/_authenticated/scans'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedSystemRouteImport } from './routes/_authenticated/system'
 import { Route as ApiPublicRemovalScanRouteImport } from './routes/api/public/removal-scan'
 import { Route as ApiPublicGoogleBusinessCallbackRouteImport } from './routes/api/public/google-business/callback'
 import { Route as ApiPublicIntegrationsCallbackRouteImport } from './routes/api/public/integrations/callback'
@@ -118,6 +119,11 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSystemRoute = AuthenticatedSystemRouteImport.update({
+  id: '/system',
+  path: '/system',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const ApiPublicRemovalScanRoute = ApiPublicRemovalScanRouteImport.update({
   id: '/api/public/removal-scan',
   path: '/api/public/removal-scan',
@@ -165,6 +171,7 @@ export interface FileRoutesByFullPath {
   '/reviews': typeof AuthenticatedReviewsRoute
   '/scans': typeof AuthenticatedScansRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/system': typeof AuthenticatedSystemRoute
   '/api/public/removal-scan': typeof ApiPublicRemovalScanRoute
   '/api/public/google-business/callback': typeof ApiPublicGoogleBusinessCallbackRoute
   '/api/public/integrations/callback': typeof ApiPublicIntegrationsCallbackRoute
@@ -188,6 +195,7 @@ export interface FileRoutesByTo {
   '/reviews': typeof AuthenticatedReviewsRoute
   '/scans': typeof AuthenticatedScansRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/system': typeof AuthenticatedSystemRoute
   '/api/public/removal-scan': typeof ApiPublicRemovalScanRoute
   '/api/public/google-business/callback': typeof ApiPublicGoogleBusinessCallbackRoute
   '/api/public/integrations/callback': typeof ApiPublicIntegrationsCallbackRoute
@@ -213,6 +221,7 @@ export interface FileRoutesById {
   '/_authenticated/reviews': typeof AuthenticatedReviewsRoute
   '/_authenticated/scans': typeof AuthenticatedScansRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/system': typeof AuthenticatedSystemRoute
   '/api/public/removal-scan': typeof ApiPublicRemovalScanRoute
   '/api/public/google-business/callback': typeof ApiPublicGoogleBusinessCallbackRoute
   '/api/public/integrations/callback': typeof ApiPublicIntegrationsCallbackRoute
@@ -238,6 +247,7 @@ export interface FileRouteTypes {
     | '/reviews'
     | '/scans'
     | '/settings'
+    | '/system'
     | '/api/public/removal-scan'
     | '/api/public/google-business/callback'
     | '/api/public/integrations/callback'
@@ -261,6 +271,7 @@ export interface FileRouteTypes {
     | '/reviews'
     | '/scans'
     | '/settings'
+    | '/system'
     | '/api/public/removal-scan'
     | '/api/public/google-business/callback'
     | '/api/public/integrations/callback'
@@ -285,6 +296,7 @@ export interface FileRouteTypes {
     | '/_authenticated/reviews'
     | '/_authenticated/scans'
     | '/_authenticated/settings'
+    | '/_authenticated/system'
     | '/api/public/removal-scan'
     | '/api/public/google-business/callback'
     | '/api/public/integrations/callback'
@@ -425,6 +437,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/system': {
+      id: '/_authenticated/system'
+      path: '/system'
+      fullPath: '/system'
+      preLoaderRoute: typeof AuthenticatedSystemRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/api/public/removal-scan': {
       id: '/api/public/removal-scan'
       path: '/api/public/removal-scan'
@@ -477,6 +496,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedReviewsRoute: typeof AuthenticatedReviewsRoute
   AuthenticatedScansRoute: typeof AuthenticatedScansRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedSystemRoute: typeof AuthenticatedSystemRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -493,6 +513,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedReviewsRoute: AuthenticatedReviewsRoute,
   AuthenticatedScansRoute: AuthenticatedScansRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedSystemRoute: AuthenticatedSystemRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
