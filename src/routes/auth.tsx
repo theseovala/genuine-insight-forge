@@ -35,6 +35,9 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [busy, setBusy] = useState(false);
+  // Until React has hydrated, a click would submit the form natively (page
+  // reload, no sign-in request). Keep the button disabled until then.
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
