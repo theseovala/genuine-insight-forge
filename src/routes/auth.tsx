@@ -9,6 +9,9 @@ import { BrandMark } from "@/components/app/primitives";
 import { BRAND } from "@/lib/domain";
 
 export const Route = createFileRoute("/auth")({
+  // Client-only: a server-rendered form accepts typing/clicks before React
+  // hydrates, which silently discards the credentials on hydration.
+  ssr: false,
   head: () => ({
     meta: [
       { title: `Sign in — ${BRAND.name}` },
