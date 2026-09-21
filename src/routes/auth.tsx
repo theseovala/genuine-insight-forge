@@ -57,6 +57,10 @@ function AuthPage() {
   }
 
   useEffect(() => {
+    setReady(true);
+  }, []);
+
+  useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => {
       if (data.session) void navigate({ to: "/dashboard", replace: true });
     });
