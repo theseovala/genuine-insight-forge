@@ -128,14 +128,14 @@ export const getScan = createServerFn({ method: "GET" })
     } = null;
     if (previous) {
       const { data: previousFindings } = await supabase.from("scan_findings").select("code,title").eq("scan_id", previous.id);
-      const before = new Map((previousFindings ?? []).map((f: any) => [f.code, f.title as string]));
-      const now = new Map((findings.data ?? []).map((f: any) => [f.code, f.title as string]));
+      const before = new Map<string, string>((previousFindings ?? []).map((f: any) => [String(f.code), String(f.title)]));
+      const now = new Map<string, string>((findings.data ?? []).map((f: any) => [String(f.code), String(f.title)]));
       comparison = {
         previousScanId: previous.id,
         previousScore: previous.score,
         previousAt: previous.created_at,
-        resolved: Array.from(before.entries()).filter(([code]) => !now.has(code)).map(([code, title]) => ({ code, title: title as string })),
-        introduced: Array.from(now.entries()).filter(([code]) => !before.has(code)).map(([code, title]) => ({ code, title: title as string })),
+        resolved: Array.from(before.entries()).filter(([code]) => !now.has(code)).map(([code, title]) => ({ code, title })),
+        introduced: Array.from(now.entries()).filter(([code]) => !before.has(code)).map(([code, title]) => ({ code, title })),
         unchanged: Array.from(now.keys()).filter((code) => before.has(code)).length,
       };
     }
