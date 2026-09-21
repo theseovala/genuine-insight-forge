@@ -570,3 +570,69 @@ export const getIntegrationHealth = createServerFn({ method: "GET" })
     });
     return { items, generatedAt: new Date().toISOString() };
   });
+
+/** Full per-provider detail for the expandable health card: recent syncs, rate-limit history, 24h errors. */
+export const getIntegrationHealthDetail = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ provider: z.string() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const member = await workspace(context);
+    const wid = member.workspace_id;
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    const [syncJobs, rateLimits, logs] = await Promise.all([
+      context.supabase
+        .from("integration_sync_jobs")
+        .select("job_type,status,attempts,last_error,started_at,completed_at")
+        .eq("workspace_id", wid)
+        .eq("provider", data.provider)
+        .order("created_at", { ascending: false })
+        .limit(5),
+      context.supabase
+        .from("integration_rate_limits")
+        .select("limit_value,remaining,reset_at,source,recorded_at")
+        .eq("workspace_id", wid)
+        .eq("provider", data.provider)
+        .order("recorded_at", { ascending: false })
+        .limit(5),
+      context.supabase
+        .from("integration_api_logs")
+        .select("operation,method,endpoint,http_status,outcome_code,error_message,created_at")
+        .eq("workspace_id", wid)
+        .eq("provider", data.provider)
+        .gte("created_at", since)
+        .order("created_at", { ascending: false })
+        .limit(15),
+    ]);
+    for (const r of [syncJobs, rateLimits, logs]) if (r.error) throw r.error;
+
+    return {
+      syncJobs: (syncJobs.data ?? []).map((j: any) => ({
+        jobType: j.job_type,
+        status: j.status,
+        attempts: j.attempts,
+        lastError: j.last_error ?? null,
+        startedAt: j.started_at ?? null,
+        completedAt: j.completed_at ?? null,
+      })),
+      rateLimits: (rateLimits.data ?? []).map((r: any) => ({
+        limit: r.limit_value ?? null,
+        remaining: r.remaining ?? null,
+        resetAt: r.reset_at ?? null,
+        source: r.source,
+        recordedAt: r.recorded_at,
+      })),
+      errors: (logs.data ?? [])
+        .filter((l: any) => l.error_message)
+        .map((l: any) => ({
+          operation: l.operation,
+          method: l.method,
+          endpoint: l.endpoint,
+          httpStatus: l.http_status ?? null,
+          outcomeCode: l.outcome_code ?? null,
+          message: l.error_message,
+          at: l.created_at,
+        })),
+      calls24h: (logs.data ?? []).length,
+    };
+  });
