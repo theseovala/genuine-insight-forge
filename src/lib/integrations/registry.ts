@@ -520,7 +520,7 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     group: "AI",
     label: "Cloud AI gateway",
     description: "Built-in AI models used for scan analysis, reports and reply drafting.",
-    kind: "managed",
+    kind: "api_key",
     requiredSecrets: ["LOVABLE_API_KEY"],
     scopes: [],
     docsUrl: "https://docs.lovable.dev/features/ai",
