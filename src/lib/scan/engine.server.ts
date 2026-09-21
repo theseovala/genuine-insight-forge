@@ -251,7 +251,7 @@ function crossValidate(identity: ReturnType<typeof extractIdentity>, discovery: 
 export async function runScan(admin: SupabaseClient, scanId: string): Promise<RunScanResult> {
   const { data: scan, error } = await admin
     .from("scans")
-    .select("id,workspace_id,target_url,target_domain,status,attempts,max_attempts")
+    .select("id,workspace_id,target_url,target_domain,status,attempts,max_attempts,created_at")
     .eq("id", scanId)
     .single();
   if (error) throw error;
