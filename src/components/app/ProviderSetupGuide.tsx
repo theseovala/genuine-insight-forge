@@ -65,6 +65,31 @@ const CONSOLE_STEPS: Record<string, ConsoleStep[]> = {
   ],
 };
 
+/** Steps derived from the provider registry when no hand-written guide exists. */
+function genericSteps(definition: IntegrationDefinition): ConsoleStep[] {
+  const steps: ConsoleStep[] = [
+    {
+      title: `Open the ${definition.label} developer documentation`,
+      detail:
+        definition.kind === "oauth2"
+          ? "Create an application for your business account, then copy its client ID and secret."
+          : "Sign in to your provider account and create an API key for this business.",
+      link: { href: definition.docsUrl, label: "Open provider docs" },
+    },
+  ];
+  if (definition.approvalRequired) {
+    steps.push({ title: "Provider approval required", detail: definition.approvalRequired });
+  }
+  if (definition.kind === "oauth2") {
+    steps.push({
+      title: "Add this redirect address to the application",
+      detail: "Paste the address below into the provider's allowed OAuth redirect URIs exactly as shown.",
+      showRedirectUri: true,
+    });
+  }
+  return steps;
+}
+
 function StepRow({ index, done, children }: { index: number; done: boolean; children: ReactNode }) {
   return (
     <li className={`rounded-lg border p-3 transition-colors ${done ? "border-positive/30 bg-positive/5" : "bg-background"}`}>
@@ -109,7 +134,7 @@ export function ProviderSetupGuide({
   const testFn = useServerFn(testIntegration);
   const startFn = useServerFn(startIntegrationOAuth);
 
-  const consoleSteps = CONSOLE_STEPS[definition.id] ?? [];
+  const consoleSteps = CONSOLE_STEPS[definition.id] ?? genericSteps(definition);
   const redirectUri =
     typeof window === "undefined" ? "" : `${window.location.origin}/api/public/integrations/callback`;
   const savedAccount = (accountRef ?? "").trim();
