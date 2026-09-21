@@ -22,14 +22,14 @@ export type Database = {
           id: string
           input_hash: string
           input_tokens: number | null
-          model: string
+          model: string | null
           output: string | null
           output_tokens: number | null
           purpose: string
           report_id: string | null
           review_id: string | null
           status: string
-          user_id: string
+          user_id: string | null
           workspace_id: string
         }
         Insert: {
@@ -39,14 +39,14 @@ export type Database = {
           id?: string
           input_hash: string
           input_tokens?: number | null
-          model: string
+          model?: string | null
           output?: string | null
           output_tokens?: number | null
           purpose: string
           report_id?: string | null
           review_id?: string | null
           status: string
-          user_id: string
+          user_id?: string | null
           workspace_id: string
         }
         Update: {
@@ -56,14 +56,14 @@ export type Database = {
           id?: string
           input_hash?: string
           input_tokens?: number | null
-          model?: string
+          model?: string | null
           output?: string | null
           output_tokens?: number | null
           purpose?: string
           report_id?: string | null
           review_id?: string | null
           status?: string
-          user_id?: string
+          user_id?: string | null
           workspace_id?: string
         }
         Relationships: [

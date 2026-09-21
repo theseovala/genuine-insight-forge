@@ -26,15 +26,15 @@ export const REPORT_CATEGORIES = [
 
 const AnalysisSchema = z.object({
   executiveSummary: z.string().min(20),
-  condition: z.enum(["healthy", "needs_attention", "critical", "insufficient_evidence"]),
+  condition: z.enum(["healthy", "needs_attention", "critical", "insufficient_evidence"]).default("insufficient_evidence"),
   categories: z.array(
     z.object({
       category: z.enum(REPORT_CATEGORIES),
       verdict: z.enum(["good", "mixed", "poor", "data_not_available", "insufficient_evidence"]),
       note: z.string(),
-      findingCodes: z.array(z.string()),
+      findingCodes: z.array(z.string()).default([]),
     }),
-  ),
+  ).default([]),
   actionPlan: z.array(
     z.object({
       findingCode: z.string(),
@@ -43,7 +43,7 @@ const AnalysisSchema = z.object({
       action: z.string(),
       expectedObjective: z.string(),
     }),
-  ),
+  ).default([]),
   crossSourceNotes: z.array(z.object({ findingCode: z.string(), note: z.string() })).default([]),
   historical: z
     .object({
@@ -66,6 +66,9 @@ const SYSTEM_PROMPT = [
   "Only reference finding codes that appear in context.findings. Only use categories that have real data in the context.",
   "For every action plan item state the problem, why it matters, the action, and the objective, in plain language a business owner understands.",
   "Priorities are already calculated in the context (priorityRank); explain them, do not reorder them.",
+  'Return exactly this JSON shape: {"executiveSummary": string, "condition": "healthy"|"needs_attention"|"critical"|"insufficient_evidence", "categories": [{"category": string, "verdict": "good"|"mixed"|"poor"|"data_not_available"|"insufficient_evidence", "note": string, "findingCodes": string[]}], "actionPlan": [{"findingCode": string, "problem": string, "impact": string, "action": string, "expectedObjective": string}], "crossSourceNotes": [{"findingCode": string, "note": string}], "historical": null | {"note": string, "improved": string[], "worsened": string[]}}.',
+  `Allowed category values: ${REPORT_CATEGORIES.join(", ")}.`,
+  "Keep the whole reply under 900 words and include at most six action plan items.",
 ].join(" ");
 
 /** Rejects a reply that references data the scan never produced. */
@@ -120,7 +123,7 @@ export async function analyseWithAi(
     .select("output,model,created_at")
     .eq("input_hash", hash)
     .eq("purpose", "scan_analysis")
-    .eq("status", "success")
+    .eq("status", "completed")
     .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
     .order("created_at", { ascending: false })
     .limit(1)
@@ -158,7 +161,7 @@ export async function analyseWithAi(
       duration_ms: result.latencyMs,
       input_tokens: result.inputTokens,
       output_tokens: result.outputTokens,
-      status: "success",
+      status: "completed",
     });
     return {
       status: "completed",
