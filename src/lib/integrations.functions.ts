@@ -59,7 +59,7 @@ export const listIntegrations = createServerFn({ method: "GET" })
     if (error) throw error;
     const rows = new Map((data ?? []).map((row: any) => [row.provider, row]));
 
-    const google = await context.supabase
+    const google = await supabaseAdmin
       .from("google_business_connections")
       .select("google_account_email,status,last_synced_at,last_error")
       .eq("workspace_id", member.workspace_id)

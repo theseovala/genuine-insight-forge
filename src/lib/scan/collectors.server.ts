@@ -29,16 +29,107 @@ async function timed<T>(fn: () => Promise<T>) {
   }
 }
 
+const TRUSTED_HOSTS = new Set([
+  "cloudflare-dns.com",
+  "rdap.org",
+  "www.googleapis.com",
+  "safebrowsing.googleapis.com",
+  "search.google.com",
+]);
+
+/** True for loopback, link-local, private and carrier-grade NAT address space. */
+function isPrivateAddress(address: string) {
+  const ipv4 = address.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
+    if (a === 0 || a === 10 || a === 127) return true;
+    if (a === 169 && b === 254) return true; // link-local incl. cloud metadata
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 100 && b >= 64 && b <= 127) return true;
+    if (a >= 224) return true; // multicast / reserved
+    return false;
+  }
+  const v6 = address.toLowerCase();
+  if (v6 === "::1" || v6 === "::") return true;
+  if (v6.startsWith("fe80") || v6.startsWith("fc") || v6.startsWith("fd")) return true;
+  if (v6.startsWith("::ffff:")) return isPrivateAddress(v6.slice(7));
+  return false;
+}
+
+const resolutionCache = new Map<string, string[]>();
+
+async function resolveHost(hostname: string): Promise<string[]> {
+  const cached = resolutionCache.get(hostname);
+  if (cached) return cached;
+  const addresses: string[] = [];
+  for (const type of ["A", "AAAA"]) {
+    const response = await fetch(
+      `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(hostname)}&type=${type}`,
+      { headers: { accept: "application/dns-json", "user-agent": UA }, signal: AbortSignal.timeout(8_000) },
+    );
+    if (!response.ok) continue;
+    const payload = (await response.json()) as { Answer?: Array<{ type: number; data: string }> };
+    for (const answer of payload.Answer ?? []) {
+      if (answer.type === 1 || answer.type === 28) addresses.push(answer.data);
+    }
+  }
+  resolutionCache.set(hostname, addresses);
+  return addresses;
+}
+
+/**
+ * SSRF guard. Rejects non-HTTP schemes, embedded credentials, odd ports,
+ * internal hostnames, literal private IPs and hostnames that resolve into
+ * private, loopback, link-local or cloud-metadata address space.
+ */
+export async function assertPublicTarget(rawUrl: string) {
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    throw new Error("That address could not be read as a website address.");
+  }
+  if (!/^https?:$/.test(url.protocol)) throw new Error("Only http and https addresses can be scanned.");
+  if (url.username || url.password) throw new Error("Addresses containing a username or password cannot be scanned.");
+  if (url.port && url.port !== "80" && url.port !== "443") throw new Error("Only the standard web ports 80 and 443 can be scanned.");
+
+  const host = url.hostname.toLowerCase().replace(/\.$/, "");
+  if (TRUSTED_HOSTS.has(host)) return url;
+  if (host === "localhost" || /(^|\.)(local|internal|localdomain|home|lan|localhost)$/.test(host)) {
+    throw new Error("Internal network addresses cannot be scanned.");
+  }
+  if (isPrivateAddress(host.replace(/^\[|\]$/g, ""))) throw new Error("Private network addresses cannot be scanned.");
+
+  const addresses = await resolveHost(host);
+  if (addresses.length === 0) throw new Error("That domain name could not be resolved.");
+  if (addresses.some(isPrivateAddress)) throw new Error("That domain points at a private network address and cannot be scanned.");
+  return url;
+}
+
 async function request(url: string, init: RequestInit = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    return await fetch(url, {
-      redirect: "follow",
-      ...init,
-      headers: { "user-agent": UA, accept: "*/*", ...(init.headers ?? {}) },
-      signal: controller.signal,
-    });
+    let current = url;
+    // Manual redirect handling: every hop is re-validated against the SSRF guard.
+    for (let hop = 0; hop < 6; hop += 1) {
+      await assertPublicTarget(current);
+      const response = await fetch(current, {
+        ...init,
+        redirect: "manual",
+        headers: { "user-agent": UA, accept: "*/*", ...(init.headers ?? {}) },
+        signal: controller.signal,
+      });
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get("location");
+        if (!location) return response;
+        current = new URL(location, current).toString();
+        continue;
+      }
+      return response;
+    }
+    throw new Error("The address redirected too many times.");
   } finally {
     clearTimeout(timer);
   }
@@ -52,6 +143,7 @@ export function normalizeTarget(input: string) {
   url.hash = "";
   return { url: url.toString(), domain: url.hostname.replace(/^www\./i, ""), origin: url.origin };
 }
+
 
 /** Loads the page itself: status, redirects, timing, response headers and HTML. */
 export async function collectPage(url: string): Promise<SourceResult> {

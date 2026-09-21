@@ -24,12 +24,15 @@ export const createScan = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ url: z.string().min(3).max(2000) }).parse(input))
   .handler(async ({ data, context }) => {
     const member = await workspace(context as Ctx);
-    const { normalizeTarget } = await import("@/lib/scan/collectors.server");
+    const { normalizeTarget, assertPublicTarget } = await import("@/lib/scan/collectors.server");
     const target = normalizeTarget(data.url);
+    // SSRF guard: reject internal, private or metadata addresses before anything is queued.
+    await assertPublicTarget(target.url);
     // Double-click guard: an active scan for the same address is reused instead of duplicated.
     const { data: active } = await (context as Ctx).supabase
       .from("scans")
       .select("id,target_url,target_domain")
+      .eq("workspace_id", member.workspace_id)
       .eq("target_domain", target.domain)
       .in("status", ["queued", "running", "retrying"])
       .order("created_at", { ascending: false })
