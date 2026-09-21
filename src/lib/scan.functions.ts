@@ -27,7 +27,22 @@ export const createScan = createServerFn({ method: "POST" })
     const { normalizeTarget, assertPublicTarget } = await import("@/lib/scan/collectors.server");
     const target = normalizeTarget(data.url);
     // SSRF guard: reject internal, private or metadata addresses before anything is queued.
-    await assertPublicTarget(target.url);
+    try {
+      await assertPublicTarget(target.url);
+    } catch (blocked) {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { recordSecurityEvent } = await import("@/lib/ops.server");
+      await recordSecurityEvent(supabaseAdmin, {
+        workspaceId: member.workspace_id,
+        actor: (context as Ctx).userId,
+        category: "crawler",
+        eventType: "blocked_target",
+        severity: "warning",
+        message: blocked instanceof Error ? blocked.message : "Blocked scan target.",
+        metadata: { target: target.url },
+      });
+      throw blocked;
+    }
     // Double-click guard: an active scan for the same address is reused instead of duplicated.
     const { data: active } = await (context as Ctx).supabase
       .from("scans")
