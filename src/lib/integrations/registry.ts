@@ -144,6 +144,18 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     credentialFields: GOOGLE_OAUTH_FIELDS,
   },
   {
+    id: "youtube_analytics",
+    group: "Google",
+    label: "YouTube Analytics",
+    description: "Channel views, watch time and engagement reports.",
+    kind: "oauth2",
+    requiredSecrets: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET"],
+    scopes: ["https://www.googleapis.com/auth/yt-analytics.readonly", "openid", "email"],
+    docsUrl: "https://developers.google.com/youtube/analytics/reference/reports/query",
+    credentialGroup: "google_oauth",
+    credentialFields: GOOGLE_OAUTH_FIELDS,
+  },
+  {
     id: "facebook",
     group: "Meta",
     label: "Facebook Page",
