@@ -429,70 +429,121 @@ export async function runScan(admin: SupabaseClient, scanId: string): Promise<Ru
       { onConflict: "scan_id,category,metric_key" },
     );
   }
+
+  // ---------- History: what changed since the previous scan of this domain ----------
+  const { data: previousScan } = await admin
+    .from("scans")
+    .select("id,score,created_at")
+    .eq("target_domain", scan.target_domain)
+    .in("status", ["completed", "completed_with_warnings"])
+    .lt("created_at", scan.created_at)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let previousCodes = new Map<string, { severity: string; impact: number }>();
+  if (previousScan) {
+    const { data: previousFindings } = await admin.from("scan_findings").select("code,severity,impact").eq("scan_id", previousScan.id);
+    previousCodes = new Map((previousFindings ?? []).map((row: any) => [String(row.code), { severity: row.severity, impact: row.impact ?? 0 }]));
+  }
+  const currentCodes = new Set(allFindings.map((finding) => finding.code));
+  const resolvedIssues = Array.from(previousCodes.keys()).filter((code) => !currentCodes.has(code));
+  const newIssues = allFindings.filter((finding) => !previousCodes.has(finding.code)).map((finding) => finding.code);
+
+  // ---------- Deterministic priority ----------
+  const { prioritize } = await import("./priority.server");
+  const prioritizable = allFindings.map((finding) => ({
+    code: finding.code,
+    category: finding.category,
+    severity: finding.severity,
+    impact: finding.impact,
+    source: finding.source,
+    evidence: finding.evidence ?? null,
+  }));
+  const priorities = new Map(prioritize(prioritizable).map((item) => [item.code, item]));
+
+  const detectedAt = new Date().toISOString();
   if (allFindings.length) {
     await admin.from("scan_findings").upsert(
-      allFindings.map((finding) => ({
-        scan_id: scanId,
-        workspace_id: scan.workspace_id,
-        category: finding.category,
-        code: finding.code,
-        severity: finding.severity,
-        title: finding.title,
-        detail: finding.detail,
-        recommendation: finding.recommendation ?? null,
-        impact: finding.impact,
-        evidence: {
-          ...(finding.evidence ?? {}),
+      allFindings.map((finding) => {
+        const priority = priorities.get(finding.code)!;
+        const before = previousCodes.get(finding.code);
+        const changeState = !previousScan ? "new" : !before ? "new" : before.severity !== finding.severity ? "changed" : "unchanged";
+        return {
+          scan_id: scanId,
+          workspace_id: scan.workspace_id,
+          category: finding.category,
+          code: finding.code,
+          severity: finding.severity,
+          title: finding.title,
+          detail: finding.detail,
+          recommendation: finding.recommendation ?? null,
+          impact: finding.impact,
+          confidence: priority.confidence,
+          priority_score: priority.priorityScore,
+          priority_rank: priority.priorityRank,
+          status: "open",
+          change_state: changeState,
+          evidence: {
+            ...(finding.evidence ?? {}),
+            source: finding.source,
+            collectedAt: detectedAt,
+            affectedCount: priority.affected,
+            verification: finding.source === "cross_source" ? "compared" : "measured",
+          },
           source: finding.source,
-          collectedAt: new Date().toISOString(),
-          confidence: finding.source === "cross_source" ? "reported" : "high",
-          verification: finding.source === "cross_source" ? "compared" : "measured",
-        },
-        source: finding.source,
-      })),
+        };
+      }),
       { onConflict: "scan_id,code" },
     );
   }
 
-  await stage(admin, scanId, "analyze", "completed", `${allFindings.length} findings`);
+  await stage(admin, scanId, "analyze", "completed", `${allFindings.length} findings prioritised`);
   await stage(admin, scanId, "ai", "running");
 
-  // ---------- AI analysis over verified findings only ----------
-  let summary: string | null = null;
-  let model: string | null = null;
-  const aiStarted = Date.now();
-  try {
-    const { runAiText } = await import("@/lib/ai-gateway.server");
-    const evidence = {
-      url: target.url,
-      score,
-      business: identity,
-      platforms: discovery.map((item) => ({ provider: item.provider, relevant: item.relevant, status: item.status })),
-      sources: sourceResults.map((s) => ({ source: s.source, status: s.status, error: s.errorMessage ?? null })),
-      measurements: normalizedMetrics.map((m) => ({ category: m.category, key: m.metricKey, value: m.valueNumeric ?? m.valueText, unit: m.unit ?? null })),
-      findings: allFindings.map((f) => ({ code: f.code, severity: f.severity, title: f.title, detail: f.detail, impact: f.impact })),
-    };
-    const result = await runAiText(
-      "You are a technical SEO and web reputation analyst. Use ONLY the supplied measurements and findings. " +
-        "Never invent data, numbers, rankings, reviews or provider results. If something was not measured, write 'Data unavailable'. " +
-        "Reply in plain text with: a two-sentence executive summary, then 'Priority actions:' followed by at most five numbered actions, " +
-        "each naming the business impact and the finding code it is based on.",
-      JSON.stringify(evidence),
-    );
-    summary = result.output;
-    model = result.model;
-    await admin.from("ai_runs").insert({
-      workspace_id: scan.workspace_id,
-      user_id: (await admin.from("scans").select("requested_by").eq("id", scanId).maybeSingle()).data?.requested_by,
-      purpose: "scan_analysis",
-      model: result.model,
-      input_hash: scanId,
-      output: result.output.slice(0, 4000),
-      duration_ms: Date.now() - aiStarted,
-      status: "success",
-    });
-  } catch (caught) {
-    const message = caught instanceof Error ? caught.message : String(caught);
+  // ---------- AI interpretation over validated data only ----------
+  const { buildAiContext } = await import("./ai-context.server");
+  const { analyseWithAi } = await import("./ai-analysis.server");
+  const requestedBy = (await admin.from("scans").select("requested_by").eq("id", scanId).maybeSingle()).data?.requested_by ?? null;
+
+  const aiContext = buildAiContext({
+    url: target.url,
+    domain: target.domain,
+    scannedAt: detectedAt,
+    score,
+    identity: identity as Record<string, unknown>,
+    sources: sourceResults.map((s) => ({ source: s.source, status: s.status, errorMessage: s.errorMessage ?? null, collectedAt: detectedAt })),
+    platforms: discovery.map((item) => ({ provider: item.provider, status: item.status, relevant: item.relevant, detail: item.detail })),
+    metrics: normalizedMetrics,
+    findings: allFindings.map((finding) => {
+      const priority = priorities.get(finding.code)!;
+      return {
+        code: finding.code,
+        category: finding.category,
+        severity: finding.severity,
+        title: finding.title,
+        detail: finding.detail,
+        impact: finding.impact,
+        source: finding.source,
+        evidence: finding.evidence ?? null,
+        confidence: priority.confidence,
+        priorityRank: priority.priorityRank,
+        affected: priority.affected,
+      };
+    }),
+    history: previousScan
+      ? {
+          previousScanAt: previousScan.created_at,
+          previousScore: previousScan.score,
+          newIssues,
+          resolvedIssues,
+          unchanged: allFindings.length - newIssues.length,
+        }
+      : null,
+  });
+
+  const ai = await analyseWithAi(admin, scan.workspace_id, requestedBy, aiContext);
+  if (ai.status === "failed") {
     await admin.from("scan_sources").upsert(
       {
         scan_id: scanId,
@@ -500,31 +551,82 @@ export async function runScan(admin: SupabaseClient, scanId: string): Promise<Ru
         source: "ai_analysis",
         provider: "lovable_ai",
         status: "failed",
-        duration_ms: Date.now() - aiStarted,
-        error_message: message.slice(0, 500),
+        duration_ms: ai.latencyMs,
+        error_message: (ai.error ?? "AI analysis failed").slice(0, 500),
         raw: {},
         created_at: new Date().toISOString(),
       },
       { onConflict: "scan_id,source" },
     );
-    await stage(admin, scanId, "ai", "failed", message.slice(0, 300));
+    await stage(admin, scanId, "ai", "failed", (ai.error ?? "AI analysis failed").slice(0, 300));
+  } else {
+    await admin.from("scan_sources").upsert(
+      {
+        scan_id: scanId,
+        workspace_id: scan.workspace_id,
+        source: "ai_analysis",
+        provider: ai.provider,
+        status: "completed",
+        duration_ms: ai.latencyMs,
+        error_message: null,
+        raw: { model: ai.model, inputTokens: ai.inputTokens, outputTokens: ai.outputTokens, reused: ai.status === "reused" } as any,
+        created_at: new Date().toISOString(),
+      },
+      { onConflict: "scan_id,source" },
+    );
+    await stage(admin, scanId, "ai", "completed", `${ai.model}${ai.status === "reused" ? " (reused, identical data)" : ""}`);
   }
-  if (summary) await stage(admin, scanId, "ai", "completed", model);
 
   await stage(admin, scanId, "report", "running");
+
+  // Report sections are derived from stored findings, so the report, the
+  // screen and the CSV can never disagree.
+  const severityCounts = allFindings.reduce<Record<string, number>>((counts, finding) => {
+    counts[finding.severity] = (counts[finding.severity] ?? 0) + 1;
+    return counts;
+  }, {});
+  const categoryCounts = allFindings.reduce<Record<string, number>>((counts, finding) => {
+    counts[finding.category] = (counts[finding.category] ?? 0) + 1;
+    return counts;
+  }, {});
+
   await admin.from("scan_reports").upsert(
     {
       scan_id: scanId,
       workspace_id: scan.workspace_id,
       score,
       category_scores: categoryScores,
-      summary,
-      model,
+      summary: ai.analysis?.executiveSummary ?? null,
+      model: ai.model,
+      ai_status: ai.status === "failed" ? "failed" : "completed",
+      ai_error: ai.error,
+      ai_latency_ms: ai.latencyMs,
+      ai_context_hash: ai.contextHash,
+      action_plan: ai.analysis?.actionPlan ?? null,
+      historical: {
+        previousScanId: previousScan?.id ?? null,
+        previousScanAt: previousScan?.created_at ?? null,
+        previousScore: previousScan?.score ?? null,
+        newIssues,
+        resolvedIssues,
+        unchanged: allFindings.length - newIssues.length,
+        aiNote: ai.analysis?.historical ?? null,
+      },
+      sections: {
+        condition: ai.analysis?.condition ?? "insufficient_evidence",
+        categories: ai.analysis?.categories ?? [],
+        crossSourceNotes: ai.analysis?.crossSourceNotes ?? [],
+        severityCounts,
+        categoryCounts,
+        sourcesUsed: sourceResults.map((s) => ({ source: s.source, status: s.status })),
+        unavailable: aiContext.unavailable,
+      },
     },
     { onConflict: "scan_id" },
   );
 
   await stage(admin, scanId, "report", "completed", score === null ? "Report stored without a score" : `Score ${score}`);
+
 
   // ---------- Failure isolation ----------
   // Technical checks decide the outcome; a platform that is simply not
