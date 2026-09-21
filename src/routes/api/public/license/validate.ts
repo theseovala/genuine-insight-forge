@@ -29,7 +29,12 @@ export const Route = createFileRoute("/api/public/license/validate")({
         const { validateLicense } = await import("@/lib/license/authority.server");
 
         const decision = await validateLicense(supabaseAdmin, {
-          ...body.data,
+          licenseKey: body.data.licenseKey,
+          domain: body.data.domain,
+          installationRef: body.data.installationRef ?? null,
+          feature: body.data.feature ?? null,
+          version: body.data.version ?? null,
+
           body: body.data as Record<string, unknown>,
           signature: request.headers.get("x-license-signature") ?? null,
           timestamp: request.headers.get("x-license-timestamp"),
