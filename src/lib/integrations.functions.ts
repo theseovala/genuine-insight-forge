@@ -199,11 +199,36 @@ export const testIntegration = createServerFn({ method: "POST" })
     const member = await workspace(context);
     const definition = integrationById(data.provider);
     if (!definition) throw new Error("Unknown integration.");
-    if (definition.kind === "manual") throw new Error(definition.manualReason ?? "This integration has no public API.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const providers = await import("@/lib/integrations/providers.server");
     const { loadProviderCredentials } = await import("@/lib/integrations/credentials.server");
     const creds = await loadProviderCredentials(supabaseAdmin, member.workspace_id, data.provider);
+
+    const recordHealth = async (code: string, message: string | null, ok = false) => {
+      const now = new Date().toISOString();
+      await supabaseAdmin.from("integration_health").upsert(
+        {
+          workspace_id: member.workspace_id,
+          provider: data.provider,
+          status: ok ? "healthy" : "unhealthy",
+          latency_ms: null,
+          outcome_code: code,
+          last_error: ok ? null : message,
+          last_checked_at: now,
+          ...(ok ? { last_ok_at: now } : {}),
+        },
+        { onConflict: "workspace_id,provider" },
+      );
+      await supabaseAdmin.from("integration_api_logs").insert({
+        workspace_id: member.workspace_id,
+        provider: data.provider,
+        operation: "connection_test",
+        endpoint: "connection_test",
+        http_status: null,
+        outcome_code: code,
+        error_message: ok ? null : message,
+      });
+    };
 
     const log = (level: string, message: string, httpStatus: number | null, eventType = "connection_test") =>
       supabaseAdmin.from("integration_events").insert({
@@ -215,6 +240,15 @@ export const testIntegration = createServerFn({ method: "POST" })
         http_status: httpStatus,
       });
 
+    if (definition.kind === "manual") {
+      // Partner-only APIs: reported honestly instead of pretending a test is possible.
+      const message = definition.manualReason ?? "This provider has no public API for this workspace.";
+      const code = definition.approvalRequired ? "APPROVAL_REQUIRED" : "UNAVAILABLE";
+      await log("warning", message, null);
+      await recordHealth(code, message);
+      return { ok: false, status: 0, code: code as "APPROVAL_REQUIRED" | "UNAVAILABLE", message };
+    }
+
     if (definition.id === "google_business") {
       const { data: connection } = await supabaseAdmin
         .from("google_business_connections")
@@ -224,6 +258,7 @@ export const testIntegration = createServerFn({ method: "POST" })
       if (!connection || connection.status !== "connected") {
         const message = "Google Business Profile is not connected yet.";
         await log("warning", message, null);
+        await recordHealth("NOT_CONFIGURED", message);
         return { ok: false, status: 0, code: "NOT_CONFIGURED" as const, message };
       }
       const { usableAccessToken } = await import("@/lib/google-business-sync.server");
@@ -257,6 +292,7 @@ export const testIntegration = createServerFn({ method: "POST" })
       if (!row?.access_token_ciphertext) {
         const message = `${definition.label} is not connected yet.`;
         await log("warning", message, null);
+        await recordHealth("NOT_CONFIGURED", message);
         return { ok: false, status: 0, code: "NOT_CONFIGURED" as const, message };
       }
       const { decryptValue, encryptValue } = await import("@/lib/integrations/crypto.server");
@@ -269,7 +305,8 @@ export const testIntegration = createServerFn({ method: "POST" })
             .update({ status: "expired", last_error: "Access expired and the provider issued no refresh token. Reconnect the account." })
             .eq("id", row.id);
           await log("warning", "Access token expired without a refresh token.", null, "token_expired");
-          return { ok: false, status: 0, message: "Access expired. Reconnect this account." };
+          await recordHealth("TOKEN_EXPIRED", "Access expired. Reconnect this account.");
+          return { ok: false, status: 0, code: "TOKEN_EXPIRED" as const, message: "Access expired. Reconnect this account." };
         }
         try {
           const refreshed = await providers.refreshAccessToken(
@@ -295,7 +332,8 @@ export const testIntegration = createServerFn({ method: "POST" })
           const message = caught instanceof Error ? caught.message : "Token refresh failed.";
           await supabaseAdmin.from("integration_connections").update({ status: "expired", last_error: message }).eq("id", row.id);
           await log("error", message, null, "token_refresh_failed");
-          return { ok: false, status: 0, message };
+          await recordHealth("TOKEN_EXPIRED", message);
+          return { ok: false, status: 0, code: "TOKEN_EXPIRED" as const, message };
         }
       }
       const config = providers.OAUTH_PROVIDERS[data.provider];

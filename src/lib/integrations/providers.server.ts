@@ -48,7 +48,14 @@ export function outcomeFor(ok: boolean, status: number, message: string): TestOu
       : "PROVIDER_ERROR";
   }
   if (status === 401) return "AUTHENTICATION_FAILED";
-  if (status === 403) return /scope/i.test(message) ? "INSUFFICIENT_SCOPE" : "INVALID_CREDENTIALS";
+  if (status === 403) {
+    if (/scope|insufficient permission/i.test(message)) return "INSUFFICIENT_SCOPE";
+    // Google returns 403 when the API itself is disabled or needs allow-listing for the project;
+    // that is a provider-side setup state, not a bad credential.
+    if (/has not been used in project|is disabled|blocked|not enabled|enable it by visiting|accessNotConfigured/i.test(message))
+      return "APPROVAL_REQUIRED";
+    return "INVALID_CREDENTIALS";
+  }
   if (status === 429) return "RATE_LIMITED";
   return "PROVIDER_ERROR";
 }
