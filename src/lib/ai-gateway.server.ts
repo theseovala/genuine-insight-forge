@@ -145,11 +145,12 @@ export async function runAiText(system: string, prompt: string): Promise<AiTextR
 /** Strips a ```json fence if the model wrapped its answer in one. */
 function unfence(text: string) {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const body = fenced ? fenced[1] : text;
+  const body = fenced?.[1] ?? text;
   const start = body.search(/[{[]/);
   const end = Math.max(body.lastIndexOf("}"), body.lastIndexOf("]"));
   return start >= 0 && end > start ? body.slice(start, end + 1) : body.trim();
 }
+
 
 export class AiValidationError extends Error {}
 
