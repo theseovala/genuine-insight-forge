@@ -8,7 +8,8 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: "border-transparent bg-primary text-primary-foreground shadow hover:bg-primary/80",
+        default:
+          "border-transparent bg-primary text-primary-foreground shadow-[inset_0_1px_0_oklch(1_0_0_/_0.2),0_2px_8px_-4px_color-mix(in_oklab,var(--primary)_55%,transparent)] hover:bg-primary/90",
         secondary:
           "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
         destructive:
