@@ -272,7 +272,8 @@ function ScansPage() {
                     <span className="block truncate font-medium">{scan.target_domain}</span>
                     <span className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
                       <Badge variant="outline" className="h-5 px-1.5 text-[10px] uppercase">
-                        {scan.status}
+                        {SCAN_STATUS_LABEL[scan.status] ?? scan.status}
+
                       </Badge>
                       <span className="num">{scan.score === null ? "No score" : `${scan.score}/100`}</span>
                       <span>· {new Date(scan.created_at).toLocaleString()}</span>
@@ -299,7 +300,7 @@ function ScansPage() {
             <>
               <Section
                 title={data.scan.target_domain}
-                description={`${data.scan.status} · ${data.scan.score === null ? "Score unavailable" : `Score ${data.scan.score}/100`}`}
+                description={`${SCAN_STATUS_LABEL[data.scan.status] ?? data.scan.status} · ${data.scan.score === null ? "Score unavailable" : `Score ${data.scan.score}/100`}`}
                 action={
                   <div className="flex flex-wrap gap-2">
                     {["queued", "running", "retrying"].includes(data.scan.status) ? (
