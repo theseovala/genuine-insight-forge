@@ -96,6 +96,9 @@ export async function assertPublicTarget(rawUrl: string) {
 
   const host = url.hostname.toLowerCase().replace(/\.$/, "");
   if (TRUSTED_HOSTS.has(host)) return url;
+  // Also checked here, so a redirect that lands on a listing page is refused on
+  // that hop rather than being crawled as if it were the business site.
+  assertScannableHost(host);
   if (host === "localhost" || /(^|\.)(local|internal|localdomain|home|lan|localhost)$/.test(host)) {
     throw new Error("Internal network addresses cannot be scanned.");
   }
@@ -135,6 +138,36 @@ async function request(url: string, init: RequestInit = {}) {
   }
 }
 
+/**
+ * Hosts that are a map listing, a review permalink or a link shortener for one —
+ * never a business website. Crawling them produces a confident-looking report
+ * about the platform's own redirect page ("21 words of visible text", "no H1",
+ * "business name is not published"), which is a false report about the business
+ * the person actually meant. They are refused with an explanation instead.
+ */
+const LISTING_HOSTS: { pattern: RegExp; label: string }[] = [
+  { pattern: /^(share\.google|goo\.gl|maps\.app\.goo\.gl|g\.page|maps\.google\.[a-z.]+)$/i, label: "Google Maps or Google review" },
+  { pattern: /^(www\.)?google\.[a-z.]+$/i, label: "Google" },
+  { pattern: /^(www\.)?(facebook|fb)\.com$/i, label: "Facebook" },
+  { pattern: /^(www\.)?instagram\.com$/i, label: "Instagram" },
+  { pattern: /^(www\.)?(twitter|x)\.com$/i, label: "X" },
+  { pattern: /^(www\.)?(yelp|tripadvisor|trustpilot|justdial|glassdoor|indeed)\.[a-z.]+$/i, label: "review site" },
+  { pattern: /^(bit\.ly|tinyurl\.com|t\.co|lnkd\.in)$/i, label: "shortened" },
+];
+
+function assertScannableHost(hostname: string) {
+  const host = hostname.toLowerCase().replace(/\.$/, "");
+  const hit = LISTING_HOSTS.find((entry) => entry.pattern.test(host));
+  if (!hit) return;
+  if (hit.label === "shortened") {
+    throw new Error("Shortened links cannot be scanned. Enter the business website address itself, for example seovale.com");
+  }
+  throw new Error(
+    `That is a ${hit.label} link, not a business website, so scanning it would describe ${host} instead of the business. ` +
+      `Enter the business website address, or connect the platform under Settings → Integrations to analyse its listing and reviews.`,
+  );
+}
+
 export function normalizeTarget(input: string) {
   const trimmed = input.trim();
   const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
@@ -145,6 +178,7 @@ export function normalizeTarget(input: string) {
     throw new Error("Enter a valid website address, for example seovale.com");
   }
   if (!url.hostname.includes(".")) throw new Error("Enter a valid website address, for example seovale.com");
+  assertScannableHost(url.hostname);
   url.hash = "";
   return { url: url.toString(), domain: url.hostname.replace(/^www\./i, ""), origin: url.origin };
 }
