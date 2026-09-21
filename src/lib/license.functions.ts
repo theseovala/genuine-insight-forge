@@ -311,9 +311,9 @@ export const setLicenseStatus = createServerFn({ method: "POST" })
     const { data: license } = await db.from("licenses").select("id, client_id, status, license_key").eq("id", data.licenseId).maybeSingle();
     if (!license) throw new Error("License not found.");
 
-    const patch: Record<string, unknown> = { status: data.status };
-    if (data.status === "active") patch["activated_at"] = new Date().toISOString();
+    const patch = { status: data.status, ...(data.status === "active" ? { activated_at: new Date().toISOString() } : {}) };
     const { error } = await db.from("licenses").update(patch).eq("id", data.licenseId);
+
     if (error) throw new Error(error.message);
 
     if (data.status === "revoked") {
