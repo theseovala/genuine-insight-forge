@@ -94,3 +94,9 @@
 - [ ] Cross-source verification + duplicate detection (needs Google Business / Meta access — blocked on provider approval)
 - [ ] Provider-sourced usage/rate-limit extraction during sync
 - [ ] Ultra Premium pass 3: apply the existing depth/glow/density language to the new Scan Engine screen (palette, fonts, layout unchanged)
+
+## Master Integration Center (2026-09-21)
+- [x] Website intelligence category: crawler/screenshots (Firecrawl), PageSpeed/Lighthouse, SSL monitoring (SSL Labs), DNS/RDAP/WHOIS, uptime (UptimeRobot), URL reputation (Safe Browsing) — all with real documented live tests
+- [x] SERP provider (SerpApi) + YouTube Analytics OAuth provider
+- [x] Integration overview panel (connected / pending / auth errors / expiry / approval-required / 24h API errors + audit log) from real rows
+- [ ] Provider-sourced usage + rate-limit extraction during sync (needs configured provider keys)
