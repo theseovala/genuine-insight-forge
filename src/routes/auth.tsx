@@ -9,6 +9,9 @@ import { BrandMark } from "@/components/app/primitives";
 import { BRAND } from "@/lib/domain";
 
 export const Route = createFileRoute("/auth")({
+  // Client-only: a server-rendered form accepts typing/clicks before React
+  // hydrates, which silently discards the credentials on hydration.
+  ssr: false,
   head: () => ({
     meta: [
       { title: `Sign in — ${BRAND.name}` },
@@ -35,6 +38,9 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [busy, setBusy] = useState(false);
+  // Until React has hydrated, a click would submit the form natively (page
+  // reload, no sign-in request). Keep the button disabled until then.
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -52,6 +58,10 @@ function AuthPage() {
     if (resetError) setError(resetError.message);
     else setNotice("Check your inbox for a secure password reset link.");
   }
+
+  useEffect(() => {
+    setReady(true);
+  }, []);
 
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => {
@@ -183,9 +193,9 @@ function AuthPage() {
               <p className="rounded-lg bg-accent px-3 py-2 text-sm text-foreground">{notice}</p>
             )}
 
-            <Button type="submit" className="w-full" disabled={busy}>
-              {busy && <Loader2 className="animate-spin" />}
-              {mode === "signin" ? "Sign in" : "Create account"}
+            <Button type="submit" className="w-full" disabled={busy || !ready}>
+              {(busy || !ready) && <Loader2 className="animate-spin" />}
+              {!ready ? "Loading…" : mode === "signin" ? "Sign in" : "Create account"}
             </Button>
             {mode === "signin" && (
               <Button type="button" variant="link" className="h-auto w-full" disabled={busy} onClick={() => void sendReset()}>
