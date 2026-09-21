@@ -22,6 +22,7 @@ import {
 } from "./collectors.server";
 import { analyze } from "./analyze.server";
 import { discoverPlatforms, type PlatformDiscovery } from "./discovery.server";
+import { recordEvidence, reconcileConflicts, upsertFacts, type Confidence, type FactInput } from "./canonical.server";
 
 /** How long a collected source stays valid for incremental re-use, per source. */
 export const FRESHNESS_MINUTES: Record<string, number> = {
@@ -248,6 +249,54 @@ function crossValidate(identity: ReturnType<typeof extractIdentity>, discovery: 
   return findings;
 }
 
+/** Facts the collectors actually observed, each tagged with its own source. */
+function collectFacts(
+  identity: ReturnType<typeof extractIdentity>,
+  html: string,
+  finalUrl: string | null,
+  tlsRaw: Record<string, unknown> | null,
+  rdapRaw: Record<string, unknown> | null,
+  observedAt: string,
+) {
+  const facts: FactInput[] = [];
+  const push = (
+    fieldKey: string,
+    value: unknown,
+    sourceProvider: string,
+    sourceType: string,
+    confidence: Confidence,
+    sourceUrl?: string | null,
+  ) => {
+    if (typeof value !== "string" || !value.trim()) return;
+    facts.push({ fieldKey, value: value.trim(), sourceProvider, sourceType, confidence, observedAt, sourceUrl: sourceUrl ?? finalUrl });
+  };
+
+  // Source 1: schema.org structured data published by the site.
+  push("name", identity.name, "website_schema", "structured_data", "high");
+  push("phone", identity.phone, "website_schema", "structured_data", "high");
+  push("address", identity.address, "website_schema", "structured_data", "high");
+  push("category", identity.category, "website_schema", "structured_data", "medium");
+  push("website", identity.website, "website_schema", "structured_data", "high");
+
+  // Source 2: the rendered page itself — an independent view of the same facts.
+  push("title", html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/\s+/g, " "), "website_html", "page_markup", "verified");
+  push(
+    "meta_description",
+    html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i)?.[1],
+    "website_html",
+    "page_markup",
+    "verified",
+  );
+  push("canonical", html.match(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i)?.[1], "website_html", "page_markup", "verified");
+  push("phone", html.match(/href=["']tel:([^"']+)["']/i)?.[1], "website_html", "page_markup", "medium");
+  push("website", finalUrl, "website_html", "http_response", "verified");
+
+  // Source 3+: infrastructure observations.
+  if (tlsRaw) push("ssl_issuer", (tlsRaw as any).issuer, "ssl", "certificate", "verified");
+  if (rdapRaw) push("registrar", (rdapRaw as any).registrar, "rdap", "registry", "verified");
+  return facts;
+}
+
 export async function runScan(admin: SupabaseClient, scanId: string): Promise<RunScanResult> {
   const { data: scan, error } = await admin
     .from("scans")
@@ -402,7 +451,59 @@ export async function runScan(admin: SupabaseClient, scanId: string): Promise<Ru
   await stage(admin, scanId, "cross_validate", "running");
   const identity = html ? extractIdentity(html) : { name: null, phone: null, address: null, website: null, category: null, sameAs: [] };
   const crossFindings = crossValidate(identity, discovery);
-  await stage(admin, scanId, "cross_validate", "completed", `${crossFindings.length} consistency checks`);
+
+  // ---------- Canonical facts, change detection and source conflicts ----------
+  const observedAt = new Date().toISOString();
+  const tlsRaw = (sourceResults.find((s) => s.source === "tls")?.raw ?? null) as Record<string, unknown> | null;
+  const rdapRaw = (sourceResults.find((s) => s.source === "rdap")?.raw ?? null) as Record<string, unknown> | null;
+  const finalUrl = ((httpRow?.raw as any)?.finalUrl as string | null) ?? target.url;
+  const facts = collectFacts(identity, html, finalUrl, tlsRaw, rdapRaw, observedAt);
+  const factChanges = await upsertFacts(admin, scan.workspace_id, scan.target_domain, scanId, facts);
+  const conflicts = await reconcileConflicts(admin, scan.workspace_id, scan.target_domain, scanId, facts);
+
+  for (const conflict of conflicts) {
+    crossFindings.push({
+      category: "consistency",
+      code: `conflict_${conflict.fieldKey}_${conflict.sourceA}_${conflict.sourceB}`,
+      severity: "medium",
+      title: `Sources disagree about the ${conflict.fieldKey.replace(/_/g, " ")}`,
+      detail: `MISMATCH — ${conflict.sourceA} reports "${conflict.valueA}" while ${conflict.sourceB} reports "${conflict.valueB}". Neither value was chosen automatically.`,
+      recommendation: "Decide which value is correct and publish the same value on every source.",
+      impact: 3,
+      evidence: {
+        status: "MISMATCH",
+        field: conflict.fieldKey,
+        sourceA: conflict.sourceA,
+        valueA: conflict.valueA,
+        observedA: conflict.observedAAt,
+        sourceB: conflict.sourceB,
+        valueB: conflict.valueB,
+        observedB: conflict.observedBAt,
+      },
+      source: "cross_source",
+    });
+  }
+  for (const change of factChanges) {
+    crossFindings.push({
+      category: "consistency",
+      code: `changed_${change.fieldKey}_${change.sourceProvider}`,
+      severity: "info",
+      title: `${change.fieldKey.replace(/_/g, " ")} changed since the previous scan`,
+      detail: `CHANGED — ${change.sourceProvider} previously reported "${change.previous}" and now reports "${change.current}".`,
+      recommendation: null,
+      impact: 1,
+      evidence: { status: "CHANGED", field: change.fieldKey, previous: change.previous, current: change.current, source: change.sourceProvider },
+      source: "cross_source",
+    });
+  }
+
+  await stage(
+    admin,
+    scanId,
+    "cross_validate",
+    "completed",
+    `${facts.length} facts stored · ${conflicts.length} conflicts · ${factChanges.length} changes`,
+  );
 
   await stage(admin, scanId, "analyze", "running");
   const pageFailed = sourceResults.find((s) => s.source === "http")?.status !== "completed";
@@ -498,7 +599,20 @@ export async function runScan(admin: SupabaseClient, scanId: string): Promise<Ru
     );
   }
 
-  await stage(admin, scanId, "analyze", "completed", `${allFindings.length} findings prioritised`);
+  // Evidence records are exploded from the findings that were actually stored,
+  // so the report can never cite evidence the database does not hold.
+  const { data: storedFindings } = await admin
+    .from("scan_findings")
+    .select("id,code,source,evidence")
+    .eq("scan_id", scanId);
+  const evidenceCount = await recordEvidence(
+    admin,
+    scan.workspace_id,
+    scanId,
+    (storedFindings ?? []).map((row: any) => ({ id: row.id, code: row.code, source: row.source, evidence: row.evidence ?? null })),
+  );
+
+  await stage(admin, scanId, "analyze", "completed", `${allFindings.length} findings prioritised · ${evidenceCount} evidence records`);
   await stage(admin, scanId, "ai", "running");
 
   // ---------- AI interpretation over validated data only ----------
