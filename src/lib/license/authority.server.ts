@@ -4,7 +4,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createHmac } from "node:crypto";
-import { correlationId, hashIp, hashToken, safeEqual, signPayload } from "./crypto.server";
+import { correlationId, decryptSecret, hashIp, hashToken, safeEqual, signPayload } from "./crypto.server";
 
 
 export type LicenseStatus =
