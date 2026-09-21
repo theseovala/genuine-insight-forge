@@ -114,3 +114,21 @@
 - [ ] Data freshness monitoring; system performance timings
 - [ ] Admin debug view per scan (timeline, provider calls, errors, retries, AI, report)
 - [ ] Confirmation + server-side authorization on destructive operations
+
+## License, Source Protection & Secure Deployment (current)
+- [ ] License authority schema: clients, license_plans, licenses, license_features, license_activations, installations, license_domains, download_tokens, download_events, license_events, license_validations, license_revocations, license_transfers (RLS + grants + tenant isolation)
+- [ ] Immutable non-sequential license IDs (SVL-XXXX-XXXX-XXXX)
+- [ ] License states: pending/active/suspended/expired/revoked/cancelled/transfer_pending — enforced server-side
+- [ ] Domain lock + installation binding (server fingerprint, no device data)
+- [ ] Backend-to-backend validation endpoint (signed requests, minimal response, replay + rate limiting)
+- [ ] Platform roles: owner/super_admin/security_admin/tech_lead/developer/qa/support (DB-backed, least privilege)
+- [ ] TOTP MFA (encrypted secrets, recovery codes) + step-up auth for sensitive operations
+- [ ] Releases + checksums + signatures; artifact inspection before release
+- [ ] Short-lived single-use download tokens + secure download route + download audit
+- [ ] Update authorization endpoint (version compatibility, signed update metadata)
+- [ ] Tamper/abuse detection → deny + record security event, never destructive
+- [ ] Offline grace: signed license cache with expiry + bindings, bounded
+- [ ] License Admin Panel (licenses, clients, installations, domains, downloads, releases, security events, audit, MFA, access control)
+- [ ] Client Portal (own license/installation/version/updates/download history only)
+- [ ] Security test pass: wrong/expired/suspended/revoked license, wrong domain/installation, duplicate install, invalid/expired/replayed token, failed MFA, brute force, cross-client access, direct API access
+- [ ] Regression: Scan → Report → CSV unchanged
