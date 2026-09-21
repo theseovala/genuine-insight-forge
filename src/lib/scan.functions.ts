@@ -381,3 +381,36 @@ export const exportScanCsv = createServerFn({ method: "POST" })
     return { filename: `seovale-scan-${scan.target_domain}-${new Date(scan.created_at).toISOString().slice(0, 10)}.csv`, csv: lines.join("\n") };
   });
 
+
+/**
+ * Finding triage. The status is stored on the finding row itself, scoped to the
+ * caller's workspace, so the report, filters and CSV all read the same value.
+ */
+export const setFindingStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        findingId: z.string().uuid(),
+        status: z.enum(["open", "acknowledged", "resolved", "ignored", "recheck_required"]),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const member = await workspace(context as Ctx);
+    const { data: finding, error: readError } = await context.supabase
+      .from("scan_findings")
+      .select("id, scan_id, scans!inner(workspace_id)")
+      .eq("id", data.findingId)
+      .maybeSingle();
+    if (readError) throw new Error(readError.message);
+    if (!finding || finding.scans?.workspace_id !== member.workspace_id) {
+      throw new Error("Finding not found.");
+    }
+    const { error } = await context.supabase
+      .from("scan_findings")
+      .update({ status: data.status })
+      .eq("id", data.findingId);
+    if (error) throw new Error(error.message);
+    return { ok: true, status: data.status };
+  });
