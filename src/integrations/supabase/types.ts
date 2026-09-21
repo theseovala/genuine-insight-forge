@@ -1703,6 +1703,63 @@ export type Database = {
           },
         ]
       }
+      scan_stages: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          detail: string | null
+          id: string
+          label: string
+          position: number
+          scan_id: string
+          stage: string
+          started_at: string | null
+          status: string
+          workspace_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          detail?: string | null
+          id?: string
+          label: string
+          position?: number
+          scan_id: string
+          stage: string
+          started_at?: string | null
+          status?: string
+          workspace_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          detail?: string | null
+          id?: string
+          label?: string
+          position?: number
+          scan_id?: string
+          stage?: string
+          started_at?: string | null
+          status?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scan_stages_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scan_stages_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scans: {
         Row: {
           attempts: number
