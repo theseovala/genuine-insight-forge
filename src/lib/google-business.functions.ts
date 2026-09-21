@@ -68,6 +68,10 @@ export const syncGoogleBusinessReviews = createServerFn({ method: "POST" })
       const token = await usableAccessToken(supabaseAdmin, member.workspace_id, connection);
       const batches = await fetchGoogleReviews(token);
       const { data: rules } = await context.supabase.from("alert_rules").select("negative_rating_threshold").eq("workspace_id", member.workspace_id).maybeSingle();
+      // A report the platform will act on has to point at the review. Google
+      // publishes no per-review permalink, so this returns the place link when a
+      // real place id came back and null otherwise — never a guessed URL.
+      const { deriveReviewUrl } = await import("@/lib/removal/review-url");
       let found = 0;
       let created = 0;
       let updated = 0;
@@ -80,6 +84,7 @@ export const syncGoogleBusinessReviews = createServerFn({ method: "POST" })
           const { error: locationError } = await context.supabase.from("locations").insert({ workspace_id: member.workspace_id, external_ref: batch.location.externalRef, name: batch.location.name, city: batch.location.city, country: batch.location.country });
           if (locationError) throw locationError;
         }
+        const reviewUrl = deriveReviewUrl({ platform: "google", placeId: batch.location.placeId }).url;
         for (const review of batch.reviews) {
           found += 1;
           const sentiment = review.rating >= 4 ? "positive" : review.rating === 3 ? "neutral" : "negative";
@@ -87,12 +92,12 @@ export const syncGoogleBusinessReviews = createServerFn({ method: "POST" })
           const { data: existing } = await context.supabase.from("reviews").select("id").eq("workspace_id", member.workspace_id).eq("platform", "google").eq("external_id", review.id).maybeSingle();
           let storedReviewId: string;
           if (existing) {
-            const { error: updateError } = await context.supabase.from("reviews").update({ author: review.author, rating: review.rating, body: review.body, sentiment, priority, location_name: batch.location.name, external_created_at: review.createdAt }).eq("id", existing.id);
+            const { error: updateError } = await context.supabase.from("reviews").update({ author: review.author, rating: review.rating, body: review.body, sentiment, priority, location_name: batch.location.name, external_created_at: review.createdAt, review_url: reviewUrl }).eq("id", existing.id);
             if (updateError) throw updateError;
             storedReviewId = existing.id;
             updated += 1;
           } else {
-            const { data: inserted, error: insertError } = await context.supabase.from("reviews").insert({ workspace_id: member.workspace_id, platform: "google", external_id: review.id, source: "google_business", author: review.author, rating: review.rating, sentiment, status: "pending", priority, location_name: batch.location.name, body: review.body, external_created_at: review.createdAt }).select("id").single();
+            const { data: inserted, error: insertError } = await context.supabase.from("reviews").insert({ workspace_id: member.workspace_id, platform: "google", external_id: review.id, source: "google_business", author: review.author, rating: review.rating, sentiment, status: "pending", priority, location_name: batch.location.name, body: review.body, external_created_at: review.createdAt, review_url: reviewUrl }).select("id").single();
             if (insertError) throw insertError;
             storedReviewId = inserted.id;
             created += 1;

@@ -2564,11 +2564,15 @@ export type Database = {
           appeal_text: string | null
           confidence: number
           created_at: string
+          evidence: Json | null
           id: string
           model: string | null
+          outcome: string | null
+          outcome_at: string | null
           rationale: string
           resolved_at: string | null
           review_id: string
+          route: string | null
           status: string
           submitted_at: string | null
           submitted_by: string | null
@@ -2580,11 +2584,15 @@ export type Database = {
           appeal_text?: string | null
           confidence?: number
           created_at?: string
+          evidence?: Json | null
           id?: string
           model?: string | null
+          outcome?: string | null
+          outcome_at?: string | null
           rationale: string
           resolved_at?: string | null
           review_id: string
+          route?: string | null
           status?: string
           submitted_at?: string | null
           submitted_by?: string | null
@@ -2596,11 +2604,15 @@ export type Database = {
           appeal_text?: string | null
           confidence?: number
           created_at?: string
+          evidence?: Json | null
           id?: string
           model?: string | null
+          outcome?: string | null
+          outcome_at?: string | null
           rationale?: string
           resolved_at?: string | null
           review_id?: string
+          route?: string | null
           status?: string
           submitted_at?: string | null
           submitted_by?: string | null
@@ -2781,6 +2793,7 @@ export type Database = {
           replied_at: string | null
           replied_by: string | null
           reply: string | null
+          review_url: string | null
           sentiment: string
           source: string
           status: string
@@ -2804,6 +2817,7 @@ export type Database = {
           replied_at?: string | null
           replied_by?: string | null
           reply?: string | null
+          review_url?: string | null
           sentiment?: string
           source: string
           status?: string
@@ -2827,6 +2841,7 @@ export type Database = {
           replied_at?: string | null
           replied_by?: string | null
           reply?: string | null
+          review_url?: string | null
           sentiment?: string
           source?: string
           status?: string

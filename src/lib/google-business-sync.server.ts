@@ -6,7 +6,20 @@ const REVIEWS_API = "https://mybusiness.googleapis.com/v4";
 const STARS: Record<string, number> = { ONE: 1, TWO: 2, THREE: 3, FOUR: 4, FIVE: 5 };
 
 type Connection = { access_token_ciphertext: string; refresh_token_ciphertext: string; token_expires_at: string };
-export type GoogleLocation = { externalRef: string; name: string; city: string; country: string; account: string; resource: string };
+export type GoogleLocation = {
+  externalRef: string;
+  name: string;
+  city: string;
+  country: string;
+  account: string;
+  resource: string;
+  /**
+   * The place id Google returned for this location, kept separate from
+   * `externalRef` because `externalRef` falls back to the resource name. Only a
+   * real place id can be turned into a link, so the two must not be confused.
+   */
+  placeId: string | null;
+};
 export type GoogleReview = { id: string; author: string; rating: number; body: string; createdAt: string };
 
 function requiredEnv(name: string) {
@@ -76,13 +89,15 @@ async function locations(account: string, token: string) {
       const resource = typeof row["name"] === "string" ? row["name"] : "";
       if (!resource) continue;
       const address = row["storefrontAddress"] ?? {};
+      const placeId = typeof row["metadata"]?.["placeId"] === "string" ? row["metadata"]["placeId"] : null;
       result.push({
-        externalRef: row["metadata"]?.["placeId"] ?? resource,
+        externalRef: placeId ?? resource,
         name: row["title"] ?? "Google Business location",
         city: address["locality"] ?? "Unknown city",
         country: address["regionCode"] ?? "Unknown country",
         account,
         resource,
+        placeId,
       });
     }
     pageToken = typeof payload["nextPageToken"] === "string" ? payload["nextPageToken"] : undefined;

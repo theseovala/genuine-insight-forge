@@ -40,6 +40,27 @@ export function parseScanResults(text: string) {
 }
 
 /**
+ * True only when the connected Google account actually granted the
+ * `business.manage` scope. No connection, a read failure, or a partial grant all
+ * return false, so a route is reported as needing provider approval rather than
+ * being presented as something the system can act on.
+ */
+export async function providerApiApproved(client: any, workspaceId: string): Promise<boolean> {
+  try {
+    const { data, error } = await client
+      .from("google_business_connections")
+      .select("status, scopes")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
+    if (error || !data || data.status !== "connected") return false;
+    const scopes = Array.isArray(data.scopes) ? data.scopes.map(String) : [];
+    return scopes.some((scope: string) => scope.endsWith("/auth/business.manage"));
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Scans up to `limit` not-yet-assessed reviews of one workspace and records
  * removal cases plus a scan history row. Returns real counts only.
  */
@@ -60,7 +81,7 @@ export async function runRemovalScan(
 
   const { data: reviews, error } = await client
     .from("reviews")
-    .select("id, author, rating, body, platform, location_name, external_created_at")
+    .select("id, author, rating, body, platform, location_name, external_created_at, external_id, review_url")
     .eq("workspace_id", workspaceId)
     .neq("source", "seed")
     .order("external_created_at", { ascending: false })
@@ -91,21 +112,86 @@ export async function runRemovalScan(
     1,
   );
 
+  // Whether the provider has really approved API access for this client. Read
+  // from the granted scopes, and false on any error, so a route is never shown
+  // as actionable on an assumption.
+  const capability = {
+    providerApiApproved: await providerApiApproved(client, workspaceId),
+    legalSourceConnected: false,
+  };
+
   try {
     const { runAiText } = await import("@/lib/ai-gateway.server");
     const { output, model } = await runAiText(SCAN_SYSTEM, prompt);
     const results = parseScanResults(output).filter((r) => pending.some((p) => p.id === r.id));
 
-    const rows = results.map((r) => ({
-      workspace_id: workspaceId,
-      review_id: r.id,
-      violation_type: r.violation,
-      confidence: Math.max(0, Math.min(1, Number(r.confidence) || 0)),
-      rationale: String(r.rationale ?? "").slice(0, 1000) || "Flagged by automatic policy scan.",
-      appeal_text: r.appeal ? String(r.appeal).slice(0, 2000) : null,
-      status: "flagged",
-      model,
-    }));
+    const { detectRoutes, primaryRoute } = await import("@/lib/removal/routes");
+    const { buildEvidencePackage } = await import("@/lib/removal/evidence.server");
+    const { deriveReviewUrl } = await import("@/lib/removal/review-url");
+    const openedAt = new Date().toISOString();
+
+    const rows = results.map((r) => {
+      const review = pending.find((p) => p.id === r.id)!;
+      const confidence = Math.max(0, Math.min(1, Number(r.confidence) || 0));
+      const rationale = String(r.rationale ?? "").slice(0, 1000) || "Flagged by automatic policy scan.";
+
+      const routes = detectRoutes({ platform: review.platform, violation: r.violation, capability });
+
+      // The stored URL is used when the sync captured one. When it did not, the
+      // derivation runs again here rather than a link being invented, and it
+      // reports "unavailable" if provider data does not support one.
+      const link = review.review_url
+        ? { url: review.review_url as string, precision: "review_permalink" as const, derivation: "provider_supplied", patternSource: null }
+        : deriveReviewUrl({ platform: review.platform });
+
+      // BEFORE: the state of the review at the moment the case was opened. No
+      // submission, response or recheck exists yet, so the package will report
+      // an unverified outcome — which is the truth.
+      const ledger = [
+        {
+          phase: "BEFORE" as const,
+          at: openedAt,
+          actor: { kind: "system" as const, id: null },
+          observation: `Case opened. The review was published on ${review.platform} and is visible in the workspace.`,
+          source: { type: "stored_review_row", detail: `reviews.id=${review.id}` },
+        },
+      ];
+
+      const evidence = buildEvidencePackage({
+        review: {
+          id: review.id,
+          platform: review.platform,
+          externalId: (review.external_id as string | null) ?? null,
+          author: review.author,
+          rating: review.rating,
+          body: String(review.body),
+          externalCreatedAt: (review.external_created_at as string | null) ?? null,
+          url: link.url,
+          urlPrecision: link.precision,
+          urlDerivation: link.derivation,
+          urlPatternSource: link.patternSource,
+        },
+        finding: { violationType: r.violation, confidence, explanation: rationale, model },
+        routes,
+        ledger,
+        legalSourceConnected: capability.legalSourceConnected,
+      });
+
+      return {
+        workspace_id: workspaceId,
+        review_id: r.id,
+        violation_type: r.violation,
+        confidence,
+        rationale,
+        appeal_text: r.appeal ? String(r.appeal).slice(0, 2000) : null,
+        status: "flagged",
+        model,
+        route: primaryRoute(routes),
+        evidence,
+        outcome: evidence.verification.outcome,
+        outcome_at: evidence.verification.outcomeAt,
+      };
+    });
 
     if (rows.length > 0) {
       const { error: insertError } = await client

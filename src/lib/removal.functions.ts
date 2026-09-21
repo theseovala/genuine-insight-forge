@@ -137,6 +137,16 @@ export const updateRemovalCase = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const workspaceId = await workspaceIdFor(context);
     const now = new Date().toISOString();
+
+    const { row, evidence, ledger } = await caseLedger(context, workspaceId, data.id);
+    const { CASE_STATUSES, assertTransition, appendEntry } = await import("@/lib/removal/lifecycle");
+
+    // Only guard transitions between statuses the state machine knows about, so
+    // a row written before this existed can still be moved.
+    if ((CASE_STATUSES as readonly string[]).includes(row.status) && row.status !== data.status) {
+      assertTransition(row.status as never, data.status as never);
+    }
+
     const patch = {
       status: data.status,
       ...(data.status === "submitted" ? { submitted_at: now, submitted_by: context.userId } : {}),
@@ -148,7 +158,22 @@ export const updateRemovalCase = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .eq("workspace_id", workspaceId);
     if (error) throw error;
-    return { ok: true };
+
+    // A status change made from the UI is a person's assertion about the case,
+    // so it is recorded as exactly that. It deliberately does not carry
+    // `reviewVisible`, which means it can never establish a verified outcome:
+    // the outcome column still reads "unverified" until a recheck is recorded.
+    const phase = data.status === "submitted" ? ("SUBMISSION" as const) : ("AFTER" as const);
+    const next = appendEntry(ledger as never, {
+      phase,
+      at: now,
+      actor: { kind: "user", id: context.userId },
+      observation: `A workspace member set the case status to "${data.status}".`,
+      source: { type: "user_assertion", detail: "Status changed from the removals screen; not a provider confirmation." },
+    });
+    const committed = await commitLedger(context, workspaceId, data.id, evidence, next);
+
+    return { ok: true, outcome: committed.outcome, outcomeAt: committed.outcomeAt };
   });
 
 async function caseWithReview(context: Ctx, workspaceId: string, caseId: string) {
@@ -246,4 +271,249 @@ export const publishRemovalReply = createServerFn({ method: "POST" })
     if (reviewError) throw reviewError;
 
     return { postedToGoogle };
+  });
+
+// ---------------------------------------------------------------------------
+// Verification loop: BEFORE -> SUBMISSION -> RESPONSE -> RECHECK -> AFTER
+//
+// Each of the functions below appends one entry to the case ledger and reseals
+// the evidence package. The outcome column is always recomputed from the ledger
+// by `resealWithLedger`, never taken from the caller, so a case cannot be marked
+// removed because a report was filed, because the provider claimed it, or
+// because a model predicted it. Only a recheck observation can do that.
+// ---------------------------------------------------------------------------
+
+/** Loads a case together with its ledger, creating an empty ledger if absent. */
+async function caseLedger(context: Ctx, workspaceId: string, caseId: string) {
+  const { data, error } = await context.supabase
+    .from("removal_cases")
+    .select("id, status, route, evidence, outcome, review_id")
+    .eq("id", caseId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("That removal case no longer exists.");
+  const evidence = data.evidence && typeof data.evidence === "object" ? data.evidence : null;
+  const ledger = Array.isArray(evidence?.verification?.ledger) ? evidence.verification.ledger : [];
+  return { row: data as any, evidence, ledger };
+}
+
+/**
+ * Writes a ledger entry and the recomputed outcome back to the case. The status
+ * is only changed when the caller asks for it, so existing behaviour is
+ * untouched for callers that only record evidence.
+ */
+async function commitLedger(
+  context: Ctx,
+  workspaceId: string,
+  caseId: string,
+  evidence: any,
+  ledger: unknown[],
+  status?: string,
+) {
+  const { resealWithLedger } = await import("@/lib/removal/evidence.server");
+
+  // A case created before the evidence package existed has nothing to reseal.
+  // The ledger is still recorded, and the outcome is still derived from it.
+  let nextEvidence = evidence;
+  let outcome: string;
+  let outcomeAt: string | null;
+  if (evidence) {
+    nextEvidence = resealWithLedger(evidence, ledger as never);
+    outcome = nextEvidence.verification.outcome;
+    outcomeAt = nextEvidence.verification.outcomeAt;
+  } else {
+    const { resolveOutcome } = await import("@/lib/removal/lifecycle");
+    const resolved = resolveOutcome(ledger as never);
+    outcome = resolved.outcome;
+    outcomeAt = resolved.outcomeAt;
+    nextEvidence = { schema: "seovale.evidence.legacy_ledger_only", verification: { ledger } };
+  }
+
+  const { error } = await context.supabase
+    .from("removal_cases")
+    .update({
+      evidence: nextEvidence,
+      outcome,
+      outcome_at: outcomeAt,
+      ...(status ? { status } : {}),
+    })
+    .eq("id", caseId)
+    .eq("workspace_id", workspaceId);
+  if (error) throw error;
+  return { outcome, outcomeAt };
+}
+
+/** Returns the evidence package, detected routes and verification ledger. */
+export const getRemovalCaseDetail = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ caseId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const workspaceId = await workspaceIdFor(context);
+    const { row, evidence, ledger } = await caseLedger(context, workspaceId, data.caseId);
+    const { phaseProgress, providerDecision, resolveOutcome, nextRecheckDue } = await import("@/lib/removal/lifecycle");
+    const resolved = resolveOutcome(ledger as never);
+    return {
+      id: row.id,
+      status: row.status as string,
+      route: (row.route as string | null) ?? null,
+      evidence,
+      routes: Array.isArray(evidence?.routes) ? evidence.routes : [],
+      ledger,
+      phases: phaseProgress(ledger as never),
+      providerDecision: providerDecision(ledger as never),
+      outcome: resolved.outcome,
+      outcomeAt: resolved.outcomeAt,
+      outcomeBasis: resolved.basis,
+      nextRecheckDue: nextRecheckDue(ledger as never),
+    };
+  });
+
+/**
+ * Records that a submission actually left the system or was filed by a person
+ * through the provider interface. Recording a submission never establishes an
+ * outcome.
+ */
+export const recordSubmission = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        caseId: z.string().uuid(),
+        route: z.string().min(3).max(64),
+        /** How it was filed. `manual_provider_interface` for a human submission. */
+        channel: z.string().min(3).max(120),
+        /** What was actually submitted, in the submitter's own words. */
+        observation: z.string().min(3).max(2000),
+        /** A reference the provider issued at submission time, if any. */
+        reference: z.string().max(200).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const workspaceId = await workspaceIdFor(context);
+    const { row, evidence, ledger } = await caseLedger(context, workspaceId, data.caseId);
+    const { appendEntry, assertTransition } = await import("@/lib/removal/lifecycle");
+    const { ROUTES } = await import("@/lib/removal/routes");
+    if (!(ROUTES as readonly string[]).includes(data.route)) {
+      throw new Error(`"${data.route}" is not one of the legitimate routes this system recognises.`);
+    }
+    if (row.status !== "submitted") assertTransition(row.status, "submitted");
+
+    const next = appendEntry(ledger as never, {
+      phase: "SUBMISSION",
+      at: new Date().toISOString(),
+      actor: { kind: "user", id: context.userId },
+      observation: data.observation,
+      source: {
+        type: "submission_record",
+        detail: `route=${data.route}; channel=${data.channel}${data.reference ? `; provider reference=${data.reference}` : ""}`,
+      },
+    });
+    const result = await commitLedger(context, workspaceId, data.caseId, evidence, next, "submitted");
+    return { ...result, phase: "SUBMISSION" as const };
+  });
+
+/**
+ * Records what the provider actually answered. The answer is stored verbatim and
+ * is never generated, paraphrased or predicted. A provider claiming removal does
+ * not mark the review removed — a recheck has to confirm it.
+ */
+export const recordProviderResponse = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        caseId: z.string().uuid(),
+        /** Where the answer arrived from, e.g. provider_interface, email, api. */
+        channel: z.string().min(3).max(120),
+        /** The provider's answer exactly as received. */
+        verbatim: z.string().min(1).max(8000),
+        decision: z.enum(["accepted", "rejected", "no_response"]),
+        /** Only a reference the provider itself issued. Never invented. */
+        reference: z.string().max(200).optional(),
+        receivedAt: z.string().datetime().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const workspaceId = await workspaceIdFor(context);
+    const { evidence, ledger } = await caseLedger(context, workspaceId, data.caseId);
+    const { appendEntry } = await import("@/lib/removal/lifecycle");
+    const receivedAt = data.receivedAt ?? new Date().toISOString();
+
+    const next = appendEntry(ledger as never, {
+      phase: "RESPONSE",
+      at: receivedAt,
+      actor: { kind: "provider", id: null },
+      observation: `The provider answered: ${data.decision}.`,
+      source: { type: "provider_response", detail: `channel=${data.channel}` },
+      providerResponse: {
+        channel: data.channel,
+        verbatim: data.verbatim,
+        reference: data.reference ?? null,
+        decision: data.decision,
+        receivedAt,
+      },
+    });
+    const result = await commitLedger(context, workspaceId, data.caseId, evidence, next);
+    return { ...result, phase: "RESPONSE" as const };
+  });
+
+/**
+ * Records a recheck: a fresh observation of whether the review is still there.
+ * This is the only input that can establish a verified outcome.
+ *
+ * `reviewVisible` must come from an actual observation. `null` means the recheck
+ * could not be carried out, which establishes nothing and is stored as such.
+ */
+export const recordRecheckResult = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        caseId: z.string().uuid(),
+        reviewVisible: z.boolean().nullable(),
+        /** How the observation was made, so it can be re-checked by a person. */
+        method: z.string().min(3).max(200),
+        observation: z.string().min(3).max(2000),
+        observedAt: z.string().datetime().optional(),
+        /** Set true to also close the case once the recheck settles it. */
+        closeCase: z.boolean().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const workspaceId = await workspaceIdFor(context);
+    const { row, evidence, ledger } = await caseLedger(context, workspaceId, data.caseId);
+    const { appendEntry, resolveOutcome, canTransition } = await import("@/lib/removal/lifecycle");
+    const observedAt = data.observedAt ?? new Date().toISOString();
+
+    let next = appendEntry(ledger as never, {
+      phase: "RECHECK",
+      at: observedAt,
+      actor: { kind: "user", id: context.userId },
+      observation: data.observation,
+      source: { type: "recheck_observation", detail: data.method },
+      reviewVisible: data.reviewVisible,
+    });
+
+    const resolved = resolveOutcome(next as never);
+
+    // AFTER is recorded only once the recheck actually settled the question.
+    let status: string | undefined;
+    if (data.closeCase && resolved.outcome !== "unverified") {
+      next = appendEntry(next as never, {
+        phase: "AFTER",
+        at: observedAt,
+        actor: { kind: "system", id: null },
+        observation: resolved.basis,
+        source: { type: "derived_from_recheck", detail: `outcome=${resolved.outcome}` },
+      });
+      const target = resolved.outcome === "removed" ? "approved" : "rejected";
+      if (canTransition(row.status, target)) status = target;
+    }
+
+    const result = await commitLedger(context, workspaceId, data.caseId, evidence, next, status);
+    return { ...result, phase: "RECHECK" as const, basis: resolved.basis, statusChangedTo: status ?? null };
   });
