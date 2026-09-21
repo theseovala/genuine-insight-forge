@@ -411,7 +411,7 @@ function LicensingPage() {
                         <Download className="mr-2 h-4 w-4" /> Download package {publishedRelease.version}
                       </Button>
                     )}
-                  </div disabled={busy}>
+                  </div>
 
                   {data.isStaff && (
                     <div className="mt-3 flex flex-wrap gap-2">
@@ -497,7 +497,7 @@ function LicensingPage() {
                         Roll back
                       </Button>
                     )}
-                  </div disabled={busy}>
+                  </div>
                 </div>
               ))}
             </div>
