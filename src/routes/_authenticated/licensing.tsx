@@ -69,6 +69,7 @@ function LicensingPage() {
   const [newLicense, setNewLicense] = useState({ clientId: "", domain: "", expiresAt: "" });
   const [issued, setIssued] = useState<{ licenseKey: string; licenseSecret: string; domain: string } | null>(null);
   const [domainEdit, setDomainEdit] = useState<Record<string, string>>({});
+  const [releaseForm, setReleaseForm] = useState({ version: "", buildId: "", artifactPath: "" });
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["license-overview"] });
