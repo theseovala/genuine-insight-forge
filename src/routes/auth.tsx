@@ -190,9 +190,9 @@ function AuthPage() {
               <p className="rounded-lg bg-accent px-3 py-2 text-sm text-foreground">{notice}</p>
             )}
 
-            <Button type="submit" className="w-full" disabled={busy}>
-              {busy && <Loader2 className="animate-spin" />}
-              {mode === "signin" ? "Sign in" : "Create account"}
+            <Button type="submit" className="w-full" disabled={busy || !ready}>
+              {(busy || !ready) && <Loader2 className="animate-spin" />}
+              {!ready ? "Loading…" : mode === "signin" ? "Sign in" : "Create account"}
             </Button>
             {mode === "signin" && (
               <Button type="button" variant="link" className="h-auto w-full" disabled={busy} onClick={() => void sendReset()}>
