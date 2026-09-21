@@ -33,6 +33,7 @@ import { Route as ApiPublicIntegrationsCallbackRouteImport } from './routes/api/
 import { Route as ApiPublicIntegrationsJobsRunRouteImport } from './routes/api/public/integrations/jobs-run'
 import { Route as ApiPublicIntegrationsWebhookRouteImport } from './routes/api/public/integrations/webhook'
 import { Route as ApiPublicLicenseActivateRouteImport } from './routes/api/public/license/activate'
+import { Route as ApiPublicLicenseDownloadRouteImport } from './routes/api/public/license/download'
 import { Route as ApiPublicLicenseValidateRouteImport } from './routes/api/public/license/validate'
 
 const IndexRoute = IndexRouteImport.update({
@@ -161,6 +162,12 @@ const ApiPublicLicenseActivateRoute =
     path: '/api/public/license/activate',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicLicenseDownloadRoute =
+  ApiPublicLicenseDownloadRouteImport.update({
+    id: '/api/public/license/download',
+    path: '/api/public/license/download',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicLicenseValidateRoute =
   ApiPublicLicenseValidateRouteImport.update({
     id: '/api/public/license/validate',
@@ -192,6 +199,7 @@ export interface FileRoutesByFullPath {
   '/api/public/integrations/jobs-run': typeof ApiPublicIntegrationsJobsRunRoute
   '/api/public/integrations/webhook': typeof ApiPublicIntegrationsWebhookRoute
   '/api/public/license/activate': typeof ApiPublicLicenseActivateRoute
+  '/api/public/license/download': typeof ApiPublicLicenseDownloadRoute
   '/api/public/license/validate': typeof ApiPublicLicenseValidateRoute
 }
 export interface FileRoutesByTo {
@@ -218,6 +226,7 @@ export interface FileRoutesByTo {
   '/api/public/integrations/jobs-run': typeof ApiPublicIntegrationsJobsRunRoute
   '/api/public/integrations/webhook': typeof ApiPublicIntegrationsWebhookRoute
   '/api/public/license/activate': typeof ApiPublicLicenseActivateRoute
+  '/api/public/license/download': typeof ApiPublicLicenseDownloadRoute
   '/api/public/license/validate': typeof ApiPublicLicenseValidateRoute
 }
 export interface FileRoutesById {
@@ -246,6 +255,7 @@ export interface FileRoutesById {
   '/api/public/integrations/jobs-run': typeof ApiPublicIntegrationsJobsRunRoute
   '/api/public/integrations/webhook': typeof ApiPublicIntegrationsWebhookRoute
   '/api/public/license/activate': typeof ApiPublicLicenseActivateRoute
+  '/api/public/license/download': typeof ApiPublicLicenseDownloadRoute
   '/api/public/license/validate': typeof ApiPublicLicenseValidateRoute
 }
 export interface FileRouteTypes {
@@ -274,6 +284,7 @@ export interface FileRouteTypes {
     | '/api/public/integrations/jobs-run'
     | '/api/public/integrations/webhook'
     | '/api/public/license/activate'
+    | '/api/public/license/download'
     | '/api/public/license/validate'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -300,6 +311,7 @@ export interface FileRouteTypes {
     | '/api/public/integrations/jobs-run'
     | '/api/public/integrations/webhook'
     | '/api/public/license/activate'
+    | '/api/public/license/download'
     | '/api/public/license/validate'
   id:
     | '__root__'
@@ -327,6 +339,7 @@ export interface FileRouteTypes {
     | '/api/public/integrations/jobs-run'
     | '/api/public/integrations/webhook'
     | '/api/public/license/activate'
+    | '/api/public/license/download'
     | '/api/public/license/validate'
   fileRoutesById: FileRoutesById
 }
@@ -341,6 +354,7 @@ export interface RootRouteChildren {
   ApiPublicIntegrationsJobsRunRoute: typeof ApiPublicIntegrationsJobsRunRoute
   ApiPublicIntegrationsWebhookRoute: typeof ApiPublicIntegrationsWebhookRoute
   ApiPublicLicenseActivateRoute: typeof ApiPublicLicenseActivateRoute
+  ApiPublicLicenseDownloadRoute: typeof ApiPublicLicenseDownloadRoute
   ApiPublicLicenseValidateRoute: typeof ApiPublicLicenseValidateRoute
 }
 
@@ -514,6 +528,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicLicenseActivateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/license/download': {
+      id: '/api/public/license/download'
+      path: '/api/public/license/download'
+      fullPath: '/api/public/license/download'
+      preLoaderRoute: typeof ApiPublicLicenseDownloadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/license/validate': {
       id: '/api/public/license/validate'
       path: '/api/public/license/validate'
@@ -572,6 +593,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicIntegrationsJobsRunRoute: ApiPublicIntegrationsJobsRunRoute,
   ApiPublicIntegrationsWebhookRoute: ApiPublicIntegrationsWebhookRoute,
   ApiPublicLicenseActivateRoute: ApiPublicLicenseActivateRoute,
+  ApiPublicLicenseDownloadRoute: ApiPublicLicenseDownloadRoute,
   ApiPublicLicenseValidateRoute: ApiPublicLicenseValidateRoute,
 }
 export const routeTree = rootRouteImport
