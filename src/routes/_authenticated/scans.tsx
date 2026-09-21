@@ -611,6 +611,48 @@ function ScansPage() {
                               ) : (
                                 <p className="mt-2 text-[11px]">No separate evidence record was stored for this finding.</p>
                               )}
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={triage.isPending}
+                                  onClick={() =>
+                                    triage.mutate({
+                                      findingId: finding.id,
+                                      status: (finding.status ?? "open") === "resolved" ? "open" : "resolved",
+                                    })
+                                  }
+                                >
+                                  {(finding.status ?? "open") === "resolved" ? "Reopen" : "Mark resolved"}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  disabled={triage.isPending}
+                                  onClick={() =>
+                                    triage.mutate({
+                                      findingId: finding.id,
+                                      status: (finding.status ?? "open") === "ignored" ? "open" : "ignored",
+                                    })
+                                  }
+                                >
+                                  {(finding.status ?? "open") === "ignored" ? "Un-ignore" : "Ignore"}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    void navigator.clipboard
+                                      .writeText(
+                                        `${finding.title}\n${finding.detail}\n${finding.recommendation ?? ""}`.trim(),
+                                      )
+                                      .then(() => toast.success("Finding copied."))
+                                      .catch(() => toast.error("Could not copy this finding."));
+                                  }}
+                                >
+                                  Copy
+                                </Button>
+                              </div>
                             </div>
                           ) : null}
                         </li>
