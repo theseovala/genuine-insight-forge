@@ -3,7 +3,9 @@
  * Frontend input is never trusted: every identifier is re-resolved from the database.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { correlationId, hashIp, hashToken, safeEqual, signPayload, sha256Hex } from "./crypto.server";
+import { createHmac } from "node:crypto";
+import { correlationId, hashIp, hashToken, safeEqual, signPayload } from "./crypto.server";
+
 
 export type LicenseStatus =
   | "pending"
