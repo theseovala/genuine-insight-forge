@@ -420,6 +420,37 @@ function LicensingPage() {
 
         {/* ---------- releases ---------- */}
         <Section title="Releases" description="Only signed packages that passed artifact inspection can be downloaded.">
+          {isStaff && (
+            <div className="mb-4 grid gap-2 md:grid-cols-4">
+              <Input
+                placeholder="Version (1.0.0)"
+                value={releaseForm.version}
+                onChange={(e) => setReleaseForm({ ...releaseForm, version: e.target.value })}
+              />
+              <Input
+                placeholder="Build id"
+                value={releaseForm.buildId}
+                onChange={(e) => setReleaseForm({ ...releaseForm, buildId: e.target.value })}
+              />
+              <Input
+                placeholder="Artifact path in release storage"
+                value={releaseForm.artifactPath}
+                onChange={(e) => setReleaseForm({ ...releaseForm, artifactPath: e.target.value })}
+              />
+              <Button
+                variant="outline"
+                disabled={!releaseForm.version || !releaseForm.buildId || !releaseForm.artifactPath}
+                onClick={() =>
+                  run(
+                    () => publishRelease({ data: { ...releaseForm } }),
+                    "Release inspected, signed and published.",
+                  )
+                }
+              >
+                Publish release
+              </Button>
+            </div>
+          )}
           {!releases.length ? (
             <EmptyState icon={KeyRound} title="No releases yet" description="Package and publish a build to make it downloadable." />
           ) : (
