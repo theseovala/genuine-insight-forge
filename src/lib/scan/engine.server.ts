@@ -795,6 +795,27 @@ export async function runScan(admin: SupabaseClient, scanId: string): Promise<Ru
 
   await audit(admin, scan.workspace_id, `scan.${status}`, scanId, { score, findings: allFindings.length, reused, warnings });
 
+  // Real notification from the actual outcome — no notification is written
+  // unless the scan reached one of these terminal states.
+  await admin.from("notifications").insert({
+    workspace_id: scan.workspace_id,
+    user_id: scan.requested_by ?? null,
+    type: status === "failed" ? "scan_failed" : "scan_completed",
+    severity: status === "failed" ? "critical" : status === "completed_with_warnings" ? "warning" : "success",
+    title:
+      status === "failed"
+        ? `Scan failed for ${scan.target_domain}`
+        : status === "completed_with_warnings"
+          ? `Scan completed with warnings for ${scan.target_domain}`
+          : `Scan completed for ${scan.target_domain}`,
+    message:
+      status === "failed"
+        ? "No data source could be reached for this address."
+        : `Score ${score}/100 · ${allFindings.length} findings${warnings.length ? ` · failed checks: ${warnings.join(", ")}` : ""}`,
+    entity_type: "scan",
+    entity_id: scanId,
+  });
+
   return {
     status,
     score,
