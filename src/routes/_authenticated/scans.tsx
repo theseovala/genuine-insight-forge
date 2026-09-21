@@ -307,18 +307,26 @@ function ScansPage() {
                 {data.findings.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No issues were detected in what could be measured.</p>
                 ) : (
-                  <ul className="space-y-2">
+                  <ul className="stagger space-y-2">
                     {[...data.findings]
                       .sort((a: any, b: any) => b.impact - a.impact)
                       .map((finding: any) => (
-                        <li key={finding.code} className="rounded-lg border border-border">
+                        <li
+                          key={finding.code}
+                          className={cn(
+                            "card-interactive overflow-hidden rounded-lg border border-border",
+                            openFinding === finding.code && "edge-illuminate",
+                          )}
+                        >
                           <button
                             type="button"
-                            className="flex w-full items-start gap-3 px-3 py-2 text-left"
+                            className="press flex w-full items-start gap-3 px-3 py-2 text-left"
                             aria-expanded={openFinding === finding.code}
                             onClick={() => setOpenFinding(openFinding === finding.code ? null : finding.code)}
                           >
-                            <AlertTriangle className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                            <span className="icon-tile mt-0.5">
+                              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                            </span>
                             <span className="min-w-0 flex-1">
                               <span className="block text-sm font-medium">{finding.title}</span>
                               <span className="block text-xs text-muted-foreground">{finding.detail}</span>
@@ -329,7 +337,7 @@ function ScansPage() {
                             <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform", openFinding === finding.code && "rotate-180")} />
                           </button>
                           {openFinding === finding.code ? (
-                            <div className="border-t border-border px-3 py-2 text-xs text-muted-foreground">
+                            <div className="animate-fade-in border-t border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
                               {finding.recommendation ? <p className="mb-2 text-foreground">Recommendation: {finding.recommendation}</p> : null}
                               <p>Source: {SOURCE_LABEL[finding.source] ?? finding.source} · Confidence: {finding.evidence?.confidence ?? "measured"} · Impact: -{finding.impact}</p>
                               <pre className="mt-2 max-h-48 overflow-auto rounded-md bg-muted/60 p-2 text-[11px]">{JSON.stringify(finding.evidence ?? {}, null, 2)}</pre>
