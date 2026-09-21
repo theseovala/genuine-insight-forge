@@ -21,6 +21,9 @@ import type { IntegrationDefinition } from "@/lib/integrations/registry";
 
 import { integrationStatusLabel as statusLabel, integrationStatusTone as statusTone } from "@/lib/integrations/status";
 import { GoogleBusinessSetupGuide, GoogleMapsSetupGuide } from "@/components/app/GoogleSetupGuide";
+import { ProviderSetupGuide } from "@/components/app/ProviderSetupGuide";
+
+const GUIDED_PROVIDERS = new Set(["facebook", "trustpilot", "semrush"]);
 
 function openAuthorization(url: string) {
   const popup = window.open(url, "_blank", "noopener,noreferrer");
@@ -409,6 +412,16 @@ export function IntegrationManager() {
                     <GoogleMapsSetupGuide
                       credentialsReady={(item?.credentials ?? []).some((c) => c.masked || c.fromEnvironment)}
                       verified={status === "connected"}
+                      onChanged={refresh}
+                    />
+                  )}
+
+                  {isAdmin && GUIDED_PROVIDERS.has(definition.id) && (
+                    <ProviderSetupGuide
+                      definition={definition}
+                      credentialsReady={(item?.credentials ?? []).some((c) => c.masked || c.fromEnvironment)}
+                      verified={status === "connected"}
+                      accountRef={item?.accountRef ?? null}
                       onChanged={refresh}
                     />
                   )}
