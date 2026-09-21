@@ -12,6 +12,9 @@ import {
   XCircle,
   Clock,
   Trash2,
+  Pause,
+  Play,
+  Ban,
 } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { PageHeader, Section, EmptyState } from "@/components/app/primitives";
@@ -20,7 +23,17 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { createScan, runScanNow, listScans, getScan, exportScanCsv, deleteScan } from "@/lib/scan.functions";
+import {
+  createScan,
+  runScanNow,
+  listScans,
+  getScan,
+  exportScanCsv,
+  deleteScan,
+  pauseScan,
+  resumeScan,
+  cancelScan,
+} from "@/lib/scan.functions";
 
 export const Route = createFileRoute("/_authenticated/scans")({
   head: () => ({
@@ -78,7 +91,7 @@ function ScansPage() {
     enabled: Boolean(activeId),
     refetchInterval: (query) => {
       const status = (query.state.data as any)?.scan?.status;
-      return status === "queued" || status === "running" ? 4000 : false;
+      return status === "queued" || status === "running" || status === "retrying" ? 3000 : false;
     },
   });
 
@@ -97,7 +110,10 @@ function ScansPage() {
         .catch((error: Error) => toast.error(error.message));
       return created;
     },
-    onSuccess: () => toast.success("Scan started — results appear as each source answers"),
+    onSuccess: (created: any) =>
+      created?.reused
+        ? toast.info("A scan for this address is already running — showing it")
+        : toast.success("Scan started — results appear as each source answers"),
     onError: (error: Error) => toast.error(error.message),
   });
 
@@ -134,6 +150,38 @@ function ScansPage() {
       link.download = result.filename;
       link.click();
       URL.revokeObjectURL(link.href);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const refreshScan = () => {
+    queryClient.invalidateQueries({ queryKey: ["scans"] });
+    queryClient.invalidateQueries({ queryKey: ["scan"] });
+  };
+
+  const pause = useMutation({
+    mutationFn: (id: string) => pauseScan({ data: { id } }),
+    onSuccess: () => {
+      toast.success("Scan paused after the current stage");
+      refreshScan();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const resume = useMutation({
+    mutationFn: (id: string) => resumeScan({ data: { id } }),
+    onSuccess: () => {
+      toast.success("Scan resumed");
+      refreshScan();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const stop = useMutation({
+    mutationFn: (id: string) => cancelScan({ data: { id } }),
+    onSuccess: () => {
+      toast.success("Scan cancelled");
+      refreshScan();
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -218,7 +266,23 @@ function ScansPage() {
                 title={data.scan.target_domain}
                 description={`${data.scan.status} · ${data.scan.score === null ? "Score unavailable" : `Score ${data.scan.score}/100`}`}
                 action={
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    {["queued", "running", "retrying"].includes(data.scan.status) ? (
+                      <>
+                        <Button variant="outline" size="sm" onClick={() => pause.mutate(data.scan.id)} disabled={pause.isPending}>
+                          {pause.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pause className="h-4 w-4" />} Pause
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => stop.mutate(data.scan.id)} disabled={stop.isPending}>
+                          {stop.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4" />} Cancel
+                        </Button>
+                      </>
+                    ) : null}
+                    {["paused", "failed", "cancelled"].includes(data.scan.status) ? (
+                      <Button variant="outline" size="sm" onClick={() => resume.mutate(data.scan.id)} disabled={resume.isPending}>
+                        {resume.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                        {data.scan.status === "paused" ? "Resume" : "Retry"}
+                      </Button>
+                    ) : null}
                     <Button variant="outline" size="sm" onClick={() => rescan.mutate(data.scan.target_url)} disabled={busy}>
                       {rescan.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Re-scan
                     </Button>
@@ -245,6 +309,42 @@ function ScansPage() {
                 </p>
                 {data.report?.model ? <p className="mt-2 text-xs text-muted-foreground">Analysed by {data.report.model}</p> : null}
               </Section>
+
+              {(data.stages ?? []).length > 0 ? (
+                <Section
+                  title="Scan progress"
+                  description="Each step is recorded by the engine itself, so it survives a page refresh."
+                >
+                  <ul className="space-y-1.5">
+                    {(data.stages as any[]).map((item) => (
+                      <li key={item.stage} className="flex items-start gap-2 text-sm">
+                        <span className="icon-tile mt-0.5">
+                          {item.status === "completed" ? (
+                            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                          ) : item.status === "running" ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                          ) : item.status === "failed" ? (
+                            <XCircle className="h-4 w-4 text-destructive" />
+                          ) : (
+                            <Clock className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block font-medium">{item.label}</span>
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {item.detail ??
+                              (item.status === "pending"
+                                ? "Waiting"
+                                : item.status === "running"
+                                  ? "In progress"
+                                  : item.status)}
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </Section>
+              ) : null}
 
               <Section title="Scan health" description="Every source that was contacted, with what it returned.">
                 <ul className="stagger grid gap-2 sm:grid-cols-2">
