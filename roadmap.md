@@ -164,3 +164,15 @@
 - [x] Non-admin account: no clients, no licences, no releases, admin list denied, create denied
 - [x] Scan -> report -> CSV regression passed (basecamp.com 83/100, 8 findings, 23 evidence, 82-line CSV)
 - [ ] Backup/restore drill (needs owner decision on backup target)
+
+## Prompt 3/4 — Functional wiring + button audit (current)
+- [ ] Full button/action audit: every button, row action, tab, form submit → real server fn + DB change
+- [ ] Global action states: loading, disabled, double-click protection, error normalisation
+- [ ] Scan flow: start/cancel/retry/refresh/view partial from real backend state only
+- [ ] Report actions: filter, search, compare, export CSV, copy finding, view evidence, recheck, mark resolved, ignore
+- [ ] AI actions: analyze/explain/prioritize/compare/action plan/recheck reusing existing AI gateway only
+- [ ] Integration actions per provider: connect, select resource, test, sync, reconnect, disconnect + honest statuses
+- [ ] Business/location actions wired to businesses + business_domains
+- [ ] Notifications + language preference + support buttons from stored settings
+- [ ] Filters, pagination, state invalidation after every mutation, controlled polling
+- [ ] Final end-to-end functional test with real data
