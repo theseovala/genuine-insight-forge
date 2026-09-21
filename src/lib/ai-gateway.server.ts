@@ -102,6 +102,10 @@ export async function runAiText(system: string, prompt: string): Promise<AiTextR
     return { output, model, provider, latencyMs: Date.now() - started, inputTokens, outputTokens };
   };
 
+  // Hard ceiling per attempt: without it a hanging provider stream can keep a
+  // scan in the "ai" stage until the 15-minute stale-scan backstop fires.
+  const AI_TIMEOUT_MS = 120_000;
+
   const gatewayStarted = Date.now();
   try {
     const { provider } = createGateway();
@@ -109,6 +113,7 @@ export async function runAiText(system: string, prompt: string): Promise<AiTextR
       model: provider.responses(AI_MODEL),
       system,
       prompt,
+      abortSignal: AbortSignal.timeout(AI_TIMEOUT_MS),
       providerOptions: { openai: { ...REASONING_OPTIONS } },
     });
     return await finish(result, AI_MODEL, "lovable_ai", gatewayStarted);
@@ -124,6 +129,7 @@ export async function runAiText(system: string, prompt: string): Promise<AiTextR
         model: openai.responses(FALLBACK_MODEL),
         system,
         prompt,
+        abortSignal: AbortSignal.timeout(AI_TIMEOUT_MS),
         providerOptions: { openai: { store: false } },
       });
       return await finish(result, FALLBACK_MODEL, "openai", started);
@@ -135,7 +141,12 @@ export async function runAiText(system: string, prompt: string): Promise<AiTextR
   const anthropic = await createDirectAnthropic();
   if (anthropic) {
     const started = Date.now();
-    const result = streamText({ model: anthropic(CLAUDE_MODEL), system, prompt });
+    const result = streamText({
+      model: anthropic(CLAUDE_MODEL),
+      system,
+      prompt,
+      abortSignal: AbortSignal.timeout(AI_TIMEOUT_MS),
+    });
     return await finish(result, CLAUDE_MODEL, "anthropic", started);
   }
 

@@ -13,7 +13,10 @@ export const getGoogleBusinessConnection = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const member = await workspace(context);
-    const { data, error } = await context.supabase.from("google_business_connections").select("google_account_email,status,last_synced_at,last_error").eq("workspace_id", member.workspace_id).maybeSingle();
+    // Token ciphertext is owner/admin-only at the database level, so this status read
+    // runs server-side after membership has already been verified above.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin.from("google_business_connections").select("google_account_email,status,last_synced_at,last_error").eq("workspace_id", member.workspace_id).maybeSingle();
     if (error) throw error;
     return {
       configured: Boolean(process.env["GOOGLE_BUSINESS_CLIENT_ID"] && process.env["GOOGLE_BUSINESS_CLIENT_SECRET"]),
@@ -54,10 +57,10 @@ export const syncGoogleBusinessReviews = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const member = await workspace(context);
-    const { data: connection, error } = await context.supabase.from("google_business_connections").select("access_token_ciphertext,refresh_token_ciphertext,token_expires_at,status").eq("workspace_id", member.workspace_id).maybeSingle();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: connection, error } = await supabaseAdmin.from("google_business_connections").select("access_token_ciphertext,refresh_token_ciphertext,token_expires_at,status").eq("workspace_id", member.workspace_id).maybeSingle();
     if (error) throw error;
     if (!connection || connection.status !== "connected") throw new Error("Connect Google Business Profile first.");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { fetchGoogleReviews, usableAccessToken } = await import("./google-business-sync.server");
     const { data: run, error: runError } = await context.supabase.from("sync_runs").insert({ workspace_id: member.workspace_id, platform: "google" }).select("id").single();
     if (runError) throw runError;
