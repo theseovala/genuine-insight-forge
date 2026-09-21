@@ -279,6 +279,84 @@ export type Database = {
           },
         ]
       }
+      business_facts: {
+        Row: {
+          changed_at: string | null
+          confidence: string
+          created_at: string
+          domain: string
+          external_id: string | null
+          field_key: string
+          id: string
+          last_verified_at: string
+          previous_value: string | null
+          retrieved_at: string
+          scan_id: string | null
+          source_provider: string
+          source_type: string
+          source_url: string | null
+          updated_at: string
+          value_normalized: string
+          value_raw: string | null
+          workspace_id: string
+        }
+        Insert: {
+          changed_at?: string | null
+          confidence?: string
+          created_at?: string
+          domain: string
+          external_id?: string | null
+          field_key: string
+          id?: string
+          last_verified_at?: string
+          previous_value?: string | null
+          retrieved_at?: string
+          scan_id?: string | null
+          source_provider: string
+          source_type: string
+          source_url?: string | null
+          updated_at?: string
+          value_normalized: string
+          value_raw?: string | null
+          workspace_id: string
+        }
+        Update: {
+          changed_at?: string | null
+          confidence?: string
+          created_at?: string
+          domain?: string
+          external_id?: string | null
+          field_key?: string
+          id?: string
+          last_verified_at?: string
+          previous_value?: string | null
+          retrieved_at?: string
+          scan_id?: string | null
+          source_provider?: string
+          source_type?: string
+          source_url?: string | null
+          updated_at?: string
+          value_normalized?: string
+          value_raw?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_facts_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_facts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       competitors: {
         Row: {
           created_at: string
@@ -375,6 +453,139 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "connected_platforms_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      data_conflicts: {
+        Row: {
+          created_at: string
+          detected_at: string
+          domain: string
+          field_key: string
+          id: string
+          observed_a_at: string
+          observed_b_at: string
+          resolved_at: string | null
+          scan_id: string | null
+          source_a: string
+          source_b: string
+          status: string
+          updated_at: string
+          value_a: string
+          value_b: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          detected_at?: string
+          domain: string
+          field_key: string
+          id?: string
+          observed_a_at: string
+          observed_b_at: string
+          resolved_at?: string | null
+          scan_id?: string | null
+          source_a: string
+          source_b: string
+          status?: string
+          updated_at?: string
+          value_a: string
+          value_b: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          detected_at?: string
+          domain?: string
+          field_key?: string
+          id?: string
+          observed_a_at?: string
+          observed_b_at?: string
+          resolved_at?: string | null
+          scan_id?: string | null
+          source_a?: string
+          source_b?: string
+          status?: string
+          updated_at?: string
+          value_a?: string
+          value_b?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_conflicts_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_conflicts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finding_evidence: {
+        Row: {
+          created_at: string
+          finding_id: string
+          id: string
+          observed_at: string
+          reference: string | null
+          scan_id: string
+          source: string
+          source_type: string
+          value: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          finding_id: string
+          id?: string
+          observed_at?: string
+          reference?: string | null
+          scan_id: string
+          source: string
+          source_type: string
+          value: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          finding_id?: string
+          id?: string
+          observed_at?: string
+          reference?: string | null
+          scan_id?: string
+          source?: string
+          source_type?: string
+          value?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finding_evidence_finding_id_fkey"
+            columns: ["finding_id"]
+            isOneToOne: false
+            referencedRelation: "scan_findings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finding_evidence_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finding_evidence_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
