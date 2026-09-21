@@ -112,6 +112,8 @@ function SourceIcon({ status }: { status: string }) {
   return <XCircle className="h-4 w-4 text-destructive" />;
 }
 
+const FINDING_FILTERS = ["all", "critical", "high", "medium", "low", "open", "resolved", "new", "changed"] as const;
+
 
 function ScansPage() {
   const queryClient = useQueryClient();
