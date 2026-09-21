@@ -100,3 +100,35 @@
 - [x] SERP provider (SerpApi) + YouTube Analytics OAuth provider
 - [x] Integration overview panel (connected / pending / auth errors / expiry / approval-required / 24h API errors + audit log) from real rows
 - [ ] Provider-sourced usage + rate-limit extraction during sync (needs configured provider keys)
+
+## Production Control Center + Observability (current)
+- [ ] Master system health dashboard (real checks: DB, queue, workers, AI, crawler, integrations, report/CSV engines)
+- [ ] Scan monitoring table with real View/Retry/Resume/Cancel/Re-run
+- [ ] Job queue monitoring + stuck/STALLED job detection and safe recovery
+- [ ] API monitoring + provider health (latency, failure rate, auth/rate-limit state)
+- [ ] AI health (provider, model, success/failure, latency, fallback, tokens)
+- [ ] Error center + separate security events feed
+- [ ] Audit log view with actor/action/resource
+- [ ] Log correlation IDs (request/scan/job/integration/workspace)
+- [ ] Circuit breaker + provider-aware rate limiting in the gateway
+- [ ] Data freshness monitoring; system performance timings
+- [ ] Admin debug view per scan (timeline, provider calls, errors, retries, AI, report)
+- [ ] Confirmation + server-side authorization on destructive operations
+
+## License, Source Protection & Secure Deployment (current)
+- [ ] License authority schema: clients, license_plans, licenses, license_features, license_activations, installations, license_domains, download_tokens, download_events, license_events, license_validations, license_revocations, license_transfers (RLS + grants + tenant isolation)
+- [ ] Immutable non-sequential license IDs (SVL-XXXX-XXXX-XXXX)
+- [ ] License states: pending/active/suspended/expired/revoked/cancelled/transfer_pending — enforced server-side
+- [ ] Domain lock + installation binding (server fingerprint, no device data)
+- [ ] Backend-to-backend validation endpoint (signed requests, minimal response, replay + rate limiting)
+- [ ] Platform roles: owner/super_admin/security_admin/tech_lead/developer/qa/support (DB-backed, least privilege)
+- [ ] TOTP MFA (encrypted secrets, recovery codes) + step-up auth for sensitive operations
+- [ ] Releases + checksums + signatures; artifact inspection before release
+- [ ] Short-lived single-use download tokens + secure download route + download audit
+- [ ] Update authorization endpoint (version compatibility, signed update metadata)
+- [ ] Tamper/abuse detection → deny + record security event, never destructive
+- [ ] Offline grace: signed license cache with expiry + bindings, bounded
+- [ ] License Admin Panel (licenses, clients, installations, domains, downloads, releases, security events, audit, MFA, access control)
+- [ ] Client Portal (own license/installation/version/updates/download history only)
+- [ ] Security test pass: wrong/expired/suspended/revoked license, wrong domain/installation, duplicate install, invalid/expired/replayed token, failed MFA, brute force, cross-client access, direct API access
+- [ ] Regression: Scan → Report → CSV unchanged

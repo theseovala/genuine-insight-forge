@@ -592,7 +592,19 @@ function ScansPage() {
                                 Source: {SOURCE_LABEL[finding.source] ?? finding.source} · Confidence: {finding.confidence ?? "measured"} · Impact: -{finding.impact}
                                 {finding.priority_score ? ` · Priority score: ${Number(finding.priority_score).toFixed(1)}` : ""} · Status: {finding.status ?? "open"}
                               </p>
-                              <pre className="mt-2 max-h-48 overflow-auto rounded-md bg-muted/60 p-2 text-[11px]">{JSON.stringify(finding.evidence ?? {}, null, 2)}</pre>
+                              {finding.evidenceRecords?.length ? (
+                                <div className="mt-2 space-y-1">
+                                  <p className="text-[11px] font-medium uppercase text-foreground">Evidence ({finding.evidenceRecords.length})</p>
+                                  {finding.evidenceRecords.map((record: any, index: number) => (
+                                    <p key={`${record.sourceType}-${index}`} className="break-words rounded-md bg-muted/60 px-2 py-1 text-[11px]">
+                                      <span className="text-foreground">{record.sourceType.replace(/_/g, " ")}:</span> {record.value}
+                                      <span className="text-muted-foreground"> · {SOURCE_LABEL[record.source] ?? record.source} · observed {new Date(record.observedAt).toLocaleString()}</span>
+                                    </p>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="mt-2 text-[11px]">No separate evidence record was stored for this finding.</p>
+                              )}
                             </div>
                           ) : null}
                         </li>
@@ -601,6 +613,74 @@ function ScansPage() {
                   );
                 })()}
               </Section>
+
+              <Section
+                title={`Source conflicts (${(data.conflicts ?? []).filter((row: any) => row.status === "open").length} open)`}
+                description="Where two sources disagree about the same detail. Neither value is chosen automatically."
+              >
+                {(data.conflicts ?? []).length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No disagreement was found between the sources that could be read.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {(data.conflicts as any[]).map((row) => (
+                      <li key={`${row.field_key}-${row.source_a}-${row.source_b}`} className="rounded-lg border border-border px-3 py-2 text-xs">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-medium capitalize">{row.field_key.replace(/_/g, " ")}</span>
+                          <Badge variant="outline" className="h-5 px-1.5 text-[10px] uppercase">
+                            {row.status}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 break-words text-muted-foreground">
+                          {row.source_a}: <span className="text-foreground">{row.value_a}</span> · observed {new Date(row.observed_a_at).toLocaleString()}
+                        </p>
+                        <p className="break-words text-muted-foreground">
+                          {row.source_b}: <span className="text-foreground">{row.value_b}</span> · observed {new Date(row.observed_b_at).toLocaleString()}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Section>
+
+              <Section
+                title={`Verified business details (${(data.facts ?? []).length})`}
+                description="One canonical record per detail and source, with the origin, confidence and last verification kept."
+              >
+                {(data.facts ?? []).length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No business detail could be read from the available sources.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-xs uppercase text-muted-foreground">
+                          <th className="py-1 pr-3">Detail</th>
+                          <th className="py-1 pr-3">Value</th>
+                          <th className="py-1 pr-3">Source</th>
+                          <th className="py-1 pr-3">Confidence</th>
+                          <th className="py-1">Last verified</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(data.facts as any[]).map((fact) => (
+                          <tr key={`${fact.field_key}-${fact.source_provider}`} className="border-t border-border/60 align-top">
+                            <td className="py-1 pr-3 capitalize text-muted-foreground">{fact.field_key.replace(/_/g, " ")}</td>
+                            <td className="max-w-[22rem] break-words py-1 pr-3">
+                              {fact.value_raw ?? fact.value_normalized}
+                              {fact.previous_value ? (
+                                <span className="block text-[11px] text-muted-foreground">was: {fact.previous_value}</span>
+                              ) : null}
+                            </td>
+                            <td className="py-1 pr-3 text-muted-foreground">{fact.source_provider}</td>
+                            <td className="py-1 pr-3 uppercase text-muted-foreground">{fact.confidence}</td>
+                            <td className="py-1 text-muted-foreground">{new Date(fact.last_verified_at).toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Section>
+
 
 
               <Section title={`Measurements (${data.metrics.length})`} description="Normalized values taken straight from the collected data.">

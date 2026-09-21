@@ -19,6 +19,7 @@ import { Route as AuthenticatedCompetitorsRouteImport } from './routes/_authenti
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedFeedbackRouteImport } from './routes/_authenticated/feedback'
 import { Route as AuthenticatedIntegrationsRouteImport } from './routes/_authenticated/integrations'
+import { Route as AuthenticatedLicensingRouteImport } from './routes/_authenticated/licensing'
 import { Route as AuthenticatedLocationsRouteImport } from './routes/_authenticated/locations'
 import { Route as AuthenticatedRemovalsRouteImport } from './routes/_authenticated/removals'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
@@ -26,11 +27,16 @@ import { Route as AuthenticatedResponsesRouteImport } from './routes/_authentica
 import { Route as AuthenticatedReviewsRouteImport } from './routes/_authenticated/reviews'
 import { Route as AuthenticatedScansRouteImport } from './routes/_authenticated/scans'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedSystemRouteImport } from './routes/_authenticated/system'
 import { Route as ApiPublicRemovalScanRouteImport } from './routes/api/public/removal-scan'
 import { Route as ApiPublicGoogleBusinessCallbackRouteImport } from './routes/api/public/google-business/callback'
 import { Route as ApiPublicIntegrationsCallbackRouteImport } from './routes/api/public/integrations/callback'
 import { Route as ApiPublicIntegrationsJobsRunRouteImport } from './routes/api/public/integrations/jobs-run'
 import { Route as ApiPublicIntegrationsWebhookRouteImport } from './routes/api/public/integrations/webhook'
+import { Route as ApiPublicLicenseActivateRouteImport } from './routes/api/public/license/activate'
+import { Route as ApiPublicLicenseDownloadRouteImport } from './routes/api/public/license/download'
+import { Route as ApiPublicLicenseUpdateCheckRouteImport } from './routes/api/public/license/update-check'
+import { Route as ApiPublicLicenseValidateRouteImport } from './routes/api/public/license/validate'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -83,6 +89,11 @@ const AuthenticatedIntegrationsRoute =
     path: '/integrations',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedLicensingRoute = AuthenticatedLicensingRouteImport.update({
+  id: '/licensing',
+  path: '/licensing',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedLocationsRoute = AuthenticatedLocationsRouteImport.update({
   id: '/locations',
   path: '/locations',
@@ -118,6 +129,11 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSystemRoute = AuthenticatedSystemRouteImport.update({
+  id: '/system',
+  path: '/system',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const ApiPublicRemovalScanRoute = ApiPublicRemovalScanRouteImport.update({
   id: '/api/public/removal-scan',
   path: '/api/public/removal-scan',
@@ -147,6 +163,30 @@ const ApiPublicIntegrationsWebhookRoute =
     path: '/api/public/integrations/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicLicenseActivateRoute =
+  ApiPublicLicenseActivateRouteImport.update({
+    id: '/api/public/license/activate',
+    path: '/api/public/license/activate',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicLicenseDownloadRoute =
+  ApiPublicLicenseDownloadRouteImport.update({
+    id: '/api/public/license/download',
+    path: '/api/public/license/download',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicLicenseUpdateCheckRoute =
+  ApiPublicLicenseUpdateCheckRouteImport.update({
+    id: '/api/public/license/update-check',
+    path: '/api/public/license/update-check',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicLicenseValidateRoute =
+  ApiPublicLicenseValidateRouteImport.update({
+    id: '/api/public/license/validate',
+    path: '/api/public/license/validate',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -158,6 +198,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/feedback': typeof AuthenticatedFeedbackRoute
   '/integrations': typeof AuthenticatedIntegrationsRoute
+  '/licensing': typeof AuthenticatedLicensingRoute
   '/locations': typeof AuthenticatedLocationsRoute
   '/removals': typeof AuthenticatedRemovalsRoute
   '/reports': typeof AuthenticatedReportsRoute
@@ -165,11 +206,16 @@ export interface FileRoutesByFullPath {
   '/reviews': typeof AuthenticatedReviewsRoute
   '/scans': typeof AuthenticatedScansRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/system': typeof AuthenticatedSystemRoute
   '/api/public/removal-scan': typeof ApiPublicRemovalScanRoute
   '/api/public/google-business/callback': typeof ApiPublicGoogleBusinessCallbackRoute
   '/api/public/integrations/callback': typeof ApiPublicIntegrationsCallbackRoute
   '/api/public/integrations/jobs-run': typeof ApiPublicIntegrationsJobsRunRoute
   '/api/public/integrations/webhook': typeof ApiPublicIntegrationsWebhookRoute
+  '/api/public/license/activate': typeof ApiPublicLicenseActivateRoute
+  '/api/public/license/download': typeof ApiPublicLicenseDownloadRoute
+  '/api/public/license/update-check': typeof ApiPublicLicenseUpdateCheckRoute
+  '/api/public/license/validate': typeof ApiPublicLicenseValidateRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -181,6 +227,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/feedback': typeof AuthenticatedFeedbackRoute
   '/integrations': typeof AuthenticatedIntegrationsRoute
+  '/licensing': typeof AuthenticatedLicensingRoute
   '/locations': typeof AuthenticatedLocationsRoute
   '/removals': typeof AuthenticatedRemovalsRoute
   '/reports': typeof AuthenticatedReportsRoute
@@ -188,11 +235,16 @@ export interface FileRoutesByTo {
   '/reviews': typeof AuthenticatedReviewsRoute
   '/scans': typeof AuthenticatedScansRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/system': typeof AuthenticatedSystemRoute
   '/api/public/removal-scan': typeof ApiPublicRemovalScanRoute
   '/api/public/google-business/callback': typeof ApiPublicGoogleBusinessCallbackRoute
   '/api/public/integrations/callback': typeof ApiPublicIntegrationsCallbackRoute
   '/api/public/integrations/jobs-run': typeof ApiPublicIntegrationsJobsRunRoute
   '/api/public/integrations/webhook': typeof ApiPublicIntegrationsWebhookRoute
+  '/api/public/license/activate': typeof ApiPublicLicenseActivateRoute
+  '/api/public/license/download': typeof ApiPublicLicenseDownloadRoute
+  '/api/public/license/update-check': typeof ApiPublicLicenseUpdateCheckRoute
+  '/api/public/license/validate': typeof ApiPublicLicenseValidateRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -206,6 +258,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/feedback': typeof AuthenticatedFeedbackRoute
   '/_authenticated/integrations': typeof AuthenticatedIntegrationsRoute
+  '/_authenticated/licensing': typeof AuthenticatedLicensingRoute
   '/_authenticated/locations': typeof AuthenticatedLocationsRoute
   '/_authenticated/removals': typeof AuthenticatedRemovalsRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
@@ -213,11 +266,16 @@ export interface FileRoutesById {
   '/_authenticated/reviews': typeof AuthenticatedReviewsRoute
   '/_authenticated/scans': typeof AuthenticatedScansRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/system': typeof AuthenticatedSystemRoute
   '/api/public/removal-scan': typeof ApiPublicRemovalScanRoute
   '/api/public/google-business/callback': typeof ApiPublicGoogleBusinessCallbackRoute
   '/api/public/integrations/callback': typeof ApiPublicIntegrationsCallbackRoute
   '/api/public/integrations/jobs-run': typeof ApiPublicIntegrationsJobsRunRoute
   '/api/public/integrations/webhook': typeof ApiPublicIntegrationsWebhookRoute
+  '/api/public/license/activate': typeof ApiPublicLicenseActivateRoute
+  '/api/public/license/download': typeof ApiPublicLicenseDownloadRoute
+  '/api/public/license/update-check': typeof ApiPublicLicenseUpdateCheckRoute
+  '/api/public/license/validate': typeof ApiPublicLicenseValidateRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -231,6 +289,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/feedback'
     | '/integrations'
+    | '/licensing'
     | '/locations'
     | '/removals'
     | '/reports'
@@ -238,11 +297,16 @@ export interface FileRouteTypes {
     | '/reviews'
     | '/scans'
     | '/settings'
+    | '/system'
     | '/api/public/removal-scan'
     | '/api/public/google-business/callback'
     | '/api/public/integrations/callback'
     | '/api/public/integrations/jobs-run'
     | '/api/public/integrations/webhook'
+    | '/api/public/license/activate'
+    | '/api/public/license/download'
+    | '/api/public/license/update-check'
+    | '/api/public/license/validate'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -254,6 +318,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/feedback'
     | '/integrations'
+    | '/licensing'
     | '/locations'
     | '/removals'
     | '/reports'
@@ -261,11 +326,16 @@ export interface FileRouteTypes {
     | '/reviews'
     | '/scans'
     | '/settings'
+    | '/system'
     | '/api/public/removal-scan'
     | '/api/public/google-business/callback'
     | '/api/public/integrations/callback'
     | '/api/public/integrations/jobs-run'
     | '/api/public/integrations/webhook'
+    | '/api/public/license/activate'
+    | '/api/public/license/download'
+    | '/api/public/license/update-check'
+    | '/api/public/license/validate'
   id:
     | '__root__'
     | '/'
@@ -278,6 +348,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/feedback'
     | '/_authenticated/integrations'
+    | '/_authenticated/licensing'
     | '/_authenticated/locations'
     | '/_authenticated/removals'
     | '/_authenticated/reports'
@@ -285,11 +356,16 @@ export interface FileRouteTypes {
     | '/_authenticated/reviews'
     | '/_authenticated/scans'
     | '/_authenticated/settings'
+    | '/_authenticated/system'
     | '/api/public/removal-scan'
     | '/api/public/google-business/callback'
     | '/api/public/integrations/callback'
     | '/api/public/integrations/jobs-run'
     | '/api/public/integrations/webhook'
+    | '/api/public/license/activate'
+    | '/api/public/license/download'
+    | '/api/public/license/update-check'
+    | '/api/public/license/validate'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -302,6 +378,10 @@ export interface RootRouteChildren {
   ApiPublicIntegrationsCallbackRoute: typeof ApiPublicIntegrationsCallbackRoute
   ApiPublicIntegrationsJobsRunRoute: typeof ApiPublicIntegrationsJobsRunRoute
   ApiPublicIntegrationsWebhookRoute: typeof ApiPublicIntegrationsWebhookRoute
+  ApiPublicLicenseActivateRoute: typeof ApiPublicLicenseActivateRoute
+  ApiPublicLicenseDownloadRoute: typeof ApiPublicLicenseDownloadRoute
+  ApiPublicLicenseUpdateCheckRoute: typeof ApiPublicLicenseUpdateCheckRoute
+  ApiPublicLicenseValidateRoute: typeof ApiPublicLicenseValidateRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -376,6 +456,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIntegrationsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/licensing': {
+      id: '/_authenticated/licensing'
+      path: '/licensing'
+      fullPath: '/licensing'
+      preLoaderRoute: typeof AuthenticatedLicensingRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/locations': {
       id: '/_authenticated/locations'
       path: '/locations'
@@ -425,6 +512,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/system': {
+      id: '/_authenticated/system'
+      path: '/system'
+      fullPath: '/system'
+      preLoaderRoute: typeof AuthenticatedSystemRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/api/public/removal-scan': {
       id: '/api/public/removal-scan'
       path: '/api/public/removal-scan'
@@ -460,6 +554,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicIntegrationsWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/license/activate': {
+      id: '/api/public/license/activate'
+      path: '/api/public/license/activate'
+      fullPath: '/api/public/license/activate'
+      preLoaderRoute: typeof ApiPublicLicenseActivateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/license/download': {
+      id: '/api/public/license/download'
+      path: '/api/public/license/download'
+      fullPath: '/api/public/license/download'
+      preLoaderRoute: typeof ApiPublicLicenseDownloadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/license/update-check': {
+      id: '/api/public/license/update-check'
+      path: '/api/public/license/update-check'
+      fullPath: '/api/public/license/update-check'
+      preLoaderRoute: typeof ApiPublicLicenseUpdateCheckRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/license/validate': {
+      id: '/api/public/license/validate'
+      path: '/api/public/license/validate'
+      fullPath: '/api/public/license/validate'
+      preLoaderRoute: typeof ApiPublicLicenseValidateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -470,6 +592,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFeedbackRoute: typeof AuthenticatedFeedbackRoute
   AuthenticatedIntegrationsRoute: typeof AuthenticatedIntegrationsRoute
+  AuthenticatedLicensingRoute: typeof AuthenticatedLicensingRoute
   AuthenticatedLocationsRoute: typeof AuthenticatedLocationsRoute
   AuthenticatedRemovalsRoute: typeof AuthenticatedRemovalsRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
@@ -477,6 +600,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedReviewsRoute: typeof AuthenticatedReviewsRoute
   AuthenticatedScansRoute: typeof AuthenticatedScansRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedSystemRoute: typeof AuthenticatedSystemRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -486,6 +610,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFeedbackRoute: AuthenticatedFeedbackRoute,
   AuthenticatedIntegrationsRoute: AuthenticatedIntegrationsRoute,
+  AuthenticatedLicensingRoute: AuthenticatedLicensingRoute,
   AuthenticatedLocationsRoute: AuthenticatedLocationsRoute,
   AuthenticatedRemovalsRoute: AuthenticatedRemovalsRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
@@ -493,6 +618,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedReviewsRoute: AuthenticatedReviewsRoute,
   AuthenticatedScansRoute: AuthenticatedScansRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedSystemRoute: AuthenticatedSystemRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -508,6 +634,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicIntegrationsCallbackRoute: ApiPublicIntegrationsCallbackRoute,
   ApiPublicIntegrationsJobsRunRoute: ApiPublicIntegrationsJobsRunRoute,
   ApiPublicIntegrationsWebhookRoute: ApiPublicIntegrationsWebhookRoute,
+  ApiPublicLicenseActivateRoute: ApiPublicLicenseActivateRoute,
+  ApiPublicLicenseDownloadRoute: ApiPublicLicenseDownloadRoute,
+  ApiPublicLicenseUpdateCheckRoute: ApiPublicLicenseUpdateCheckRoute,
+  ApiPublicLicenseValidateRoute: ApiPublicLicenseValidateRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
