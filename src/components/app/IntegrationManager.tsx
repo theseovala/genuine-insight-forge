@@ -13,6 +13,7 @@ import {
   listIntegrations,
   revokeProviderCredentials,
   saveIntegrationAccount,
+  getIntegrationOverview,
   saveProviderCredentials,
   startIntegrationOAuth,
   testIntegration,
@@ -23,6 +24,63 @@ import { integrationStatusLabel as statusLabel, integrationStatusTone as statusT
 import { GoogleBusinessSetupGuide, GoogleMapsSetupGuide } from "@/components/app/GoogleSetupGuide";
 import { ProviderSetupGuide } from "@/components/app/ProviderSetupGuide";
 
+
+/** Integration overview — every number is counted from real rows, nothing estimated. */
+function IntegrationOverview() {
+  const overviewFn = useServerFn(getIntegrationOverview);
+  const overview = useQuery({
+    queryKey: ["integration_overview"],
+    queryFn: () => overviewFn(),
+    refetchInterval: 60_000,
+  });
+
+  if (overview.isLoading || !overview.data) return null;
+  const d = overview.data;
+  const tiles = [
+    { label: "Connected", value: d.connected },
+    { label: "Pending configuration", value: d.pendingConfiguration },
+    { label: "Authentication errors", value: d.authErrors },
+    { label: "Token expired", value: d.expired },
+    { label: "Expiring in 7 days", value: d.expiringSoon },
+    { label: "Requires provider approval", value: d.approvalRequired },
+    { label: "API errors (24h)", value: d.errors24h },
+    { label: "Providers available", value: d.totalProviders },
+  ];
+
+  return (
+    <Section
+      title="Integration overview"
+      description="Live counts from stored connections, API logs and the audit trail."
+    >
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {tiles.map((tile) => (
+          <div key={tile.label} className="card-interactive rounded-lg border border-border p-3">
+            <p className="num text-xl font-semibold">{tile.value}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{tile.label}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3">
+        <p className="text-xs font-medium text-muted-foreground">Audit log</p>
+        {d.auditLog.length === 0 ? (
+          <p className="mt-1 text-xs text-muted-foreground">No audit entries recorded yet.</p>
+        ) : (
+          <ul className="mt-1 space-y-1">
+            {d.auditLog.map((entry) => (
+              <li key={entry.id} className="flex items-center justify-between gap-2 text-xs">
+                <span className="truncate">
+                  {entry.action}
+                  {entry.target ? ` · ${entry.target}` : ""}
+                </span>
+                <span className="shrink-0 text-muted-foreground">{relativeTime(entry.createdAt)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Section>
+  );
+}
 
 function openAuthorization(url: string) {
   const popup = window.open(url, "_blank", "noopener,noreferrer");
