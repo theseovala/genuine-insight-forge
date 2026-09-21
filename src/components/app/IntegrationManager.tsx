@@ -6,7 +6,7 @@ import { Loader2, ExternalLink, ShieldCheck, Activity, KeyRound, Plug, Lock, Rot
 import { Section, StatusBadge, EmptyState } from "@/components/app/primitives";
 import { Button } from "@/components/ui/button";
 import { relativeTime } from "@/lib/seovale-db";
-import { INTEGRATIONS, integrationById } from "@/lib/integrations/registry";
+import { INTEGRATIONS, integrationById, authTypeLabel, capabilitiesFor, rateLimitFor } from "@/lib/integrations/registry";
 import {
   disconnectIntegration,
   listIntegrationEvents,
