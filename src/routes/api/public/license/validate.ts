@@ -35,7 +35,7 @@ export const Route = createFileRoute("/api/public/license/validate")({
           feature: body.data.feature ?? null,
           version: body.data.version ?? null,
 
-          body: body.data as Record<string, unknown>,
+          rawBody: raw,
           signature: request.headers.get("x-license-signature") ?? null,
           timestamp: request.headers.get("x-license-timestamp"),
           ip: request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for"),

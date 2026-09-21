@@ -155,12 +155,12 @@ export function normalizeDomain(value: string) {
  * Deployments authenticate each call with an HMAC over `timestamp.body`
  * keyed by their license secret. The secret itself is never transmitted.
  */
-export function buildRequestSignature(body: Record<string, unknown>, timestamp: string, licenseSecret: string) {
-  return createHmac("sha256", licenseSecret).update(`${timestamp}.${JSON.stringify(body)}`).digest("base64url");
+export function buildRequestSignature(rawBody: string, timestamp: string, licenseSecret: string) {
+  return createHmac("sha256", licenseSecret).update(`${timestamp}.${rawBody}`).digest("base64url");
 }
 
 export function verifyRequestSignature(
-  body: Record<string, unknown>,
+  rawBody: string,
   signature: string | null,
   timestamp: string | null,
   licenseSecret: string,
@@ -170,7 +170,7 @@ export function verifyRequestSignature(
   if (!Number.isFinite(ts) || Math.abs(Date.now() - ts) > VALIDATION_LEEWAY_MS) {
     return { ok: false as const, reason: "stale_request" };
   }
-  const expected = buildRequestSignature(body, timestamp, licenseSecret);
+  const expected = buildRequestSignature(rawBody, timestamp, licenseSecret);
   return safeEqual(expected, signature) ? { ok: true as const } : { ok: false as const, reason: "invalid_signature" };
 }
 
@@ -186,7 +186,7 @@ export type ValidationInput = {
   ip?: string | null;
   signature?: string | null;
   timestamp?: string | null;
-  body?: Record<string, unknown>;
+  rawBody?: string;
 };
 
 export type ValidationDecision = {
@@ -260,7 +260,7 @@ export async function validateLicense(db: Db, input: ValidationInput): Promise<V
     } catch {
       return fail("invalid_signature", "License secret could not be verified.", license.id, license.client_id);
     }
-    const verified = verifyRequestSignature(input.body ?? {}, input.signature, input.timestamp ?? null, secret);
+    const verified = verifyRequestSignature(input.rawBody ?? "", input.signature, input.timestamp ?? null, secret);
     if (!verified.ok) return fail("invalid_signature", `Request signature rejected (${verified.reason}).`, license.id, license.client_id);
   }
 

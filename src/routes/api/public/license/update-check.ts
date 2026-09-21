@@ -46,7 +46,7 @@ export const Route = createFileRoute("/api/public/license/update-check")({
           ip: request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for"),
           signature: request.headers.get("x-license-signature") ?? null,
           timestamp: request.headers.get("x-license-timestamp"),
-          body: body.data as Record<string, unknown>,
+          rawBody: raw,
         });
         if (!decision.ok) {
           return Response.json(
