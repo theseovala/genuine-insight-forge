@@ -120,7 +120,7 @@ export async function analyseWithAi(
     .select("output,model,created_at")
     .eq("input_hash", hash)
     .eq("purpose", "scan_analysis")
-    .eq("status", "success")
+    .eq("status", "completed")
     .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
     .order("created_at", { ascending: false })
     .limit(1)
@@ -158,7 +158,7 @@ export async function analyseWithAi(
       duration_ms: result.latencyMs,
       input_tokens: result.inputTokens,
       output_tokens: result.outputTokens,
-      status: "success",
+      status: "completed",
     });
     return {
       status: "completed",
