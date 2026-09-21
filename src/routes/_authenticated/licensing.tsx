@@ -215,7 +215,7 @@ function LicensingPage() {
                     <span className="text-muted-foreground">{client.contact_email ?? "no contact email"}</span>
                   </li>
                 ))}
-                {!data.clients.length && <EmptyState title="No clients yet" description="Add a client before issuing a licence." />}
+                {!data.clients.length && <EmptyState icon={KeyRound} title="No clients yet" description="Add a client before issuing a licence." />}
               </ul>
             </Section>
 
@@ -296,7 +296,7 @@ function LicensingPage() {
         {/* ---------- licences ---------- */}
         <Section title={data?.isStaff ? "Licences" : "Your licence"} description="Status, authorized domain, installations and available actions.">
           {!data?.licenses.length ? (
-            <EmptyState title="No licences" description="No licence is associated with this account yet." />
+            <EmptyState icon={KeyRound} title="No licences" description="No licence is associated with this account yet." />
           ) : (
             <div className="space-y-4">
               {data.licenses.map((license: any) => (
@@ -418,7 +418,7 @@ function LicensingPage() {
         {/* ---------- releases ---------- */}
         <Section title="Releases" description="Only signed packages that passed artifact inspection can be downloaded.">
           {!releases.length ? (
-            <EmptyState title="No releases yet" description="Package and publish a build to make it downloadable." />
+            <EmptyState icon={KeyRound} title="No releases yet" description="Package and publish a build to make it downloadable." />
           ) : (
             <div className="space-y-2 text-sm">
               {releases.map((release: any) => (
@@ -445,7 +445,7 @@ function LicensingPage() {
         {/* ---------- downloads ---------- */}
         <Section title="Download history" description="Every authorization and download attempt is recorded.">
           {!data?.downloads.length ? (
-            <EmptyState title="No downloads yet" description="Authorized downloads will appear here." />
+            <EmptyState icon={KeyRound} title="No downloads yet" description="Authorized downloads will appear here." />
           ) : (
             <div className="space-y-1 text-sm">
               {data.downloads.map((event: any) => (
@@ -462,7 +462,7 @@ function LicensingPage() {
         {/* ---------- events ---------- */}
         <Section title="Licence audit history" description="Who did what, when — no secrets are ever stored in these records.">
           {!data?.events.length ? (
-            <EmptyState title="No events yet" description="Licence activity will appear here." />
+            <EmptyState icon={KeyRound} title="No events yet" description="Licence activity will appear here." />
           ) : (
             <div className="space-y-1 text-sm">
               {data.events.map((event: any) => (
@@ -479,7 +479,7 @@ function LicensingPage() {
         {data?.isStaff && (
           <Section title="Licence security events" description="Denied and suspicious attempts recorded by the licence authority.">
             {!data.securityEvents.length ? (
-              <EmptyState title="No security events" description="Nothing has been denied so far." />
+              <EmptyState icon={KeyRound} title="No security events" description="Nothing has been denied so far." />
             ) : (
               <div className="space-y-1 text-sm">
                 {data.securityEvents.map((event: any) => (

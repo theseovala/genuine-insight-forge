@@ -19,6 +19,7 @@ import { Route as AuthenticatedCompetitorsRouteImport } from './routes/_authenti
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedFeedbackRouteImport } from './routes/_authenticated/feedback'
 import { Route as AuthenticatedIntegrationsRouteImport } from './routes/_authenticated/integrations'
+import { Route as AuthenticatedLicensingRouteImport } from './routes/_authenticated/licensing'
 import { Route as AuthenticatedLocationsRouteImport } from './routes/_authenticated/locations'
 import { Route as AuthenticatedRemovalsRouteImport } from './routes/_authenticated/removals'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
@@ -88,6 +89,11 @@ const AuthenticatedIntegrationsRoute =
     path: '/integrations',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedLicensingRoute = AuthenticatedLicensingRouteImport.update({
+  id: '/licensing',
+  path: '/licensing',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedLocationsRoute = AuthenticatedLocationsRouteImport.update({
   id: '/locations',
   path: '/locations',
@@ -192,6 +198,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/feedback': typeof AuthenticatedFeedbackRoute
   '/integrations': typeof AuthenticatedIntegrationsRoute
+  '/licensing': typeof AuthenticatedLicensingRoute
   '/locations': typeof AuthenticatedLocationsRoute
   '/removals': typeof AuthenticatedRemovalsRoute
   '/reports': typeof AuthenticatedReportsRoute
@@ -220,6 +227,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/feedback': typeof AuthenticatedFeedbackRoute
   '/integrations': typeof AuthenticatedIntegrationsRoute
+  '/licensing': typeof AuthenticatedLicensingRoute
   '/locations': typeof AuthenticatedLocationsRoute
   '/removals': typeof AuthenticatedRemovalsRoute
   '/reports': typeof AuthenticatedReportsRoute
@@ -250,6 +258,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/feedback': typeof AuthenticatedFeedbackRoute
   '/_authenticated/integrations': typeof AuthenticatedIntegrationsRoute
+  '/_authenticated/licensing': typeof AuthenticatedLicensingRoute
   '/_authenticated/locations': typeof AuthenticatedLocationsRoute
   '/_authenticated/removals': typeof AuthenticatedRemovalsRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
@@ -280,6 +289,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/feedback'
     | '/integrations'
+    | '/licensing'
     | '/locations'
     | '/removals'
     | '/reports'
@@ -308,6 +318,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/feedback'
     | '/integrations'
+    | '/licensing'
     | '/locations'
     | '/removals'
     | '/reports'
@@ -337,6 +348,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/feedback'
     | '/_authenticated/integrations'
+    | '/_authenticated/licensing'
     | '/_authenticated/locations'
     | '/_authenticated/removals'
     | '/_authenticated/reports'
@@ -442,6 +454,13 @@ declare module '@tanstack/react-router' {
       path: '/integrations'
       fullPath: '/integrations'
       preLoaderRoute: typeof AuthenticatedIntegrationsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/licensing': {
+      id: '/_authenticated/licensing'
+      path: '/licensing'
+      fullPath: '/licensing'
+      preLoaderRoute: typeof AuthenticatedLicensingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/locations': {
@@ -573,6 +592,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFeedbackRoute: typeof AuthenticatedFeedbackRoute
   AuthenticatedIntegrationsRoute: typeof AuthenticatedIntegrationsRoute
+  AuthenticatedLicensingRoute: typeof AuthenticatedLicensingRoute
   AuthenticatedLocationsRoute: typeof AuthenticatedLocationsRoute
   AuthenticatedRemovalsRoute: typeof AuthenticatedRemovalsRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
@@ -590,6 +610,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFeedbackRoute: AuthenticatedFeedbackRoute,
   AuthenticatedIntegrationsRoute: AuthenticatedIntegrationsRoute,
+  AuthenticatedLicensingRoute: AuthenticatedLicensingRoute,
   AuthenticatedLocationsRoute: AuthenticatedLocationsRoute,
   AuthenticatedRemovalsRoute: AuthenticatedRemovalsRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
