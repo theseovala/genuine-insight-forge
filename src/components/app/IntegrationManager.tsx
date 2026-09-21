@@ -20,7 +20,12 @@ import {
 } from "@/lib/integrations.functions";
 import type { IntegrationDefinition } from "@/lib/integrations/registry";
 
-import { integrationStatusLabel as statusLabel, integrationStatusTone as statusTone } from "@/lib/integrations/status";
+import {
+  integrationStatusLabel as statusLabel,
+  integrationStatusTone as statusTone,
+  integrationOutcomeLabel as outcomeLabel,
+  integrationOutcomeTone as outcomeTone,
+} from "@/lib/integrations/status";
 import { GoogleBusinessSetupGuide, GoogleMapsSetupGuide } from "@/components/app/GoogleSetupGuide";
 import { ProviderSetupGuide } from "@/components/app/ProviderSetupGuide";
 
@@ -342,20 +347,33 @@ export function IntegrationManager() {
               // APPROVAL_REQUIRED / UNAVAILABLE state is recorded too.
               const targets = INTEGRATIONS;
               let ok = 0;
-              const failures: string[] = [];
+              // Outcomes are grouped by the adapter's own code, so an
+              // approval-gated provider never reads as a plain failure.
+              const byCode = new Map<string, string[]>();
               for (const definition of targets) {
+                let code = "PROVIDER_ERROR";
                 try {
                   const result = await testFn({ data: { provider: definition.id } });
+                  code = result.code ?? (result.ok ? "CONNECTED" : "PROVIDER_ERROR");
                   if (result.ok) ok += 1;
-                  else failures.push(definition.label);
                 } catch {
-                  failures.push(definition.label);
+                  code = "PROVIDER_ERROR";
                 }
+                if (code !== "CONNECTED") byCode.set(code, [...(byCode.get(code) ?? []), definition.label]);
               }
               setTestingAll(false);
               refresh();
-              if (failures.length === 0) toast.success(`All ${ok} integrations verified`);
-              else toast.error(`${ok} connected · ${failures.length} not connected: ${failures.join(", ")}`);
+              if (byCode.size === 0) toast.success(`All ${ok} integrations verified`);
+              else {
+                const summary = Array.from(byCode.entries())
+                  .map(([code, labels]) => `${outcomeLabel[code] ?? code}: ${labels.length}`)
+                  .join(" · ");
+                toast.error(`${ok} connected · ${summary}`, {
+                  description: Array.from(byCode.entries())
+                    .map(([code, labels]) => `${outcomeLabel[code] ?? code} — ${labels.join(", ")}`)
+                    .join("\n"),
+                });
+              }
             }}
           >
             {testingAll ? <Loader2 className="animate-spin" /> : <Activity />} Test all connections
@@ -389,6 +407,14 @@ export function IntegrationManager() {
                         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${statusTone[status]}`}>
                           {statusLabel[status] ?? status}
                         </span>
+                        {item?.outcomeCode && item.outcomeCode !== "CONNECTED" && (
+                          <span
+                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${outcomeTone[item.outcomeCode] ?? "bg-neutral-soft text-muted-foreground"}`}
+                            title={`Last live test returned ${item.outcomeCode}`}
+                          >
+                            {outcomeLabel[item.outcomeCode] ?? item.outcomeCode}
+                          </span>
+                        )}
                         {!item?.configured && definition.requiredSecrets.length > 0 && (
                           <StatusBadge status="Credentials missing" />
                         )}

@@ -4,6 +4,39 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createHmac, timingSafeEqual } from "crypto";
 
+/**
+ * Headers that must never be written to the event record. Provider signatures
+ * are kept — they are message authentication codes over the body, not
+ * credentials, and they are what makes a stored event auditable. Anything that
+ * could carry a credential is dropped before the row is built, so a provider
+ * that starts sending one cannot leak it into the database.
+ */
+const SECRET_BEARING_HEADERS = new Set([
+  "authorization",
+  "proxy-authorization",
+  "cookie",
+  "set-cookie",
+  "x-api-key",
+  "x-auth-token",
+  "x-access-token",
+  "x-csrf-token",
+  "api-key",
+  "apikey",
+]);
+
+function auditableHeaders(headers: Headers) {
+  const safe: Record<string, string> = {};
+  for (const [key, value] of headers.entries()) {
+    const name = key.toLowerCase();
+    if (SECRET_BEARING_HEADERS.has(name)) {
+      safe[name] = "[redacted]";
+      continue;
+    }
+    safe[name] = value;
+  }
+  return safe;
+}
+
 export const Route = createFileRoute("/api/public/integrations/webhook")({
   server: {
     handlers: {
@@ -74,7 +107,7 @@ export const Route = createFileRoute("/api/public/integrations/webhook")({
             provider,
             event_type: "rejected",
             signature_valid: false,
-            headers: Object.fromEntries(request.headers.entries()),
+            headers: auditableHeaders(request.headers),
             payload: { raw: raw.slice(0, 2000) },
             status: "rejected",
             error_message: verifyError || "Signature verification failed.",
@@ -136,7 +169,7 @@ export const Route = createFileRoute("/api/public/integrations/webhook")({
             event_type: eventType,
             signature_valid: true,
             payload,
-            headers: Object.fromEntries(request.headers.entries()),
+            headers: auditableHeaders(request.headers),
             status: "received",
           })
           .select("id")

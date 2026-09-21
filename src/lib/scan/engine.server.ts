@@ -120,8 +120,28 @@ async function stopRequested(admin: SupabaseClient, scanId: string) {
   return data?.status === "paused" || data?.status === "cancelled" ? (data.status as string) : null;
 }
 
+/**
+ * Postgres `jsonb` cannot hold a NUL character, and real pages do contain them.
+ * Without this the whole row is rejected with 22P05 and the source silently
+ * disappears — which then looks like "the website could not be loaded" and
+ * produces findings that are not true. Strip the character, keep the content.
+ */
+function jsonbSafe<T>(value: T): T {
+  if (typeof value === "string") return value.replace(/\u0000/g, "") as unknown as T;
+  if (Array.isArray(value)) return value.map(jsonbSafe) as unknown as T;
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value as Record<string, unknown>)) out[key.replace(/\u0000/g, "")] = jsonbSafe(item);
+    return out as unknown as T;
+  }
+  return value;
+}
+
 async function storeSource(admin: SupabaseClient, scanId: string, workspaceId: string, result: SourceResult, domain: string) {
-  await admin.from("scan_sources").upsert(
+  const raw = jsonbSafe(result.raw);
+  // The error is inspected, never discarded: a source that cannot be stored is
+  // recorded as a failed source instead of vanishing from the scan.
+  const { error: storeError } = await admin.from("scan_sources").upsert(
     {
       scan_id: scanId,
       workspace_id: workspaceId,
@@ -131,11 +151,28 @@ async function storeSource(admin: SupabaseClient, scanId: string, workspaceId: s
       http_status: result.httpStatus ?? null,
       duration_ms: result.durationMs,
       error_message: result.errorMessage ?? null,
-      raw: result.raw as any,
+      raw: raw as any,
       created_at: new Date().toISOString(),
     },
     { onConflict: "scan_id,source" },
   );
+  if (storeError) {
+    await admin.from("scan_sources").upsert(
+      {
+        scan_id: scanId,
+        workspace_id: workspaceId,
+        source: result.source,
+        provider: result.provider ?? null,
+        status: "failed",
+        http_status: result.httpStatus ?? null,
+        duration_ms: result.durationMs,
+        error_message: `The collected payload could not be stored: ${storeError.message}`.slice(0, 500),
+        raw: {},
+        created_at: new Date().toISOString(),
+      },
+      { onConflict: "scan_id,source" },
+    );
+  }
   if (result.provider) {
     await admin.from("provider_raw_data").insert({
       workspace_id: workspaceId,
@@ -143,7 +180,7 @@ async function storeSource(admin: SupabaseClient, scanId: string, workspaceId: s
       resource_type: result.source,
       external_id: domain,
       scan_id: scanId,
-      payload: result.raw as any,
+      payload: raw as any,
     });
   }
   await admin.from("integration_api_logs").insert({
@@ -811,7 +848,7 @@ export async function runScan(admin: SupabaseClient, scanId: string): Promise<Ru
     message:
       status === "failed"
         ? "No data source could be reached for this address."
-        : `Score ${score}/100 · ${allFindings.length} findings${warnings.length ? ` · failed checks: ${warnings.join(", ")}` : ""}`,
+        : `${score === null ? "Score unavailable" : `Score ${score}/100`} · ${allFindings.length} findings${warnings.length ? ` · failed checks: ${warnings.join(", ")}` : ""}`,
     entity_type: "scan",
     entity_id: scanId,
   });

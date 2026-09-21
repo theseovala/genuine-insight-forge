@@ -141,16 +141,29 @@ export async function runAiText(system: string, prompt: string): Promise<AiTextR
   const anthropic = await createDirectAnthropic();
   if (anthropic) {
     const started = Date.now();
-    const result = streamText({
-      model: anthropic(CLAUDE_MODEL),
-      system,
-      prompt,
-      abortSignal: AbortSignal.timeout(AI_TIMEOUT_MS),
-    });
-    return await finish(result, CLAUDE_MODEL, "anthropic", started);
+    try {
+      const result = streamText({
+        model: anthropic(CLAUDE_MODEL),
+        system,
+        prompt,
+        abortSignal: AbortSignal.timeout(AI_TIMEOUT_MS),
+      });
+      return await finish(result, CLAUDE_MODEL, "anthropic", started);
+    } catch (error) {
+      errors.push(error);
+    }
   }
 
-  throw errors[0] ?? new Error("AI is not configured for this project.");
+  // Every provider failed. Report which one failed and why, in order, so the
+  // stored ai_runs row names the real blocker instead of the last stream error.
+  if (errors.length) {
+    const tried = ["lovable_ai", ...(createDirectOpenAI() ? ["openai"] : []), ...(anthropic ? ["anthropic"] : [])];
+    const detail = errors
+      .map((error, index) => `${tried[index] ?? "provider"}: ${error instanceof Error ? error.message : String(error)}`)
+      .join(" | ");
+    throw new Error(`Every AI provider failed — ${detail}`);
+  }
+  throw new Error("AI is not configured for this project.");
 }
 
 /** Strips a ```json fence if the model wrapped its answer in one. */

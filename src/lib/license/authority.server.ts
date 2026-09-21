@@ -114,21 +114,20 @@ export async function rateLimit(
   const windowStart = new Date(Math.floor(Date.now() / windowMs) * windowMs).toISOString();
   const keyHash = hashToken(`${bucket}:${key}`);
 
-  const { data: existing } = await db
-    .from("security_rate_limits")
-    .select("id, count")
-    .eq("bucket", bucket)
-    .eq("key_hash", keyHash)
-    .eq("window_start", windowStart)
-    .maybeSingle();
-
-  if (!existing) {
-    await db.from("security_rate_limits").insert({ bucket, key_hash: keyHash, window_start: windowStart, count: 1 });
-    return { allowed: true, count: 1, retryAfterSeconds: 0 };
-  }
-  const count = (existing.count as number) + 1;
-  await db.from("security_rate_limits").update({ count }).eq("id", existing.id);
+  // One atomic statement. Reading the row, adding one in JavaScript and writing
+  // it back loses increments under concurrent requests, which let the limit be
+  // bypassed by issuing requests in parallel.
+  const { data: count, error } = await db.rpc("consume_rate_limit", {
+    p_bucket: bucket,
+    p_key_hash: keyHash,
+    p_window_start: windowStart,
+  });
   const retryAfterSeconds = Math.max(1, Math.ceil((new Date(windowStart).getTime() + windowMs - Date.now()) / 1000));
+  if (error || typeof count !== "number") {
+    // The counter could not be advanced, so this request cannot be proven to be
+    // within the limit. Refuse rather than allow an unmetered request through.
+    return { allowed: false, count: limit + 1, retryAfterSeconds };
+  }
   return { allowed: count <= limit, count, retryAfterSeconds };
 }
 
