@@ -1020,6 +1020,27 @@ export type Database = {
           },
         ]
       }
+      platform_admins: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["platform_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["platform_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["platform_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       platform_credentials: {
         Row: {
           access_token: string
@@ -2078,7 +2099,9 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          kind: Database["public"]["Enums"]["workspace_kind"]
           name: string
+          parent_workspace_id: string | null
           slug: string
           updated_at: string
         }
@@ -2086,7 +2109,9 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          kind?: Database["public"]["Enums"]["workspace_kind"]
           name?: string
+          parent_workspace_id?: string | null
           slug: string
           updated_at?: string
         }
@@ -2094,11 +2119,21 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          kind?: Database["public"]["Enums"]["workspace_kind"]
           name?: string
+          parent_workspace_id?: string | null
           slug?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "workspaces_parent_workspace_id_fkey"
+            columns: ["parent_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -2148,6 +2183,8 @@ export type Database = {
       }
     }
     Enums: {
+      platform_role: "super_admin"
+      workspace_kind: "agency" | "client" | "business"
       workspace_role: "owner" | "admin" | "member"
     }
     CompositeTypes: {
@@ -2276,6 +2313,8 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      platform_role: ["super_admin"],
+      workspace_kind: ["agency", "client", "business"],
       workspace_role: ["owner", "admin", "member"],
     },
   },

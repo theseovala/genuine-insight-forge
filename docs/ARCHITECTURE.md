@@ -26,15 +26,34 @@ Real provider APIs  → validation → database → audit/event system → UI up
 
 ```
 User (auth.users)
- → Workspace (tenant boundary; workspace_members: owner | admin | member)
-    → integration_connections / integration_provider_credentials (encrypted)
+ → platform_admins (super_admin — granted only by the backend/service role)
+ → Workspace (tenant boundary; kind: agency | client | business, optional parent_workspace_id)
+    → workspace_members: owner | admin | member
+    → integration_connections / integration_provider_credentials (encrypted, service-role only)
     → provider accounts (account_ref on the connection)
     → sync jobs → API logs → stored data (reviews, alerts…) → audit logs
 Business/Location → Reviews → sentiment/AI analysis → replies → publishing
 Business/Location → SEO projects → domains → keywords → rankings → competitors → audits
 ```
 
-Cross-tenant isolation is enforced twice: RLS policies compare `workspace_members` on every read, and every server function resolves the caller's workspace from the authenticated session (`requireSupabaseAuth`), never from client input.
+### Authorization model (RBAC)
+
+| Level | Where it lives | Grants |
+| --- | --- | --- |
+| Super Admin | `platform_admins` (no INSERT policy — service role only) | every workspace |
+| Agency | workspace with `kind = 'agency'`; child clients/businesses point at it via `parent_workspace_id` | owner/admin of the agency reach all descendant workspaces |
+| Client / Business | workspace with `kind = 'client' | 'business'` | only its own members |
+| Member roles | `workspace_members.role` (owner/admin/member) | member = read/write in that workspace; owner/admin additionally gate privileged actions |
+
+Every policy in `public` resolves through two security-definer helpers, so isolation is defined in exactly one place:
+
+- `private.is_workspace_member(workspace_id [, user_id])` — super admin, direct member, or owner/admin of an ancestor workspace (`private.workspace_lineage`).
+- `private.has_workspace_role(workspace_id, roles[] [, user_id])` — same, restricted to the listed roles.
+
+`workspaces.parent_workspace_id` is guarded by `public.assert_workspace_hierarchy()` (no self-parent, no cycles, max depth 10). A client can never reach a sibling client: its lineage only walks upward, never sideways or downward.
+
+Cross-tenant isolation is enforced twice: RLS uses the helpers above on every read, and every server function resolves the caller's workspace from the authenticated session (`requireSupabaseAuth`), never from client input.
+
 
 ## 3. Database schema (public)
 
