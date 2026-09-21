@@ -141,7 +141,12 @@ export async function runAiText(system: string, prompt: string): Promise<AiTextR
   const anthropic = await createDirectAnthropic();
   if (anthropic) {
     const started = Date.now();
-    const result = streamText({ model: anthropic(CLAUDE_MODEL), system, prompt });
+    const result = streamText({
+      model: anthropic(CLAUDE_MODEL),
+      system,
+      prompt,
+      abortSignal: AbortSignal.timeout(AI_TIMEOUT_MS),
+    });
     return await finish(result, CLAUDE_MODEL, "anthropic", started);
   }
 
