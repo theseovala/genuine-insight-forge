@@ -112,12 +112,16 @@ function SourceIcon({ status }: { status: string }) {
   return <XCircle className="h-4 w-4 text-destructive" />;
 }
 
+const FINDING_FILTERS = ["all", "critical", "high", "medium", "low", "open", "resolved", "new", "changed"] as const;
+
 
 function ScansPage() {
   const queryClient = useQueryClient();
   const [url, setUrl] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [openFinding, setOpenFinding] = useState<string | null>(null);
+  const [findingFilter, setFindingFilter] = useState<(typeof FINDING_FILTERS)[number]>("all");
+
 
   const scans = useQuery({ queryKey: ["scans"], queryFn: () => listScans() });
   const detail = useQuery({
@@ -340,10 +344,22 @@ function ScansPage() {
                 {data.scan.error_message ? (
                   <p className="mb-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{data.scan.error_message}</p>
                 ) : null}
+                {data.report?.ai_status === "failed" ? (
+                  <p className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+                    AI analysis failed for this scan, so no interpretation is shown. The measured findings below are unaffected.
+                    {data.report?.ai_error ? <span className="mt-1 block text-xs opacity-80">{data.report.ai_error}</span> : null}
+                  </p>
+                ) : null}
                 <p className="text-sm text-muted-foreground">
                   {data.report?.summary ? data.report.summary : "AI summary unavailable for this scan."}
                 </p>
-                {data.report?.model ? <p className="mt-2 text-xs text-muted-foreground">Analysed by {data.report.model}</p> : null}
+                {data.report?.model ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Analysed by {data.report.model}
+                    {data.report?.ai_latency_ms ? ` in ${(data.report.ai_latency_ms / 1000).toFixed(1)}s` : ""}
+                  </p>
+                ) : null}
+
               </Section>
 
               {(data.stages ?? []).length > 0 ? (
@@ -475,14 +491,67 @@ function ScansPage() {
                 </Section>
               ) : null}
 
-              <Section title={`Findings (${data.findings.length})`} description="Each finding links back to the measurement it came from.">
-                {data.findings.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No issues were detected in what could be measured.</p>
-                ) : (
-                  <ul className="stagger space-y-2">
-                    {[...data.findings]
-                      .sort((a: any, b: any) => b.impact - a.impact)
-                      .map((finding: any) => (
+              {Array.isArray(data.report?.action_plan) && (data.report!.action_plan as any[]).length > 0 ? (
+                <Section title="Action plan" description="Ordered by the deterministic priority score, explained by AI from the stored findings.">
+                  <ol className="space-y-2">
+                    {(data.report!.action_plan as any[]).map((item, index) => (
+                      <li key={`${item.findingCode}-${index}`} className="rounded-lg border border-border px-3 py-2 text-sm">
+                        <p className="font-medium">
+                          {index + 1}. {item.problem}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">Why it matters: {item.impact}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">Do this: {item.action}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">Objective: {item.expectedObjective}</p>
+                        <button
+                          type="button"
+                          className="press mt-2 text-xs underline underline-offset-2"
+                          onClick={() => setOpenFinding(item.findingCode)}
+                        >
+                          View evidence ({item.findingCode})
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                </Section>
+              ) : null}
+
+              <Section
+                title={`Findings (${data.findings.length})`}
+                description="Each finding links back to the measurement it came from."
+                action={
+                  <div className="flex flex-wrap gap-1">
+                    {FINDING_FILTERS.map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => setFindingFilter(option)}
+                        className={cn(
+                          "press rounded-full border border-border px-2.5 py-1 text-[11px] capitalize",
+                          findingFilter === option ? "bg-primary text-primary-foreground" : "text-muted-foreground",
+                        )}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                }
+              >
+                {(() => {
+                  const visible = (data.findings as any[]).filter((finding) => {
+                    if (findingFilter === "all") return true;
+                    if (["critical", "high", "medium", "low"].includes(findingFilter)) return finding.severity === findingFilter;
+                    if (findingFilter === "open" || findingFilter === "resolved") return (finding.status ?? "open") === findingFilter;
+                    return (finding.change_state ?? "new") === findingFilter;
+                  });
+                  if (data.findings.length === 0) {
+                    return <p className="text-sm text-muted-foreground">No issues were detected in what could be measured.</p>;
+                  }
+                  if (visible.length === 0) {
+                    return <p className="text-sm text-muted-foreground">No findings match this filter.</p>;
+                  }
+                  return (
+                    <ul className="stagger space-y-2">
+                      {visible.map((finding: any) => (
                         <li
                           key={finding.code}
                           className={cn(
@@ -500,9 +569,17 @@ function ScansPage() {
                               <AlertTriangle className="h-4 w-4 text-muted-foreground" />
                             </span>
                             <span className="min-w-0 flex-1">
-                              <span className="block text-sm font-medium">{finding.title}</span>
+                              <span className="block text-sm font-medium">
+                                {finding.priority_rank ? <span className="text-muted-foreground">#{finding.priority_rank} </span> : null}
+                                {finding.title}
+                              </span>
                               <span className="block text-xs text-muted-foreground">{finding.detail}</span>
                             </span>
+                            {finding.change_state && finding.change_state !== "unchanged" ? (
+                              <Badge variant="outline" className="h-5 shrink-0 px-1.5 text-[10px] uppercase">
+                                {finding.change_state}
+                              </Badge>
+                            ) : null}
                             <Badge variant="outline" className={cn("h-5 shrink-0 px-1.5 text-[10px] uppercase", SEVERITY_TONE[finding.severity])}>
                               {finding.severity}
                             </Badge>
@@ -511,15 +588,20 @@ function ScansPage() {
                           {openFinding === finding.code ? (
                             <div className="animate-fade-in border-t border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
                               {finding.recommendation ? <p className="mb-2 text-foreground">Recommendation: {finding.recommendation}</p> : null}
-                              <p>Source: {SOURCE_LABEL[finding.source] ?? finding.source} · Confidence: {finding.evidence?.confidence ?? "measured"} · Impact: -{finding.impact}</p>
+                              <p>
+                                Source: {SOURCE_LABEL[finding.source] ?? finding.source} · Confidence: {finding.confidence ?? "measured"} · Impact: -{finding.impact}
+                                {finding.priority_score ? ` · Priority score: ${Number(finding.priority_score).toFixed(1)}` : ""} · Status: {finding.status ?? "open"}
+                              </p>
                               <pre className="mt-2 max-h-48 overflow-auto rounded-md bg-muted/60 p-2 text-[11px]">{JSON.stringify(finding.evidence ?? {}, null, 2)}</pre>
                             </div>
                           ) : null}
                         </li>
                       ))}
-                  </ul>
-                )}
+                    </ul>
+                  );
+                })()}
               </Section>
+
 
               <Section title={`Measurements (${data.metrics.length})`} description="Normalized values taken straight from the collected data.">
                 {data.metrics.length === 0 ? (

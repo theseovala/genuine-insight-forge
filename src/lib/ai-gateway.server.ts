@@ -70,14 +70,39 @@ export async function createDirectAnthropic() {
   return createAnthropic({ apiKey: key });
 }
 
+export interface AiTextResult {
+  output: string;
+  model: string;
+  provider: string;
+  latencyMs: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
+}
+
 /**
  * Runs one text generation, trying Lovable AI first and falling back to the
  * project's own OpenAI key, then its Anthropic key, so AI never goes dark.
+ * Returns the real model, latency and token usage the provider reported.
  */
-export async function runAiText(system: string, prompt: string) {
+export async function runAiText(system: string, prompt: string): Promise<AiTextResult> {
   const { streamText } = await import("ai");
   const errors: unknown[] = [];
 
+  const finish = async (result: any, model: string, provider: string, started: number): Promise<AiTextResult> => {
+    const output = (await result.text).trim();
+    let inputTokens: number | null = null;
+    let outputTokens: number | null = null;
+    try {
+      const usage = await result.usage;
+      inputTokens = usage?.inputTokens ?? null;
+      outputTokens = usage?.outputTokens ?? null;
+    } catch {
+      // Usage is optional metadata; never fail a good answer over it.
+    }
+    return { output, model, provider, latencyMs: Date.now() - started, inputTokens, outputTokens };
+  };
+
+  const gatewayStarted = Date.now();
   try {
     const { provider } = createGateway();
     const result = streamText({
@@ -86,13 +111,14 @@ export async function runAiText(system: string, prompt: string) {
       prompt,
       providerOptions: { openai: { ...REASONING_OPTIONS } },
     });
-    return { output: (await result.text).trim(), model: AI_MODEL };
+    return await finish(result, AI_MODEL, "lovable_ai", gatewayStarted);
   } catch (error) {
     errors.push(error);
   }
 
   const openai = createDirectOpenAI();
   if (openai) {
+    const started = Date.now();
     try {
       const result = streamText({
         model: openai.responses(FALLBACK_MODEL),
@@ -100,7 +126,7 @@ export async function runAiText(system: string, prompt: string) {
         prompt,
         providerOptions: { openai: { store: false } },
       });
-      return { output: (await result.text).trim(), model: FALLBACK_MODEL };
+      return await finish(result, FALLBACK_MODEL, "openai", started);
     } catch (error) {
       errors.push(error);
     }
@@ -108,9 +134,59 @@ export async function runAiText(system: string, prompt: string) {
 
   const anthropic = await createDirectAnthropic();
   if (anthropic) {
+    const started = Date.now();
     const result = streamText({ model: anthropic(CLAUDE_MODEL), system, prompt });
-    return { output: (await result.text).trim(), model: CLAUDE_MODEL };
+    return await finish(result, CLAUDE_MODEL, "anthropic", started);
   }
 
   throw errors[0] ?? new Error("AI is not configured for this project.");
 }
+
+/** Strips a ```json fence if the model wrapped its answer in one. */
+function unfence(text: string) {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const body = fenced?.[1] ?? text;
+  const start = body.search(/[{[]/);
+  const end = Math.max(body.lastIndexOf("}"), body.lastIndexOf("]"));
+  return start >= 0 && end > start ? body.slice(start, end + 1) : body.trim();
+}
+
+
+export class AiValidationError extends Error {}
+
+/**
+ * Runs a JSON generation and validates it before the result is allowed
+ * anywhere near stored data. Malformed or unfaithful output is retried once
+ * with the validation error fed back; after that the caller is told the AI
+ * step failed. Nothing is ever silently accepted or invented.
+ */
+export async function runAiJson<T>(
+  system: string,
+  prompt: string,
+  validate: (value: unknown) => T,
+  attempts = 2,
+): Promise<{ value: T; raw: string } & Omit<AiTextResult, "output">> {
+  let lastError: unknown = null;
+  let feedback = "";
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const result = await runAiText(
+      `${system}\n\nReply with a single JSON object and nothing else. No prose, no markdown fence.`,
+      feedback ? `${prompt}\n\nYour previous reply was rejected: ${feedback}\nReturn corrected JSON.` : prompt,
+    );
+    try {
+      const parsed = JSON.parse(unfence(result.output));
+      const value = validate(parsed);
+      const { output, ...rest } = result;
+      return { value, raw: output, ...rest };
+    } catch (error) {
+      lastError = error;
+      feedback = error instanceof Error ? error.message.slice(0, 400) : String(error).slice(0, 400);
+    }
+  }
+
+  throw new AiValidationError(
+    `The AI reply did not pass validation after ${attempts} attempts: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
+  );
+}
+

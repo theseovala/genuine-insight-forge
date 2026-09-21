@@ -21,8 +21,10 @@ export type Database = {
           error_message: string | null
           id: string
           input_hash: string
+          input_tokens: number | null
           model: string
           output: string | null
+          output_tokens: number | null
           purpose: string
           report_id: string | null
           review_id: string | null
@@ -36,8 +38,10 @@ export type Database = {
           error_message?: string | null
           id?: string
           input_hash: string
+          input_tokens?: number | null
           model: string
           output?: string | null
+          output_tokens?: number | null
           purpose: string
           report_id?: string | null
           review_id?: string | null
@@ -51,8 +55,10 @@ export type Database = {
           error_message?: string | null
           id?: string
           input_hash?: string
+          input_tokens?: number | null
           model?: string
           output?: string | null
+          output_tokens?: number | null
           purpose?: string
           report_id?: string | null
           review_id?: string | null
@@ -1502,46 +1508,61 @@ export type Database = {
       scan_findings: {
         Row: {
           category: string
+          change_state: string
           code: string
+          confidence: string
           created_at: string
           detail: string
           evidence: Json
           id: string
           impact: number
+          priority_rank: number | null
+          priority_score: number | null
           recommendation: string | null
           scan_id: string
           severity: string
           source: string
+          status: string
           title: string
           workspace_id: string
         }
         Insert: {
           category: string
+          change_state?: string
           code: string
+          confidence?: string
           created_at?: string
           detail: string
           evidence?: Json
           id?: string
           impact?: number
+          priority_rank?: number | null
+          priority_score?: number | null
           recommendation?: string | null
           scan_id: string
           severity: string
           source: string
+          status?: string
           title: string
           workspace_id: string
         }
         Update: {
           category?: string
+          change_state?: string
           code?: string
+          confidence?: string
           created_at?: string
           detail?: string
           evidence?: Json
           id?: string
           impact?: number
+          priority_rank?: number | null
+          priority_score?: number | null
           recommendation?: string | null
           scan_id?: string
           severity?: string
           source?: string
+          status?: string
           title?: string
           workspace_id?: string
         }
@@ -1618,35 +1639,56 @@ export type Database = {
       }
       scan_reports: {
         Row: {
+          action_plan: Json | null
+          ai_context_hash: string | null
+          ai_error: string | null
+          ai_latency_ms: number | null
+          ai_status: string
           category_scores: Json
           created_at: string
           generated_by: string | null
+          historical: Json | null
           id: string
           model: string | null
           scan_id: string
           score: number | null
+          sections: Json | null
           summary: string | null
           workspace_id: string
         }
         Insert: {
+          action_plan?: Json | null
+          ai_context_hash?: string | null
+          ai_error?: string | null
+          ai_latency_ms?: number | null
+          ai_status?: string
           category_scores?: Json
           created_at?: string
           generated_by?: string | null
+          historical?: Json | null
           id?: string
           model?: string | null
           scan_id: string
           score?: number | null
+          sections?: Json | null
           summary?: string | null
           workspace_id: string
         }
         Update: {
+          action_plan?: Json | null
+          ai_context_hash?: string | null
+          ai_error?: string | null
+          ai_latency_ms?: number | null
+          ai_status?: string
           category_scores?: Json
           created_at?: string
           generated_by?: string | null
+          historical?: Json | null
           id?: string
           model?: string | null
           scan_id?: string
           score?: number | null
+          sections?: Json | null
           summary?: string | null
           workspace_id?: string
         }
