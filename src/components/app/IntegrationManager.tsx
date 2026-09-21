@@ -416,7 +416,7 @@ export function IntegrationManager() {
                     />
                   )}
 
-                  {isAdmin && GUIDED_PROVIDERS.has(definition.id) && (
+                  {isAdmin && definition.id !== "google_maps" && (definition.credentialFields?.length ?? 0) > 0 && (
                     <ProviderSetupGuide
                       definition={definition}
                       credentialsReady={(item?.credentials ?? []).some((c) => c.masked || c.fromEnvironment)}
