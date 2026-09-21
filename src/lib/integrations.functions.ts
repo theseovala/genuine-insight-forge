@@ -450,20 +450,46 @@ export const disconnectIntegration = createServerFn({ method: "POST" })
     const member = await workspace(context);
     requireAdmin(member);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row } = await supabaseAdmin
+      .from("integration_connections")
+      .select("id, access_token_ciphertext")
+      .eq("workspace_id", member.workspace_id)
+      .eq("provider", data.provider)
+      .maybeSingle();
+
+    // Revoke at the provider first where the provider supports it, so the
+    // token is dead even though the local record is about to be deleted.
+    let revokeNote = "No stored access token to revoke.";
+    if (row?.access_token_ciphertext) {
+      const { decryptValue } = await import("@/lib/integrations/crypto.server");
+      const { revokeOAuthToken } = await import("@/lib/integrations/providers.server");
+      try {
+        const outcome = await revokeOAuthToken(data.provider, await decryptValue(row.access_token_ciphertext));
+        revokeNote = outcome.message;
+      } catch (caught) {
+        revokeNote = caught instanceof Error ? caught.message : "Revoke attempt failed.";
+      }
+    }
+
     const { error } = await supabaseAdmin
       .from("integration_connections")
       .delete()
       .eq("workspace_id", member.workspace_id)
       .eq("provider", data.provider);
     if (error) throw error;
+    await supabaseAdmin
+      .from("integration_health")
+      .update({ status: "unknown", outcome_code: "NOT_CONFIGURED", last_error: null, last_checked_at: new Date().toISOString() })
+      .eq("workspace_id", member.workspace_id)
+      .eq("provider", data.provider);
     await supabaseAdmin.from("integration_events").insert({
       workspace_id: member.workspace_id,
       provider: data.provider,
       event_type: "disconnected",
       level: "info",
-      message: "Connection removed and stored credentials deleted.",
+      message: `Connection removed and stored credentials deleted. ${revokeNote}`.slice(0, 500),
     });
-    return { disconnected: true };
+    return { disconnected: true, revokeNote };
   });
 
 /**

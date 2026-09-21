@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useRealtimeInvalidate } from "@/hooks/use-realtime";
 import {
   createScan,
   runScanNow,
@@ -135,11 +136,17 @@ function ScansPage() {
     queryKey: ["scan", activeId],
     queryFn: () => getScan({ data: { id: activeId as string } }),
     enabled: Boolean(activeId),
+    // Stage and status changes are pushed by the server; this slow poll only
+    // covers a dropped websocket while a scan is still running.
     refetchInterval: (query) => {
       const status = (query.state.data as any)?.scan?.status;
-      return status === "queued" || status === "running" || status === "retrying" ? 3000 : false;
+      return status === "queued" || status === "running" || status === "retrying" ? 15000 : false;
     },
   });
+
+  // Live scan progress: every stage row the engine writes pushes an update.
+  useRealtimeInvalidate("scan-progress", ["scans", "scan_stages"], [["scans"], ["scan", activeId ?? undefined]]);
+
 
   // Finding triage writes straight to the stored finding row, then the detail
   // query is refetched so filters, report and CSV all show the same status.

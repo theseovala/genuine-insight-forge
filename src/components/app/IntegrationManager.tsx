@@ -338,7 +338,9 @@ export function IntegrationManager() {
             disabled={testingAll}
             onClick={async () => {
               setTestingAll(true);
-              const targets = INTEGRATIONS.filter((i) => i.kind !== "manual");
+              // Partner-only providers are included so their honest
+              // APPROVAL_REQUIRED / UNAVAILABLE state is recorded too.
+              const targets = INTEGRATIONS;
               let ok = 0;
               const failures: string[] = [];
               for (const definition of targets) {
