@@ -479,3 +479,94 @@ export const revokeProviderCredentials = createServerFn({ method: "POST" })
     });
     return { revoked: true };
   });
+
+export type ProviderHealth = {
+  provider: string;
+  label: string;
+  status: string | null;
+  outcomeCode: string | null;
+  lastCheckedAt: string | null;
+  lastOkAt: string | null;
+  lastSyncAt: string | null;
+  lastError: string | null;
+  errors24h: number;
+  rateLimit: { limit: number | null; remaining: number | null; resetAt: string | null } | null;
+};
+
+/** Live per-provider health: latest check, last sync, 24h error count and rate-limit snapshot. */
+export const getIntegrationHealth = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const member = await workspace(context);
+    const wid = member.workspace_id;
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    const [health, syncJobs, rateLimits, errorLogs] = await Promise.all([
+      context.supabase.from("integration_health").select("provider,status,outcome_code,last_error,last_checked_at,last_ok_at").eq("workspace_id", wid),
+      context.supabase
+        .from("integration_sync_jobs")
+        .select("provider,completed_at,status")
+        .eq("workspace_id", wid)
+        .eq("status", "completed")
+        .order("completed_at", { ascending: false })
+        .limit(200),
+      context.supabase
+        .from("integration_rate_limits")
+        .select("provider,limit_value,remaining,reset_at,recorded_at")
+        .eq("workspace_id", wid)
+        .order("recorded_at", { ascending: false })
+        .limit(200),
+      context.supabase
+        .from("integration_api_logs")
+        .select("provider")
+        .eq("workspace_id", wid)
+        .gte("created_at", since)
+        .not("error_message", "is", null)
+        .limit(5000),
+    ]);
+    for (const r of [health, syncJobs, rateLimits, errorLogs]) if (r.error) throw r.error;
+
+    const healthBy = new Map((health.data ?? []).map((r: any) => [r.provider, r]));
+    const syncBy = new Map<string, string>();
+    for (const row of syncJobs.data ?? []) {
+      if (row.completed_at && !syncBy.has(row.provider)) syncBy.set(row.provider, row.completed_at);
+    }
+    const limitBy = new Map<string, any>();
+    for (const row of rateLimits.data ?? []) {
+      if (!limitBy.has(row.provider)) limitBy.set(row.provider, row);
+    }
+    const errorsBy = new Map<string, number>();
+    for (const row of errorLogs.data ?? []) {
+      errorsBy.set(row.provider, (errorsBy.get(row.provider) ?? 0) + 1);
+    }
+
+    // Last sync can also come from the connected-platform rows used by Google sync.
+    const { data: platforms } = await context.supabase
+      .from("connected_platforms")
+      .select("platform,last_synced_at")
+      .eq("workspace_id", wid);
+    for (const row of platforms ?? []) {
+      const existing = syncBy.get(row.platform);
+      if (row.last_synced_at && (!existing || row.last_synced_at > existing)) syncBy.set(row.platform, row.last_synced_at);
+    }
+
+    const items: ProviderHealth[] = INTEGRATIONS.map((definition) => {
+      const h: any = healthBy.get(definition.id);
+      const limit = limitBy.get(definition.id);
+      return {
+        provider: definition.id,
+        label: definition.label,
+        status: h?.status ?? null,
+        outcomeCode: h?.outcome_code ?? null,
+        lastCheckedAt: h?.last_checked_at ?? null,
+        lastOkAt: h?.last_ok_at ?? null,
+        lastSyncAt: syncBy.get(definition.id) ?? null,
+        lastError: h?.last_error ?? null,
+        errors24h: errorsBy.get(definition.id) ?? 0,
+        rateLimit: limit
+          ? { limit: limit.limit_value ?? null, remaining: limit.remaining ?? null, resetAt: limit.reset_at ?? null }
+          : null,
+      };
+    });
+    return { items, generatedAt: new Date().toISOString() };
+  });
