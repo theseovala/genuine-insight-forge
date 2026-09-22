@@ -61,6 +61,11 @@ const tabs = [
   { id: "account", label: "Account", icon: CreditCard },
 ] as const;
 
+/**
+ * A labelled text field. Omitting `onChange` marks the value as one the account
+ * owner cannot edit here, and the input is rendered read-only so it cannot
+ * accept typing it would then discard.
+ */
 function Field({
   label,
   value,
@@ -69,16 +74,22 @@ function Field({
 }: {
   label: string;
   value: string;
-  onChange: (v: string) => void;
+  onChange?: (v: string) => void;
   hint?: string;
 }) {
+  const readOnly = !onChange;
   return (
     <label className="block">
       <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">{label}</span>
       <input
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-10 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring/40"
+        onChange={(e) => onChange?.(e.target.value)}
+        readOnly={readOnly}
+        aria-readonly={readOnly}
+        className={cn(
+          "h-10 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring/40",
+          readOnly && "cursor-default bg-muted/50 text-muted-foreground focus:ring-0",
+        )}
       />
       {hint && <span className="mt-1 block text-[11px] text-muted-foreground">{hint}</span>}
     </label>
@@ -471,7 +482,7 @@ function AccountTab() {
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Full name" value={fullName} onChange={setFullName} />
         <Field label="Job title" value={jobTitle} onChange={setJobTitle} />
-        <Field label="Email" value={profile.email ?? ""} onChange={() => {}} hint="Managed by your login provider." />
+        <Field label="Email" value={profile.email ?? ""} hint="Managed by your login provider." />
       </div>
       <div className="mt-5 flex gap-2 border-t pt-4">
         <Button
