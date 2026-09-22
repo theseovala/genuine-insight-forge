@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Star, TrendingUp, TrendingDown, Minus, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BRAND, platforms, type PlatformId, type Sentiment, type ReviewStatus } from "@/lib/domain";
@@ -264,17 +264,28 @@ export function EmptyState({ icon: Icon, title, description, action }: { icon: L
 /* ---------- Interactive brand coin ---------- */
 export function BrandMark({ size = "md", light = false }: { size?: "sm" | "md" | "lg"; light?: boolean }) {
   const [spinning, setSpinning] = useState(false);
+  const spinTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sizeClass = { sm: "brand-coin-sm", md: "brand-coin-md", lg: "brand-coin-lg" }[size];
+
+  useEffect(() => () => {
+    if (spinTimer.current) clearTimeout(spinTimer.current);
+  }, []);
+
+  function spin() {
+    if (spinning) return;
+    setSpinning(true);
+    spinTimer.current = setTimeout(() => {
+      setSpinning(false);
+      spinTimer.current = null;
+    }, 840);
+  }
 
   return (
     <Button
       type="button"
       variant="ghost"
       className={cn("brand-coin-button", sizeClass, light && "brand-coin-on-dark")}
-      onClick={() => setSpinning(true)}
-      onAnimationEnd={(event) => {
-        if (event.animationName === "brand-coin-spin") setSpinning(false);
-      }}
+      onClick={spin}
       disabled={spinning}
       aria-label={spinning ? `${BRAND.name} logo rotating` : `Rotate ${BRAND.name} logo`}
       aria-busy={spinning}
