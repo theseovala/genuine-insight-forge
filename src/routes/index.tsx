@@ -9,6 +9,7 @@ import {
   Star,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BrandMark } from "@/components/app/primitives";
 import { BRAND } from "@/lib/domain";
 
 export const Route = createFileRoute("/")({
@@ -71,9 +72,7 @@ function Landing() {
     <div className="min-h-screen bg-background text-foreground">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
         <div className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Star className="h-5 w-5" />
-          </div>
+          <BrandMark />
           <span className="font-display text-lg font-bold tracking-tight">{BRAND.name}</span>
         </div>
         <Button asChild variant="ghost">
