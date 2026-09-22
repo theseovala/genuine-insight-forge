@@ -272,7 +272,9 @@ export function BrandMark({ size = "md", light = false }: { size?: "sm" | "md" |
       variant="ghost"
       className={cn("brand-coin-button", sizeClass, light && "brand-coin-on-dark")}
       onClick={() => setSpinning(true)}
-      onAnimationEnd={() => setSpinning(false)}
+      onAnimationEnd={(event) => {
+        if (event.animationName === "brand-coin-spin") setSpinning(false);
+      }}
       disabled={spinning}
       aria-label={spinning ? `${BRAND.name} logo rotating` : `Rotate ${BRAND.name} logo`}
       aria-busy={spinning}
