@@ -1,7 +1,10 @@
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Star, TrendingUp, TrendingDown, Minus, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BRAND, platforms, type PlatformId, type Sentiment, type ReviewStatus } from "@/lib/domain";
+import darkCoinAsset from "@/assets/seovale-coin-dark.jpg.asset.json";
+import lightCoinAsset from "@/assets/seovale-coin-light.jpg.asset.json";
+import { Button } from "@/components/ui/button";
 
 /* ---------- Page header ---------- */
 export function PageHeader({
@@ -258,12 +261,28 @@ export function EmptyState({ icon: Icon, title, description, action }: { icon: L
   );
 }
 
-/* ---------- Brand mark ---------- */
+/* ---------- Interactive brand coin ---------- */
 export function BrandMark({ size = "md", light = false }: { size?: "sm" | "md" | "lg"; light?: boolean }) {
-  const s = { sm: "size-7 rounded-lg text-xs", md: "size-9 rounded-xl text-sm", lg: "size-14 rounded-2xl text-xl" }[size];
+  const [spinning, setSpinning] = useState(false);
+  const sizeClass = { sm: "brand-coin-sm", md: "brand-coin-md", lg: "brand-coin-lg" }[size];
+
   return (
-    <span className={cn("grid shrink-0 place-items-center bg-gradient-brand font-display font-extrabold text-primary-foreground shadow-glow", s, light && "shadow-none")}>
-      {BRAND.name.charAt(0)}
-    </span>
+    <Button
+      type="button"
+      variant="ghost"
+      className={cn("brand-coin-button", sizeClass, light && "brand-coin-on-dark")}
+      onClick={() => setSpinning(true)}
+      onAnimationEnd={() => setSpinning(false)}
+      disabled={spinning}
+      aria-label={spinning ? `${BRAND.name} logo rotating` : `Rotate ${BRAND.name} logo`}
+      aria-busy={spinning}
+      title={`Rotate ${BRAND.name} logo`}
+    >
+      <span className={cn("brand-coin", spinning && "brand-coin-spinning")} aria-hidden="true">
+        <span className="brand-coin-edge" />
+        <img className="brand-coin-face brand-coin-front" src={darkCoinAsset.url} alt="" draggable={false} />
+        <img className="brand-coin-face brand-coin-back" src={lightCoinAsset.url} alt="" draggable={false} />
+      </span>
+    </Button>
   );
 }
