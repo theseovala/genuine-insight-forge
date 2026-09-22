@@ -468,6 +468,13 @@
   .brand-coin-sm { --brand-coin-size: 36px; }
   .brand-coin-lg { --brand-coin-size: 50px; }
 }
+/* Large phones and small tablets sat on the 390px step, which left a 600px
+   viewport at 40px — below the size this breakpoint is meant to carry. */
+@media (min-width: 600px) {
+  .brand-coin-button { --brand-coin-size: 44px; }
+  .brand-coin-sm { --brand-coin-size: 38px; }
+  .brand-coin-lg { --brand-coin-size: 52px; }
+}
 @media (min-width: 768px) {
   .brand-coin-button { --brand-coin-size: 46px; }
   .brand-coin-sm { --brand-coin-size: 40px; }
