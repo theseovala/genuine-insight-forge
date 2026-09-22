@@ -134,7 +134,7 @@ function SidebarInner({
     <div className="flex h-full flex-col border-r border-sidebar-border/70">
       <div
         className={cn(
-          "flex items-center gap-2.5 border-b border-sidebar-border/60 py-3.5",
+          "flex min-h-14 items-center gap-2.5 border-b border-sidebar-border/60 py-1",
           collapsed ? "justify-center px-0" : "px-4",
         )}
       >
