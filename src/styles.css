@@ -397,7 +397,7 @@
   box-shadow: none;
   transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1), filter 180ms ease;
 }
-.brand-coin-button:hover:not(:disabled) {
+.brand-coin-button:hover:not(:disabled):not([aria-busy="true"]) {
   background: transparent;
   transform: translateY(-1px);
   filter: drop-shadow(0 5px 5px color-mix(in oklab, var(--foreground) 18%, transparent));
@@ -408,6 +408,12 @@
 .brand-coin-button:disabled {
   pointer-events: none;
   opacity: 1;
+}
+/* While the coin is mid-rotation the button keeps its focus and stays reachable
+   by keyboard; only the hover lift is suppressed so the two do not fight. */
+.brand-coin-button[aria-busy="true"] {
+  transform: none;
+  filter: none;
 }
 .brand-coin-sm {
   --brand-coin-size: 34px;
