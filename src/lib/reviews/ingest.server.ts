@@ -76,7 +76,9 @@ export async function ingestNormalizedReviews(
       review_url: review.reviewUrl,
       // A reply is only written when the provider returned one; an absent reply
       // never clears a reply already stored.
-      ...(review.reply ? { reply: review.reply.text } : {}),
+      // A reply published on the platform since the last sync also marks the
+      // review answered, with the time the platform reports.
+      ...(review.reply ? { reply: review.reply.text, status: "replied", replied_at: review.reply.publishedAt ?? review.createdAt } : {}),
     };
 
     const key = reviewKey(review.platform, review.externalId);

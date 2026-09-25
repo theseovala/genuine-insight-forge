@@ -101,7 +101,18 @@ export const Route = createFileRoute("/api/public/integrations/jobs-run")({
           google = { error: caught instanceof Error ? caught.message : "Google reconcile failed" };
         }
 
-        return Response.json({ ok: true, claimed: claimed.length, processed, failed, scansResumed, google });
+        // Hourly review sync, after the reconcile above so Google is only synced
+        // for connections Google has just proven usable. Each provider/workspace
+        // is isolated inside; this outer guard keeps the response intact.
+        let reviewSync: unknown;
+        try {
+          const { runScheduledReviewSyncs, publicSyncSummary } = await import("@/lib/reviews/scheduled-sync.server");
+          reviewSync = publicSyncSummary(await runScheduledReviewSyncs(supabaseAdmin));
+        } catch (caught) {
+          reviewSync = { error: caught instanceof Error ? caught.message : "Scheduled review sync failed" };
+        }
+
+        return Response.json({ ok: true, claimed: claimed.length, processed, failed, scansResumed, google, reviewSync });
       },
     },
   },

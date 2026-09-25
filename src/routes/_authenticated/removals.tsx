@@ -12,6 +12,7 @@ import { currentWorkspaceId } from "@/lib/seovale-db";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -228,6 +229,32 @@ const routeLabels: Record<string, string> = {
   court_order_evidence: "Court order evidence",
 };
 
+type LedgerView = {
+  phase: string;
+  at: string;
+  observation: string;
+  source?: { type?: string; detail?: string };
+  reviewVisible?: boolean | null;
+  providerResponse?: { channel: string; verbatim: string; reference: string | null; decision: string; receivedAt: string };
+};
+
+type RouteView = {
+  route: string;
+  actionState: string;
+  blockedBy: string | null;
+  policyBasis?: {
+    ruleName: string;
+    citationStatus?: "CITED" | "NO_SUPPORTED_POLICY_ROUTE";
+    citationReason?: string;
+    citation?: { finalUrl: string; title: string; section: string; excerpt: string; retrievedAt: string };
+  };
+  humanAction?: {
+    destination: { url: string; title: string; verifiedAt: string } | null;
+    whatToSubmit: string;
+    evidenceRequired: string[];
+  };
+};
+
 type CaseDetail = {
   integrity: "intact" | "mismatch" | "not_sealed";
   packageSha256: string | null;
@@ -235,9 +262,17 @@ type CaseDetail = {
   outcome: string;
   outcomeBasis: string;
   nextRecheckDue: string | null;
-  routes: Array<{ route: string; actionState: string; blockedBy: string | null }>;
-  ledger: Array<{ phase: string; at: string; observation: string; source?: { type?: string } }>;
+  stage: string;
+  primaryRoute: RouteView | null;
+  latestSubmission: LedgerView | null;
+  latestResponse: LedgerView | null;
+  latestRecheck: LedgerView | null;
+  routes: RouteView[];
+  ledger: LedgerView[];
 };
+
+/** Legal, regulator and court routes need an owner or admin to confirm human approval. */
+const legalRoutes = ["legal_removal_request", "regulator_complaint", "court_order_evidence"];
 
 /** The evidence package and verification ledger of one case, integrity-checked server-side. */
 function CaseEvidence({ caseId }: { caseId: string }) {
@@ -248,8 +283,75 @@ function CaseEvidence({ caseId }: { caseId: string }) {
   });
   if (isLoading) return <p className="mt-3 text-xs text-muted-foreground">Loading evidence…</p>;
   if (error || !data) return <p className="mt-3 text-xs text-destructive">Could not load the evidence package.</p>;
+  const primary = data.primaryRoute;
+  const citation = primary?.policyBasis?.citationStatus === "CITED" ? primary.policyBasis.citation : undefined;
   return (
     <div className="mt-3 space-y-2 rounded-lg border bg-muted/30 p-3 text-xs">
+      <div>
+        <span className="font-semibold">Stage: </span>
+        {data.stage}
+      </div>
+      <div>
+        <span className="font-semibold">Policy citation: </span>
+        {citation ? (
+          <>
+            <a href={citation.finalUrl} target="_blank" rel="noopener noreferrer" className="underline">
+              {citation.title}
+            </a>
+            {" "}— section "{citation.section}", retrieved {new Date(citation.retrievedAt).toLocaleString()}
+            <p className="mt-1 rounded-lg bg-muted/60 px-3 py-2 text-muted-foreground">"{citation.excerpt}"</p>
+          </>
+        ) : (
+          <>
+            No supported policy route
+            {primary?.policyBasis?.citationReason ? ` — ${primary.policyBasis.citationReason}` : " — no retrieved policy document is attached to this case."}
+          </>
+        )}
+      </div>
+      {primary && (
+        <div>
+          <span className="font-semibold">Recommended route: </span>
+          {routeLabels[primary.route] ?? primary.route}
+          {primary.humanAction && (
+            <>
+              {" "}· HUMAN_ACTION_REQUIRED
+              <div className="mt-1">{primary.humanAction.whatToSubmit}</div>
+              <div className="mt-1">
+                <span className="font-semibold">Official destination: </span>
+                {primary.humanAction.destination ? (
+                  <a href={primary.humanAction.destination.url} target="_blank" rel="noopener noreferrer" className="underline">
+                    {primary.humanAction.destination.title}
+                  </a>
+                ) : (
+                  "none verified for this platform — use the platform's own reporting flow"
+                )}
+              </div>
+              <div className="mt-1">
+                <span className="font-semibold">Evidence to include: </span>
+                {primary.humanAction.evidenceRequired.join(", ")}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+      <div>
+        <span className="font-semibold">Submission: </span>
+        {data.latestSubmission
+          ? `${new Date(data.latestSubmission.at).toLocaleString()} — ${data.latestSubmission.source?.detail ?? data.latestSubmission.observation}`
+          : "not submitted yet"}
+      </div>
+      <div>
+        <span className="font-semibold">Platform response: </span>
+        {data.latestResponse?.providerResponse
+          ? `${data.latestResponse.providerResponse.decision} (${new Date(data.latestResponse.at).toLocaleString()}) — "${data.latestResponse.providerResponse.verbatim}"`
+          : "none recorded"}
+      </div>
+      <div>
+        <span className="font-semibold">Recheck: </span>
+        {data.latestRecheck
+          ? `${new Date(data.latestRecheck.at).toLocaleString()} — ${data.latestRecheck.reviewVisible === true ? "review still published" : data.latestRecheck.reviewVisible === false ? "review not found" : "could not observe"} (${data.latestRecheck.source?.type ?? "unknown source"})`
+          : "no recheck yet"}
+      </div>
       <div>
         <span className="font-semibold">Package integrity: </span>
         {data.integrity === "intact"
@@ -323,11 +425,14 @@ function CaseActions({ c, onChanged }: { c: CaseRow; onChanged: () => void }) {
   const [verbatim, setVerbatim] = useState("");
   const [manualReason, setManualReason] = useState<string | null>(null);
   const [method, setMethod] = useState("");
+  const [humanApproved, setHumanApproved] = useState(false);
   const platform = c.reviews?.platform ?? "the platform";
+  const legalRoute = legalRoutes.includes(route);
 
   const done = (message: string) => {
     setMode(null);
     setReference("");
+    setHumanApproved(false);
     setVerbatim("");
     setMethod("");
     setManualReason(null);
@@ -352,9 +457,10 @@ function CaseActions({ c, onChanged }: { c: CaseRow; onChanged: () => void }) {
           channel: "manual_provider_interface",
           observation: `A workspace member filed this case with ${platform} through the ${routeLabels[route] ?? route} route.`,
           ...(reference.trim() ? { reference: reference.trim() } : {}),
+          ...(legalRoute ? { humanApproved } : {}),
         },
       }),
-    onSuccess: () => done("Submission recorded"),
+    onSuccess: (result: { duplicate?: boolean }) => done(result.duplicate ? "Already recorded — no duplicate added" : "Submission recorded"),
     onError: fail,
   });
 
@@ -468,7 +574,13 @@ function CaseActions({ c, onChanged }: { c: CaseRow; onChanged: () => void }) {
             <span className="mb-1 block text-xs font-semibold text-muted-foreground">Platform reference (optional)</span>
             <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Case or ticket number the platform gave you" />
           </div>
-          <Button size="sm" onClick={() => recordSubmit.mutate()} disabled={busy}>
+          {legalRoute && (
+            <label className="flex basis-full items-center gap-2 text-xs">
+              <Checkbox checked={humanApproved} onCheckedChange={(v) => setHumanApproved(v === true)} />
+              A person (and a lawyer where required) approved this legal submission before it was sent. Owner or admin only.
+            </label>
+          )}
+          <Button size="sm" onClick={() => recordSubmit.mutate()} disabled={busy || (legalRoute && !humanApproved)}>
             {recordSubmit.isPending ? "Saving…" : "Record submission"}
           </Button>
           <Button size="sm" variant="ghost" onClick={() => setMode(null)}>
@@ -888,7 +1000,7 @@ function RemovalsPage() {
                 )}
 
                 <p className="mt-3 text-sm">
-                  <span className="font-semibold">Why it breaks policy: </span>
+                  <span className="font-semibold">Why it may break policy (AI candidate, not confirmed): </span>
                   {c.rationale}
                 </p>
                 {c.appeal_text && (

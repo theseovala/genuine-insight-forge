@@ -63,74 +63,9 @@ export const syncGoogleBusinessReviews = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const member = await workspace(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: connection, error } = await supabaseAdmin.from("google_business_connections").select("access_token_ciphertext,refresh_token_ciphertext,token_expires_at,status,scopes").eq("workspace_id", member.workspace_id).maybeSingle();
-    if (error) throw error;
-    // A needs_reconnect row is still tried when it holds the Business Profile
-    // scope: an "API not approved" failure clears as soon as Google approves the
-    // project, and only a real call can show that.
-    if (!connection || connection.status === "revoked") throw new Error("Connect Google Business Profile first.");
-    const { fetchGoogleReviews, usableAccessToken, hasBusinessScope, markGoogleConnectionUnusable, GoogleConnectionUnusableError, MISSING_BUSINESS_SCOPE_MESSAGE } = await import("./google-business-sync.server");
-    // Without business.manage every Business Profile call returns 403, so the
-    // connection is recorded as needing reconnection instead of being tried.
-    if (!hasBusinessScope(connection.scopes)) {
-      await markGoogleConnectionUnusable(supabaseAdmin, member.workspace_id, MISSING_BUSINESS_SCOPE_MESSAGE);
-      throw new Error(MISSING_BUSINESS_SCOPE_MESSAGE);
-    }
-    const { data: run, error: runError } = await context.supabase.from("sync_runs").insert({ workspace_id: member.workspace_id, platform: "google" }).select("id").single();
-    if (runError) throw runError;
-    try {
-      const token = await usableAccessToken(supabaseAdmin, member.workspace_id, connection);
-      const batches = await fetchGoogleReviews(token);
-      const { data: rules } = await context.supabase.from("alert_rules").select("negative_rating_threshold").eq("workspace_id", member.workspace_id).maybeSingle();
-      // A report the platform will act on has to point at the review. Google
-      // publishes no per-review permalink, so this returns the place link when a
-      // real place id came back and null otherwise — never a guessed URL.
-      const { deriveReviewUrl } = await import("@/lib/removal/review-url");
-      let found = 0;
-      let created = 0;
-      let updated = 0;
-      let alerts = 0;
-      let rejected = 0;
-      for (const batch of batches) {
-        const { data: existingLocation } = await context.supabase.from("locations").select("id").eq("workspace_id", member.workspace_id).eq("external_ref", batch.location.externalRef).maybeSingle();
-        if (existingLocation) {
-          await context.supabase.from("locations").update({ name: batch.location.name, city: batch.location.city, country: batch.location.country }).eq("id", existingLocation.id);
-        } else {
-          const { error: locationError } = await context.supabase.from("locations").insert({ workspace_id: member.workspace_id, external_ref: batch.location.externalRef, name: batch.location.name, city: batch.location.city, country: batch.location.country });
-          if (locationError) throw locationError;
-        }
-        const reviewUrl = deriveReviewUrl({ platform: "google", placeId: batch.location.placeId }).url;
-        const { normalizeGoogleReview } = await import("@/lib/reviews/normalized");
-        const { ingestNormalizedReviews } = await import("@/lib/reviews/ingest.server");
-        const stored = await ingestNormalizedReviews(context.supabase, {
-          workspaceId: member.workspace_id,
-          results: batch.reviews.map((review) => normalizeGoogleReview(review, { locationName: batch.location.name, reviewUrl })),
-          negativeThreshold: rules?.negative_rating_threshold ?? 2,
-          platformLabel: "Google",
-        });
-        found += stored.found;
-        created += stored.created;
-        updated += stored.updated;
-        alerts += stored.alerts;
-        rejected += stored.rejected.length;
-      }
-      const now = new Date().toISOString();
-      await context.supabase.from("sync_runs").update({ status: "completed", locations_found: batches.length, reviews_found: found, reviews_created: created, reviews_updated: updated, alerts_created: alerts, completed_at: now }).eq("id", run.id);
-      await supabaseAdmin.from("google_business_connections").update({ status: "connected", last_synced_at: now, last_error: null }).eq("workspace_id", member.workspace_id);
-      await context.supabase.from("connected_platforms").update({ status: "connected", last_synced_at: now, last_sync_error: null }).eq("workspace_id", member.workspace_id).eq("platform", "google");
-      return { locations: batches.length, reviewsFound: found, reviewsCreated: created, reviewsUpdated: updated, alertsCreated: alerts, reviewsRejected: rejected };
-    } catch (caught) {
-      const message = caught instanceof Error ? caught.message : "Google sync failed";
-      await context.supabase.from("sync_runs").update({ status: "failed", error_message: message, completed_at: new Date().toISOString() }).eq("id", run.id);
-      if (caught instanceof GoogleConnectionUnusableError) {
-        // Scope missing, API not approved or refresh failed: the connection stops
-        // being reported as connected until the owner reconnects.
-        await markGoogleConnectionUnusable(supabaseAdmin, member.workspace_id, message);
-      } else {
-        await supabaseAdmin.from("google_business_connections").update({ last_error: message }).eq("workspace_id", member.workspace_id);
-      }
-      throw caught;
-    }
+    // The same sync the scheduler runs; here with the signed-in user's RLS client.
+    const { runGoogleReviewSync } = await import("./google-business-sync.server");
+    return runGoogleReviewSync(context.supabase, supabaseAdmin, member.workspace_id, "manual");
   });
 
 export const disconnectGoogleBusiness = createServerFn({ method: "POST" })

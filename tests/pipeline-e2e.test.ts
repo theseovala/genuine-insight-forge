@@ -27,6 +27,7 @@ import {
 import { detectRoutes } from "../src/lib/removal/routes";
 import { resealWithLedger, verifyPackageIntegrity, type EvidencePackage } from "../src/lib/removal/evidence.server";
 import { trustpilotReviewVisible } from "../src/lib/removal/recheck.server";
+import { setPolicyFetcher } from "../src/lib/removal/policy-sources.server";
 import { GOOGLE_TIMEOUT_MS } from "../src/lib/google-business-sync.server";
 
 const WORKSPACE = "66666666-6666-4666-8666-666666666666";
@@ -82,6 +83,11 @@ function memoryDb() {
 }
 
 beforeAll(() => {
+  // No network in the unit suite: the official policy document is "unreachable",
+  // so every platform route must stay uncited (NO_SUPPORTED_POLICY_ROUTE).
+  setPolicyFetcher((async () => {
+    throw new Error("network disabled in unit tests");
+  }) as unknown as typeof fetch);
   mock.module("@/lib/ai-gateway.server", () => ({
     runAiText: async () => ({ output: stubAiOutput, model: "fixture/stub-model" }),
   }));

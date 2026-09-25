@@ -146,6 +146,31 @@ export function validateEvidencePackage(pkg: EvidencePackage): void {
   if (pkg.legal.status === "LEGAL_SOURCE_REQUIRED" && pkg.legal.authorities.length > 0) {
     throw new Error("Legal authorities are present while no authorised legal source is connected.");
   }
+  // A policy citation must point at a document that was actually retrieved:
+  // URL, title, section, excerpt, retrieval time and body hash, all present.
+  for (const route of pkg.routes ?? []) {
+    const basis = route.policyBasis;
+    if (basis.source !== "POLICY_SOURCE_REQUIRED") {
+      if (!basis.source.url || Number.isNaN(Date.parse(basis.source.retrievedAt))) {
+        throw new Error(`Route ${route.route} cites a policy source without a URL or retrieval date.`);
+      }
+    }
+    if (basis.citationStatus === "CITED") {
+      const c = basis.citation;
+      if (
+        !c ||
+        basis.source === "POLICY_SOURCE_REQUIRED" ||
+        basis.source.url !== c.finalUrl ||
+        !c.title ||
+        !c.section ||
+        !c.excerpt ||
+        !/^[0-9a-f]{64}$/.test(c.documentSha256) ||
+        Number.isNaN(Date.parse(c.retrievedAt))
+      ) {
+        throw new Error(`Route ${route.route} claims a policy citation that is not backed by a retrieved document.`);
+      }
+    }
+  }
   for (const authority of pkg.legal.authorities) {
     if (!authority.url || !authority.citation || Number.isNaN(Date.parse(authority.retrievedAt))) {
       throw new Error(
@@ -276,7 +301,7 @@ export function buildEvidencePackage(input: BuildEvidenceInput): EvidencePackage
 
   items.push({
     id: "policy_classification",
-    claim: `The review was classified as ${input.finding.violationType}.`,
+    claim: `The AI classifier proposed ${input.finding.violationType} as a candidate violation, for a person to confirm.`,
     value: input.finding.explanation,
     source: {
       type: "ai_classification",
@@ -341,6 +366,26 @@ export function buildEvidencePackage(input: BuildEvidenceInput): EvidencePackage
 
 /** The evidence item naming the rule a route relies on, and whether it is cited. */
 function policyBasisItem(route: DetectedRoute, now: string): EvidenceItem {
+  const citation = route.policyBasis.citationStatus === "CITED" ? route.policyBasis.citation : undefined;
+  // A retrieved citation is only used when it agrees with the source it replaced.
+  if (citation && route.policyBasis.source !== "POLICY_SOURCE_REQUIRED" && route.policyBasis.source.url === citation.finalUrl) {
+    return {
+      id: `policy_basis_${route.route}`,
+      claim: `Route ${route.route} relies on the section "${citation.section}" of "${citation.title}".`,
+      value: citation.excerpt,
+      source: {
+        type: "retrieved_policy_document",
+        detail: `Section "${citation.section}" found in the document as retrieved; body SHA-256 ${citation.documentSha256}${citation.truncated ? " (first 3 MB)" : ""}; requested ${citation.documentUrl}`,
+        url: citation.finalUrl,
+        retrievedAt: citation.retrievedAt,
+      },
+      timestamp: now,
+      confidence: 1,
+      explanation:
+        "The excerpt is the document's own text following that heading, whitespace collapsed. It shows what the platform's policy says; whether this review falls under it is the classifier's candidate finding, for a person to confirm.",
+    };
+  }
+  const noRoute = route.policyBasis.citationStatus === "NO_SUPPORTED_POLICY_ROUTE";
   return {
       id: `policy_basis_${route.route}`,
       claim: `Route ${route.route} relies on: ${route.policyBasis.ruleName}`,
@@ -352,8 +397,9 @@ function policyBasisItem(route: DetectedRoute, now: string): EvidenceItem {
         route.policyBasis.source === "POLICY_SOURCE_REQUIRED"
           ? {
               type: "policy_source_required",
-              detail:
-                "No retrieved policy document is attached, so the rule is named but not cited.",
+              detail: noRoute
+                ? `NO_SUPPORTED_POLICY_ROUTE: ${route.policyBasis.citationReason ?? "no retrieved section covers this violation"}`
+                : "No retrieved policy document is attached, so the rule is named but not cited.",
               url: null,
               retrievedAt: now,
             }

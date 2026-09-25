@@ -361,54 +361,9 @@ async function commitLedger(
   ledger: unknown[],
   status?: string,
 ) {
-  const { resealWithLedger } = await import("@/lib/removal/evidence.server");
-
-  // A case created before the evidence package existed has nothing to reseal.
-  // The ledger is still recorded, and the outcome is still derived from it.
-  let nextEvidence = evidence;
-  let outcome: string;
-  let outcomeAt: string | null;
-  if (evidence) {
-    nextEvidence = resealWithLedger(evidence, ledger as never);
-    // Once the platform has rejected the report its appeal channel opens, so the
-    // routes are re-detected with that history instead of staying frozen at
-    // what was true when the case was opened.
-    const { hasPriorRejection } = await import("@/lib/removal/lifecycle");
-    const routes = Array.isArray(nextEvidence?.routes) ? nextEvidence.routes : [];
-    if (nextEvidence?.schema === "seovale.evidence.v1" && hasPriorRejection(ledger as never, status) && !routes.some((r: any) => r?.route === "platform_appeal")) {
-      const { detectRoutes } = await import("@/lib/removal/routes");
-      const { providerApiApproved } = await import("@/lib/removal-scan.server");
-      const { resealWithRoutes } = await import("@/lib/removal/evidence.server");
-      const rerouted = detectRoutes({
-        platform: nextEvidence.review.platform,
-        violation: nextEvidence.finding.violationType,
-        capability: { providerApiApproved: await providerApiApproved(context.supabase, workspaceId), legalSourceConnected: nextEvidence.legal?.status === "LEGAL_SOURCE_CONNECTED" },
-        priorRejection: true,
-      });
-      if (rerouted.length > 0) nextEvidence = resealWithRoutes(nextEvidence, rerouted);
-    }
-    outcome = nextEvidence.verification.outcome;
-    outcomeAt = nextEvidence.verification.outcomeAt;
-  } else {
-    const { resolveOutcome } = await import("@/lib/removal/lifecycle");
-    const resolved = resolveOutcome(ledger as never);
-    outcome = resolved.outcome;
-    outcomeAt = resolved.outcomeAt;
-    nextEvidence = { schema: "seovale.evidence.legacy_ledger_only", verification: { ledger } };
-  }
-
-  const { error } = await context.supabase
-    .from("removal_cases")
-    .update({
-      evidence: nextEvidence,
-      outcome,
-      outcome_at: outcomeAt,
-      ...(status ? { status } : {}),
-    })
-    .eq("id", caseId)
-    .eq("workspace_id", workspaceId);
-  if (error) throw error;
-  return { outcome, outcomeAt };
+  // Shared with the scheduled recheck, so both commit through one code path.
+  const { commitCaseLedger } = await import("@/lib/removal/scheduled.server");
+  return commitCaseLedger(context.supabase, workspaceId, caseId, evidence, ledger, status);
 }
 
 /** Returns the evidence package, detected routes and verification ledger. */
@@ -418,8 +373,12 @@ export const getRemovalCaseDetail = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     const workspaceId = await workspaceIdFor(context);
     const { row, evidence, ledger } = await caseLedger(context, workspaceId, data.caseId);
-    const { phaseProgress, providerDecision, resolveOutcome, nextRecheckDue } = await import("@/lib/removal/lifecycle");
+    const { phaseProgress, providerDecision, resolveOutcome, nextRecheckDue, deriveCaseStage } = await import("@/lib/removal/lifecycle");
     const resolved = resolveOutcome(ledger as never);
+    const routes = Array.isArray(evidence?.routes) ? evidence.routes : [];
+    const primary = routes.find((r: any) => r?.route === (row.route ?? "platform_policy_report")) ?? routes[0] ?? null;
+    const latestOf = (phase: string) =>
+      (ledger as any[]).filter((e) => e?.phase === phase).sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0] ?? null;
     // The package hash is actually recomputed here, so a package altered after
     // it was sealed shows as a mismatch rather than being presented as intact.
     const { EVIDENCE_SCHEMA, verifyPackageIntegrity } = await import("@/lib/removal/evidence.server");
@@ -438,7 +397,7 @@ export const getRemovalCaseDetail = createServerFn({ method: "GET" })
       status: row.status as string,
       route: (row.route as string | null) ?? null,
       evidence,
-      routes: Array.isArray(evidence?.routes) ? evidence.routes : [],
+      routes,
       ledger,
       phases: phaseProgress(ledger as never),
       providerDecision: providerDecision(ledger as never),
@@ -446,6 +405,16 @@ export const getRemovalCaseDetail = createServerFn({ method: "GET" })
       outcomeAt: resolved.outcomeAt,
       outcomeBasis: resolved.basis,
       nextRecheckDue: nextRecheckDue(ledger as never),
+      stage: deriveCaseStage({
+        status: row.status,
+        outcome: (row.outcome as string | null) ?? null,
+        ledger: ledger as never,
+        policyCited: primary?.policyBasis?.citationStatus === "CITED",
+      }),
+      primaryRoute: primary,
+      latestSubmission: latestOf("SUBMISSION"),
+      latestResponse: latestOf("RESPONSE"),
+      latestRecheck: latestOf("RECHECK"),
     };
   });
 
@@ -467,31 +436,64 @@ export const recordSubmission = createServerFn({ method: "POST" })
         observation: z.string().min(3).max(2000),
         /** A reference the provider issued at submission time, if any. */
         reference: z.string().max(200).optional(),
+        /**
+         * Legal, regulator and court routes only: the owner or admin confirms a
+         * person (and, where needed, a lawyer) approved this before it left.
+         */
+        humanApproved: z.boolean().optional(),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const workspaceId = await workspaceIdFor(context);
+    const member = await memberFor(context);
+    const workspaceId = member.workspace_id;
     const { row, evidence, ledger } = await caseLedger(context, workspaceId, data.caseId);
-    const { appendEntry, assertTransition } = await import("@/lib/removal/lifecycle");
-    const { ROUTES } = await import("@/lib/removal/routes");
+    const { appendEntry, assertTransition, findRecentDuplicate, resolveOutcome } = await import("@/lib/removal/lifecycle");
+    const { ROUTES, assertHumanApproval, requiresHumanApproval } = await import("@/lib/removal/routes");
     if (!(ROUTES as readonly string[]).includes(data.route)) {
       throw new Error(`"${data.route}" is not one of the legitimate routes this system recognises.`);
     }
-    if (row.status !== "submitted") assertTransition(row.status, "submitted");
 
-    const next = appendEntry(ledger as never, {
-      phase: "SUBMISSION",
+    // Human approval gate: nothing on a legal route is recorded as sent unless an
+    // owner or admin explicitly confirms the approval.
+    const legalRoute = requiresHumanApproval(data.route);
+    assertHumanApproval({ route: data.route, role: member.role, humanApproved: data.humanApproved });
+
+    const entry = {
+      phase: "SUBMISSION" as const,
       at: new Date().toISOString(),
-      actor: { kind: "user", id: context.userId },
+      actor: { kind: "user" as const, id: context.userId },
       observation: data.observation,
       source: {
         type: "submission_record",
-        detail: `route=${data.route}; channel=${data.channel}${data.reference ? `; provider reference=${data.reference}` : ""}`,
+        detail: `route=${data.route}; channel=${data.channel}${legalRoute ? `; human_approved_by=${context.userId}` : ""}${data.reference ? `; provider reference=${data.reference}` : ""}`,
       },
-    });
+    };
+
+    // A retried request (same route and reference within ten minutes) returns
+    // what was already recorded instead of adding a second submission.
+    const duplicate = findRecentDuplicate(ledger as never, entry);
+    if (duplicate) {
+      const resolved = resolveOutcome(ledger as never);
+      return { outcome: resolved.outcome, outcomeAt: resolved.outcomeAt, phase: "SUBMISSION" as const, duplicate: true };
+    }
+
+    if (row.status !== "submitted") assertTransition(row.status, "submitted");
+
+    const next = appendEntry(ledger as never, entry);
     const result = await commitLedger(context, workspaceId, data.caseId, evidence, next, "submitted");
-    return { ...result, phase: "SUBMISSION" as const };
+    if (legalRoute) {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin.from("audit_logs").insert({
+        workspace_id: workspaceId,
+        actor: context.userId,
+        action: "removal_legal_submission_approved",
+        target_type: "removal_case",
+        target_id: data.caseId,
+        metadata: { route: data.route, channel: data.channel, role: member.role, human_approved: true, reference: data.reference ?? null },
+      });
+    }
+    return { ...result, phase: "SUBMISSION" as const, duplicate: false };
   });
 
 /**
@@ -519,14 +521,14 @@ export const recordProviderResponse = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const workspaceId = await workspaceIdFor(context);
     const { evidence, ledger } = await caseLedger(context, workspaceId, data.caseId);
-    const { appendEntry, assertNotFuture } = await import("@/lib/removal/lifecycle");
+    const { appendEntry, assertNotFuture, findRecentDuplicate, resolveOutcome } = await import("@/lib/removal/lifecycle");
     const receivedAt = data.receivedAt ?? new Date().toISOString();
     assertNotFuture(receivedAt);
 
-    const next = appendEntry(ledger as never, {
-      phase: "RESPONSE",
+    const entry = {
+      phase: "RESPONSE" as const,
       at: receivedAt,
-      actor: { kind: "provider", id: null },
+      actor: { kind: "provider" as const, id: null },
       observation: `The provider answered: ${data.decision}.`,
       source: { type: "provider_response", detail: `channel=${data.channel}` },
       providerResponse: {
@@ -536,9 +538,15 @@ export const recordProviderResponse = createServerFn({ method: "POST" })
         decision: data.decision,
         receivedAt,
       },
-    });
+    };
+    // The same answer recorded twice within ten minutes is one answer.
+    if (findRecentDuplicate(ledger as never, entry)) {
+      const resolved = resolveOutcome(ledger as never);
+      return { outcome: resolved.outcome, outcomeAt: resolved.outcomeAt, phase: "RESPONSE" as const, duplicate: true };
+    }
+    const next = appendEntry(ledger as never, entry);
     const result = await commitLedger(context, workspaceId, data.caseId, evidence, next);
-    return { ...result, phase: "RESPONSE" as const };
+    return { ...result, phase: "RESPONSE" as const, duplicate: false };
   });
 
 /**
@@ -614,83 +622,9 @@ export const autoRecheckRemovalCase = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ caseId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const workspaceId = await workspaceIdFor(context);
-    const { row, evidence, ledger } = await caseLedger(context, workspaceId, data.caseId);
-    const { data: review, error: reviewError } = await context.supabase
-      .from("reviews")
-      .select("platform, external_id")
-      .eq("id", row.review_id)
-      .eq("workspace_id", workspaceId)
-      .maybeSingle();
-    if (reviewError) throw reviewError;
-    if (!review) return { performed: false as const, reason: "The review row no longer exists, so there is nothing to re-fetch." };
-
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    let observed: { visible: boolean | null; detail: string; method: string } | null = null;
-
-    if (review.platform === "google" && typeof review.external_id === "string" && review.external_id.startsWith("gbp:")) {
-      const { data: connection } = await supabaseAdmin
-        .from("google_business_connections")
-        .select("access_token_ciphertext,refresh_token_ciphertext,token_expires_at,status,scopes")
-        .eq("workspace_id", workspaceId)
-        .maybeSingle();
-      const sync = await import("./google-business-sync.server");
-      if (connection && connection.status === "connected" && sync.hasBusinessScope(connection.scopes)) {
-        try {
-          const token = await sync.usableAccessToken(supabaseAdmin, workspaceId, connection);
-          observed = { ...(await sync.googleReviewVisible(token, review.external_id)), method: "google_business_profile_api" };
-        } catch (caught) {
-          if (caught instanceof sync.GoogleConnectionUnusableError) await sync.markGoogleConnectionUnusable(supabaseAdmin, workspaceId, caught.message);
-          return { performed: false as const, reason: caught instanceof Error ? caught.message : "Google could not be reached." };
-        }
-      }
-    } else if (review.platform === "trustpilot" && review.external_id) {
-      const { loadProviderCredentials } = await import("@/lib/integrations/credentials.server");
-      const creds = await loadProviderCredentials(supabaseAdmin, workspaceId, "trustpilot");
-      const apiKey = creds["TRUSTPILOT_API_KEY"] ?? process.env["TRUSTPILOT_API_KEY"];
-      if (apiKey) {
-        const { trustpilotReviewVisible } = await import("@/lib/removal/recheck.server");
-        observed = { ...(await trustpilotReviewVisible(apiKey, String(review.external_id))), method: "trustpilot_api" };
-      }
-    }
-
-    if (!observed) {
-      return {
-        performed: false as const,
-        reason: `No working ${review.platform} connection can re-fetch this review. Record what you see on ${review.platform} as a user-reported observation.`,
-      };
-    }
-    if (observed.visible === null) {
-      return { performed: false as const, reason: `The automatic recheck could not observe the review: ${observed.detail}` };
-    }
-
-    const { appendEntry, resolveOutcome, statusAfterRecheck } = await import("@/lib/removal/lifecycle");
-    const observedAt = new Date().toISOString();
-    let next = appendEntry(ledger as never, {
-      phase: "RECHECK",
-      at: observedAt,
-      actor: { kind: "system", id: null },
-      observation: observed.visible ? "The provider API still returns the review." : "The provider API no longer returns the review.",
-      source: { type: "provider_api_recheck", detail: `${observed.method}: ${observed.detail}` },
-      reviewVisible: observed.visible,
-    });
-    const resolved = resolveOutcome(next as never);
-
-    // A submitted case is closed by a definite provider observation, and an
-    // "approved" case whose review is still published goes back to "rejected";
-    // any other status is left as it is.
-    let status: string | undefined;
-    const target = statusAfterRecheck(row.status, resolved.outcome);
-    if (target) {
-      next = appendEntry(next as never, {
-        phase: "AFTER",
-        at: observedAt,
-        actor: { kind: "system", id: null },
-        observation: resolved.basis,
-        source: { type: "derived_from_recheck", detail: `outcome=${resolved.outcome}` },
-      });
-      status = target;
-    }
-
-    const result = await commitLedger(context, workspaceId, data.caseId, evidence, next, status);
-    return { performed: true as const, reviewVisible: observed.visible, basis: resolved.basis, statusChangedTo: status ?? null, ...result };
+    const { recheckCase } = await import("@/lib/removal/scheduled.server");
+    // The same observation code path the scheduled recheck uses. Nothing is
+    // written unless the provider gave a definite answer.
+    return recheckCase(context.supabase, supabaseAdmin, workspaceId, data.caseId);
   });

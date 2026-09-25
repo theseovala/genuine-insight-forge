@@ -93,7 +93,19 @@ export const Route = createFileRoute("/api/public/removal-scan")({
           }
         }
 
-        return Response.json({ ran: results.length, results });
+        // Due rechecks run after the scan, isolated so a failure here never
+        // undoes or hides the scan results. Only real provider observations
+        // are written; cases with no working connection are skipped.
+        let rechecks: { examined: number; due: number; performed: number; skipped: number; failed: number } | { error: string };
+        try {
+          const { runDueRechecks } = await import("@/lib/removal/scheduled.server");
+          const summary = await runDueRechecks(supabaseAdmin, 20);
+          rechecks = { examined: summary.examined, due: summary.due, performed: summary.performed, skipped: summary.skipped, failed: summary.failed };
+        } catch (recheckError) {
+          rechecks = { error: recheckError instanceof Error ? recheckError.message : "Scheduled recheck failed" };
+        }
+
+        return Response.json({ ran: results.length, results, rechecks });
       },
     },
   },
