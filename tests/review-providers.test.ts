@@ -209,3 +209,15 @@ describe("truthful provider status", () => {
     expect(outcomeFor(false, 500, "")).toBe("PROVIDER_ERROR");
   });
 });
+
+describe("Google next action", () => {
+  test("each state names what the owner must do, and approval needs no action", async () => {
+    const { googleNextAction } = await import("../src/lib/google-business-sync.server");
+    expect(googleNextAction("INSUFFICIENT_SCOPE")?.action).toBe("RECONNECT_GOOGLE_BUSINESS_PROFILE");
+    expect(googleNextAction("AUTHENTICATION_FAILED")?.action).toBe("RECONNECT_GOOGLE_BUSINESS_PROFILE");
+    expect(googleNextAction("APPROVAL_REQUIRED")?.action).toBe("WAIT_FOR_GOOGLE_APPROVAL");
+    expect(googleNextAction("NOT_CONFIGURED")?.action).toBe("CONNECT_GOOGLE_BUSINESS_PROFILE");
+    expect(googleNextAction("RATE_LIMITED")?.action).toBe("RETRY_LATER");
+    expect(googleNextAction("CONNECTED")).toBeNull();
+  });
+});

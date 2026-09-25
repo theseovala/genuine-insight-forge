@@ -20,14 +20,16 @@ export const getGoogleBusinessConnection = createServerFn({ method: "GET" })
     if (error) throw error;
     // A stored "connected" row without the business.manage grant cannot read or
     // reply to a single review, so it is not reported as connected.
-    const { googleBusinessState } = await import("./google-business-sync.server");
+    const { googleBusinessState, googleNextAction } = await import("./google-business-sync.server");
     const state = googleBusinessState(data);
+    const nextAction = googleNextAction(state.code);
     return {
       configured: Boolean(process.env["GOOGLE_BUSINESS_CLIENT_ID"] && process.env["GOOGLE_BUSINESS_CLIENT_SECRET"]),
       connected: state.code === "CONNECTED",
       email: data?.google_account_email ?? null,
       status: data && state.code !== "CONNECTED" && data.status === "connected" ? "needs_reconnect" : (data?.status ?? null),
       statusCode: state.code,
+      nextAction,
       lastSyncedAt: data?.last_synced_at ?? null,
       lastError: state.code === "CONNECTED" || state.code === "NOT_CONFIGURED" ? null : state.message,
     };
@@ -65,6 +67,10 @@ export const syncGoogleBusinessReviews = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // The same sync the scheduler runs; here with the signed-in user's RLS client.
     const { runGoogleReviewSync } = await import("./google-business-sync.server");
+    // Same single-flight rule as the scheduler, so a click during an hourly run
+    // cannot start a second overlapping sync of the same reviews.
+    const { checkSyncSlot } = await import("@/lib/reviews/scheduled-sync.server");
+    if ((await checkSyncSlot(supabaseAdmin, member.workspace_id, "google", Date.now())).busy) throw new Error("A Google sync is already running for this workspace. Try again in a few minutes.");
     return runGoogleReviewSync(context.supabase, supabaseAdmin, member.workspace_id, "manual");
   });
 

@@ -95,10 +95,10 @@ export const Route = createFileRoute("/api/public/integrations/jobs-run")({
 
         // Keep every Google Business connection's stored state equal to Google's
         // live answer. A failure here never fails the other scheduled work.
-        let google: Array<{ code: string; httpStatus: number | null }> | { error: string } = [];
+        let google: Array<{ code: string; httpStatus: number | null; nextAction: string | null }> | { error: string } = [];
         try {
-          const { reconcileGoogleConnections } = await import("@/lib/google-business-sync.server");
-          google = (await reconcileGoogleConnections(supabaseAdmin)).map(({ code, httpStatus }) => ({ code, httpStatus }));
+          const { reconcileGoogleConnections, googleNextAction } = await import("@/lib/google-business-sync.server");
+          google = (await reconcileGoogleConnections(supabaseAdmin)).map(({ code, httpStatus }) => ({ code, httpStatus, nextAction: googleNextAction(code)?.action ?? null }));
         } catch (caught) {
           google = { error: caught instanceof Error ? caught.message : "Google reconcile failed" };
         }

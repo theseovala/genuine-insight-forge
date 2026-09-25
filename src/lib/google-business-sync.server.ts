@@ -102,6 +102,32 @@ export function googleBusinessState(row: { status?: string | null; scopes?: unkn
 }
 
 /**
+ * What the owner has to do next for a given Google state. Approval itself can
+ * only be observed with a token that holds business.manage: without it Google
+ * answers every Business Profile call with a scope error, approved or not. So
+ * INSUFFICIENT_SCOPE always leads to a reconnect, and APPROVAL_REQUIRED (scope
+ * granted, Google still refusing) needs no action — the hourly check probes it
+ * and the first successful answer turns it CONNECTED and starts syncing.
+ */
+export function googleNextAction(code: GoogleBusinessState["code"]): { action: string; detail: string } | null {
+  switch (code) {
+    case "NOT_CONFIGURED":
+      return { action: "CONNECT_GOOGLE_BUSINESS_PROFILE", detail: "Connect Google Business Profile and allow access to your business listings." };
+    case "INSUFFICIENT_SCOPE":
+      return { action: "RECONNECT_GOOGLE_BUSINESS_PROFILE", detail: "Reconnect Google Business Profile and tick 'See, edit, create and delete your Google business listings'. Without it Google cannot show whether API access is approved." };
+    case "AUTHENTICATION_FAILED":
+      return { action: "RECONNECT_GOOGLE_BUSINESS_PROFILE", detail: "Google no longer accepts the stored sign-in. Reconnect Google Business Profile." };
+    case "APPROVAL_REQUIRED":
+      return { action: "WAIT_FOR_GOOGLE_APPROVAL", detail: "Permission is granted; Google has not approved Business Profile API access yet. This is checked automatically every hour, and reviews start syncing in the hour Google approves." };
+    case "RATE_LIMITED":
+    case "PROVIDER_ERROR":
+      return { action: "RETRY_LATER", detail: "Google did not answer successfully. The hourly check will try again." };
+    default:
+      return null;
+  }
+}
+
+/**
  * One real Business Profile call (list accounts) with the given token. Used
  * right after authorization and by the connection test, so "connected" is only
  * ever recorded once Google has actually answered with authorized data.

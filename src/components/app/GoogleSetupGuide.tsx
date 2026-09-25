@@ -228,7 +228,7 @@ export function GoogleBusinessSetupGuide({ credentialsReady }: { credentialsRead
       title: "Bring in your reviews",
       detail: synced
         ? `Last synced ${relativeTime(connection.data?.lastSyncedAt as string)}.`
-        : "Pulls your real locations and reviews. Syncing is not scheduled — press Sync now whenever you want the latest reviews.",
+        : "Pulls your real locations and reviews. Once Google returns authorized data, reviews sync automatically every hour; Sync now fetches them immediately.",
       done: synced,
       action: (
         <Button size="sm" variant="outline" disabled={!connected || sync.isPending} onClick={() => sync.mutate()}>
@@ -237,6 +237,14 @@ export function GoogleBusinessSetupGuide({ credentialsReady }: { credentialsRead
       ),
     },
   ];
+
+  if (connection.data?.nextAction) {
+    steps.push({
+      title: `Next action: ${connection.data.nextAction.action.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase())}`,
+      detail: connection.data.nextAction.detail,
+      done: false,
+    });
+  }
 
   if (connection.data?.lastError) {
     steps.push({
