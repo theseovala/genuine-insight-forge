@@ -119,6 +119,49 @@ export async function probeGoogleBusinessAccess(accessToken: string): Promise<Go
   return { code: "PROVIDER_ERROR", message: `Google Business Profile request failed (${response.status}).`, httpStatus: response.status };
 }
 
+/**
+ * Brings every stored Google Business connection in line with what Google
+ * actually answers right now, so no screen keeps showing a connection that
+ * cannot read reviews. Runs from the scheduled job runner.
+ *
+ * - No business.manage scope: recorded as needing reconnection (no call made —
+ *   Google would refuse it).
+ * - Scope present: one real accounts call decides the state; CONNECTED is only
+ *   written when Google returned authorized data.
+ * Tokens and connection rows are never deleted.
+ */
+export async function reconcileGoogleConnections(admin: any) {
+  const { data: rows, error } = await admin
+    .from("google_business_connections")
+    .select("workspace_id,access_token_ciphertext,refresh_token_ciphertext,token_expires_at,status,scopes,last_error")
+    .neq("status", "revoked");
+  if (error) throw error;
+  const results: Array<{ workspaceId: string; code: GoogleBusinessState["code"]; httpStatus: number | null }> = [];
+  for (const row of rows ?? []) {
+    if (!hasBusinessScope(row.scopes)) {
+      await markGoogleConnectionUnusable(admin, row.workspace_id, MISSING_BUSINESS_SCOPE_MESSAGE);
+      results.push({ workspaceId: row.workspace_id, code: "INSUFFICIENT_SCOPE", httpStatus: null });
+      continue;
+    }
+    let probe: GoogleBusinessState & { httpStatus: number | null };
+    try {
+      probe = await probeGoogleBusinessAccess(await usableAccessToken(admin, row.workspace_id, row));
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Google check failed.";
+      probe = { code: caught instanceof GoogleConnectionUnusableError ? "AUTHENTICATION_FAILED" : "PROVIDER_ERROR", message, httpStatus: null };
+    }
+    if (probe.code === "CONNECTED") {
+      await admin.from("google_business_connections").update({ status: "connected", last_error: null }).eq("workspace_id", row.workspace_id);
+      await admin.from("connected_platforms").update({ status: "connected", last_sync_error: null }).eq("workspace_id", row.workspace_id).eq("platform", "google");
+    } else {
+      await admin.from("google_business_connections").update({ last_error: probe.message }).eq("workspace_id", row.workspace_id);
+      await admin.from("connected_platforms").update({ status: "error", last_sync_error: probe.message }).eq("workspace_id", row.workspace_id).eq("platform", "google");
+    }
+    results.push({ workspaceId: row.workspace_id, code: probe.code, httpStatus: probe.httpStatus });
+  }
+  return results;
+}
+
 async function googleGet(url: string, accessToken: string) {
   const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` }, signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS) });
   if (response.status === 403) throw classifyGoogle403(await response.text().catch(() => ""));
