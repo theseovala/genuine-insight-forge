@@ -18,11 +18,13 @@ export const Route = createFileRoute("/api/public/integrations/jobs-run")({
           return left.length === right.length && timingSafeEqual(left, right);
         };
         // Scheduler token first (works even when LOVABLE_CRON_SECRET is unset), then the platform cron secret.
-        const { data: tokenRow } = await supabaseAdmin
-          .from("scheduler_tokens")
-          .select("token")
-          .eq("name", "integration-jobs")
-          .maybeSingle();
+        // A failed lookup is retried once and then reported as 503, never as
+        // 401: a transient database error must not look like a wrong token.
+        const lookupToken = () => supabaseAdmin.from("scheduler_tokens").select("token").eq("name", "integration-jobs").maybeSingle();
+        let lookup = await lookupToken();
+        if (lookup.error) lookup = await lookupToken();
+        if (lookup.error && !expected) return new Response("Scheduler token lookup failed; retry later.", { status: 503 });
+        const tokenRow = lookup.data;
         const ok =
           token.length > 0 &&
           ((typeof tokenRow?.token === "string" && safeEqual(token, tokenRow.token)) || (!!expected && safeEqual(token, expected)));

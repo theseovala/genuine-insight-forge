@@ -14,11 +14,13 @@ export const Route = createFileRoute("/api/public/removal-scan")({
         // The scheduler authenticates with a private token stored in the
         // database; the platform cron secret is also accepted.
         const bearer = /^Bearer ([^\s,]+)$/.exec(request.headers.get("authorization") ?? "")?.[1];
-        const { data: tokenRow } = await supabaseAdmin
-          .from("scheduler_tokens")
-          .select("token")
-          .eq("name", "removal-scan")
-          .maybeSingle();
+        // A failed lookup is retried once and then reported as 503, never as
+        // 401: a transient database error must not look like a wrong token.
+        const lookupToken = () => supabaseAdmin.from("scheduler_tokens").select("token").eq("name", "removal-scan").maybeSingle();
+        let lookup = await lookupToken();
+        if (lookup.error) lookup = await lookupToken();
+        if (lookup.error && !process.env["LOVABLE_CRON_SECRET"]) return new Response("Scheduler token lookup failed; retry later.", { status: 503 });
+        const tokenRow = lookup.data;
         const { timingSafeEqual } = await import("node:crypto");
         const bearerBuf = Buffer.from(bearer ?? "");
         const tokenBuf = Buffer.from(typeof tokenRow?.token === "string" ? tokenRow.token : "");
