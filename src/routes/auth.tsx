@@ -5,6 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { LEGAL } from "@/lib/legal";
 import { BrandMark } from "@/components/app/primitives";
 import { BRAND } from "@/lib/domain";
 
@@ -40,6 +42,7 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
   // Until React has hydrated, a click would submit the form natively (page
   // reload, no sign-in request). Keep the button disabled until then.
@@ -79,12 +82,14 @@ function AuthPage() {
     setNotice(null);
     try {
       if (mode === "signup") {
+        if (!agreed) throw new Error("Please accept the Terms & Conditions and Privacy Policy to create an account.");
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: `${window.location.origin}/dashboard`,
-            data: { full_name: fullName },
+            // Consent record: which Terms / Privacy Policy version was accepted, and when.
+            data: { full_name: fullName, terms_accepted_at: new Date().toISOString(), terms_version: LEGAL.version },
           },
         });
         if (signUpError) throw signUpError;
@@ -189,6 +194,23 @@ function AuthPage() {
               />
             </div>
 
+            {mode === "signup" && (
+              <label htmlFor="agree" className="flex cursor-pointer items-start gap-2.5 text-xs leading-relaxed text-muted-foreground">
+                <Checkbox id="agree" checked={agreed} onCheckedChange={(v) => setAgreed(v === true)} className="mt-0.5" required />
+                <span>
+                  I agree to the{" "}
+                  <Link to="/terms" target="_blank" className="font-semibold text-primary hover:underline">
+                    Terms &amp; Conditions
+                  </Link>{" "}
+                  and have read the{" "}
+                  <Link to="/privacy" target="_blank" className="font-semibold text-primary hover:underline">
+                    Privacy Policy
+                  </Link>
+                  .
+                </span>
+              </label>
+            )}
+
             {error && (
               <p className="rounded-lg bg-negative-soft px-3 py-2 text-sm text-negative">{error}</p>
             )}
@@ -196,7 +218,7 @@ function AuthPage() {
               <p className="rounded-lg bg-accent px-3 py-2 text-sm text-foreground">{notice}</p>
             )}
 
-            <Button type="submit" className="w-full" disabled={busy || !ready}>
+            <Button type="submit" className="w-full" disabled={busy || !ready || (mode === "signup" && !agreed)}>
               {(busy || !ready) && <Loader2 className="animate-spin" />}
               {!ready ? "Loading…" : mode === "signin" ? "Sign in" : "Create account"}
             </Button>
@@ -221,10 +243,19 @@ function AuthPage() {
               {mode === "signin" ? "Create one" : "Sign in"}
             </button>
           </p>
-          <p className="mt-8 text-center text-xs text-muted-foreground">
+          {mode === "signin" && (
+            <p className="mt-6 text-center text-xs text-muted-foreground">
+              By signing in you agree to our{" "}
+              <Link to="/terms" className="underline hover:text-foreground">Terms</Link> and{" "}
+              <Link to="/privacy" className="underline hover:text-foreground">Privacy Policy</Link>.
+            </p>
+          )}
+          <p className="mt-8 flex flex-wrap justify-center gap-x-4 gap-y-1 text-center text-xs text-muted-foreground">
             <Link to="/" className="hover:underline">
               Back to {BRAND.name}
             </Link>
+            <Link to="/privacy" className="hover:underline">Privacy</Link>
+            <Link to="/terms" className="hover:underline">Terms</Link>
           </p>
         </div>
       </div>

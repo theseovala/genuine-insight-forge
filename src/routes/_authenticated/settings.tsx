@@ -13,6 +13,7 @@ import {
   ExternalLink,
   RefreshCw,
   Boxes,
+  ShieldCheck,
 } from "lucide-react";
 import { IntegrationManager } from "@/components/app/IntegrationManager";
 import { integrationById } from "@/lib/integrations/registry";
@@ -34,6 +35,9 @@ import {
 import { platformName } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 import { disconnectGoogleBusiness, getGoogleBusinessConnection, startGoogleBusinessConnection, syncGoogleBusinessReviews } from "@/lib/google-business.functions";
+import { useGoogleDisclosure } from "@/components/legal/GoogleDisclosureDialog";
+import { PrivacyDataPanel } from "@/components/legal/PrivacyDataPanel";
+import { GOOGLE_BUSINESS_SCOPES, GOOGLE_DISCLOSURE_VERSION } from "@/lib/legal";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({
@@ -60,6 +64,7 @@ const tabs = [
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "locations", label: "Locations", icon: MapPin },
   { id: "account", label: "Account", icon: CreditCard },
+  { id: "privacy", label: "Privacy & data", icon: ShieldCheck },
 ] as const;
 
 /**
@@ -154,6 +159,7 @@ function SettingsPage() {
           {tab === "notifications" && <NotificationsTab />}
           {tab === "locations" && <LocationsTab />}
           {tab === "account" && <AccountTab />}
+          {tab === "privacy" && <PrivacyDataPanel />}
         </div>
       </div>
     </AppShell>
@@ -248,9 +254,10 @@ function PlatformsTab({ onOpenIntegrations }: { onOpenIntegrations: () => void }
   const syncFn = useServerFn(syncGoogleBusinessReviews);
   const disconnectGoogleFn = useServerFn(disconnectGoogleBusiness);
   const google = useQuery({ queryKey: ["google_business_connection"], queryFn: () => statusFn() });
+  const disclosure = useGoogleDisclosure();
   const connectGoogle = useMutation({
     mutationFn: ({ authWindow }: { authWindow: Window | null }) =>
-      startFn({ data: { origin: window.location.origin } }).then((result) => ({ ...result, authWindow })),
+      startFn({ data: { origin: window.location.origin, disclosureVersion: GOOGLE_DISCLOSURE_VERSION } }).then((result) => ({ ...result, authWindow })),
     onSuccess: ({ authorizationUrl, authWindow }) => {
       // Sandboxed preview iframes may silently block navigating a pre-opened
       // popup (no exception — the popup just stays on about:blank). Try the
@@ -362,12 +369,21 @@ function PlatformsTab({ onOpenIntegrations }: { onOpenIntegrations: () => void }
                       openInIntegrationManager(p.platform, p.display_name || platformName(p.platform));
                       return;
                     }
-                    const authWindow = window.open("about:blank", "seovale-google-business");
-                    if (authWindow) {
-                      authWindow.document.title = "Connecting Google Business Profile…";
-                      authWindow.document.body.textContent = "Opening Google securely…";
-                    }
-                    connectGoogle.mutate({ authWindow });
+                    // The data-access disclosure comes first; its Continue click is
+                    // the user gesture that opens the Google window.
+                    disclosure.request({
+                      label: "Google Business Profile",
+                      scopes: GOOGLE_BUSINESS_SCOPES,
+                      businessProfile: true,
+                      run: () => {
+                        const authWindow = window.open("about:blank", "seovale-google-business");
+                        if (authWindow) {
+                          authWindow.document.title = "Connecting Google Business Profile…";
+                          authWindow.document.body.textContent = "Opening Google securely…";
+                        }
+                        connectGoogle.mutate({ authWindow });
+                      },
+                    });
                   }}
                 >
                   {connectGoogle.isPending && isGoogle && <Loader2 className="animate-spin" />}Connect
@@ -385,6 +401,7 @@ function PlatformsTab({ onOpenIntegrations }: { onOpenIntegrations: () => void }
           );
         })}
       </ul>
+      {disclosure.dialog}
     </Section>
   );
 }

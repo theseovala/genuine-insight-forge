@@ -184,12 +184,15 @@ export const listIntegrationEvents = createServerFn({ method: "GET" })
 
 export const startIntegrationOAuth = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ provider: z.string(), origin: z.string().url() }).parse(input))
+  .inputValidator((input: unknown) => z.object({ provider: z.string(), origin: z.string().url(), disclosureVersion: z.string().max(80).optional() }).parse(input))
   .handler(async ({ data, context }) => {
     const member = await workspace(context);
     requireAdmin(member);
     const definition = integrationById(data.provider);
     if (!definition || definition.kind !== "oauth2") throw new Error("This integration does not use sign-in authorization.");
+    // Google requires its data-access disclosure to be shown before authorization.
+    const isGoogle = definition.scopes.some((s) => s.includes("googleapis.com"));
+    if (isGoogle && !data.disclosureVersion) throw new Error("Review the Google data-access disclosure before connecting.");
     const { assertAllowedOrigin, googleCallbackOrigin } = await import("@/lib/google-business.server");
     const { buildAuthorizationUrl, providerConfigured } = await import("@/lib/integrations/providers.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -222,6 +225,10 @@ export const startIntegrationOAuth = createServerFn({ method: "POST" })
       level: "info",
       message: `Authorization requested for ${definition.label}.`,
     });
+    if (isGoogle && data.disclosureVersion) {
+      const { recordGoogleDisclosureConsent } = await import("@/lib/privacy.server");
+      await recordGoogleDisclosureConsent(supabaseAdmin, member.workspace_id, context.userId, data.provider, data.disclosureVersion, definition.scopes);
+    }
     return { authorizationUrl: buildAuthorizationUrl(data.provider, redirectUri, state, codes.challenge, creds) };
   });
 

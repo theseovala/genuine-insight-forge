@@ -41,7 +41,7 @@ export const getGoogleBusinessConnection = createServerFn({ method: "GET" })
 
 export const startGoogleBusinessConnection = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ origin: z.string().url() }).parse(input))
+  .inputValidator((input: unknown) => z.object({ origin: z.string().url(), disclosureVersion: z.string().min(1).max(80) }).parse(input))
   .handler(async ({ data, context }) => {
     const member = await workspace(context);
     if (member.role === "member") throw new Error("Only a workspace owner or admin can connect Google.");
@@ -61,6 +61,10 @@ export const startGoogleBusinessConnection = createServerFn({ method: "POST" })
       expires_at: new Date(Date.now() + 600_000).toISOString(),
     });
     if (error) throw error;
+    // Consent trail: which disclosure was shown before the user went to Google.
+    const { recordGoogleDisclosureConsent } = await import("./privacy.server");
+    const { GOOGLE_BUSINESS_SCOPES } = await import("./legal");
+    await recordGoogleDisclosureConsent(supabaseAdmin, member.workspace_id, context.userId, "google_business", data.disclosureVersion, [...GOOGLE_BUSINESS_SCOPES]);
     return { authorizationUrl: auth.url };
   });
 

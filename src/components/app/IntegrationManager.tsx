@@ -28,6 +28,8 @@ import {
 } from "@/lib/integrations/status";
 import { GoogleBusinessSetupGuide, GoogleMapsSetupGuide } from "@/components/app/GoogleSetupGuide";
 import { ProviderSetupGuide } from "@/components/app/ProviderSetupGuide";
+import { isGoogleOAuthProvider, useGoogleDisclosure } from "@/components/legal/GoogleDisclosureDialog";
+import { GOOGLE_DISCLOSURE_VERSION } from "@/lib/legal";
 
 
 /** Integration overview — every number is counted from real rows, nothing estimated. */
@@ -276,8 +278,14 @@ export function IntegrationManager() {
     void queryClient.invalidateQueries({ queryKey: ["integration_events"] });
   };
 
+  const disclosure = useGoogleDisclosure();
   const connect = useMutation({
-    mutationFn: (provider: string) => startFn({ data: { provider, origin: window.location.origin } }),
+    mutationFn: (provider: string) => {
+      const definition = integrationById(provider);
+      // Google providers are only reached through the disclosure dialog below.
+      const disclosureVersion = definition && isGoogleOAuthProvider(definition.scopes) ? GOOGLE_DISCLOSURE_VERSION : undefined;
+      return startFn({ data: { provider, origin: window.location.origin, disclosureVersion } });
+    },
     onSuccess: (result) => openAuthorization(result.authorizationUrl),
     onError: (error: Error) => toast.error(error.message),
     onSettled: () => setBusy(null),
@@ -486,8 +494,13 @@ export function IntegrationManager() {
                           size="sm"
                           disabled={!item?.configured || pending}
                           onClick={() => {
-                            setBusy(definition.id);
-                            connect.mutate(definition.id);
+                            const start = () => {
+                              setBusy(definition.id);
+                              connect.mutate(definition.id);
+                            };
+                            if (isGoogleOAuthProvider(definition.scopes)) {
+                              disclosure.request({ label: definition.label, scopes: definition.scopes, businessProfile: false, run: start });
+                            } else start();
                           }}
                         >
                           {pending && connect.isPending && <Loader2 className="animate-spin" />}
@@ -616,6 +629,7 @@ export function IntegrationManager() {
           </div>
         )}
       </Section>
+      {disclosure.dialog}
     </div>
   );
 }

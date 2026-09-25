@@ -11,6 +11,8 @@ import {
   testIntegration,
 } from "@/lib/integrations.functions";
 import type { IntegrationDefinition } from "@/lib/integrations/registry";
+import { isGoogleOAuthProvider, useGoogleDisclosure } from "@/components/legal/GoogleDisclosureDialog";
+import { GOOGLE_DISCLOSURE_VERSION } from "@/lib/legal";
 
 type ConsoleStep = { title: string; detail: string; link?: { href: string; label: string }; showRedirectUri?: boolean };
 
@@ -173,8 +175,13 @@ export function ProviderSetupGuide({
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const isGoogle = isGoogleOAuthProvider(definition.scopes);
+  const disclosure = useGoogleDisclosure();
   const connect = useMutation({
-    mutationFn: () => startFn({ data: { provider: definition.id, origin: window.location.origin } }),
+    mutationFn: () =>
+      startFn({
+        data: { provider: definition.id, origin: window.location.origin, disclosureVersion: isGoogle ? GOOGLE_DISCLOSURE_VERSION : undefined },
+      }),
     onSuccess: (r) => {
       // "noopener" in the feature string makes window.open always return null,
       // so open normally, sever the opener, and only fall back when blocked.
@@ -309,10 +316,15 @@ export function ProviderSetupGuide({
                   size="sm"
                   className="mt-2"
                   disabled={!credentialsReady || connect.isPending}
-                  onClick={() => connect.mutate()}
+                  onClick={() =>
+                    isGoogle
+                      ? disclosure.request({ label: definition.label, scopes: definition.scopes, businessProfile: false, run: () => connect.mutate() })
+                      : connect.mutate()
+                  }
                 >
                   {connect.isPending && <Loader2 className="animate-spin" />} Connect {definition.label}
                 </Button>
+                {disclosure.dialog}
               </StepRow>
             )}
           </ol>

@@ -11,6 +11,8 @@ import {
   syncGoogleBusinessReviews,
 } from "@/lib/google-business.functions";
 import { saveProviderCredentials, testIntegration } from "@/lib/integrations.functions";
+import { useGoogleDisclosure } from "@/components/legal/GoogleDisclosureDialog";
+import { GOOGLE_BUSINESS_SCOPES, GOOGLE_DISCLOSURE_VERSION } from "@/lib/legal";
 
 /** Opens Google authorization reliably, even inside a sandboxed preview frame. */
 function openAuthorization(url: string, authWindow: Window | null) {
@@ -142,10 +144,11 @@ export function GoogleBusinessSetupGuide({ credentialsReady }: { credentialsRead
   const startFn = useServerFn(startGoogleBusinessConnection);
   const syncFn = useServerFn(syncGoogleBusinessReviews);
   const connection = useQuery({ queryKey: ["google_business_connection"], queryFn: () => statusFn() });
+  const disclosure = useGoogleDisclosure();
 
   const connect = useMutation({
     mutationFn: ({ authWindow }: { authWindow: Window | null }) =>
-      startFn({ data: { origin: window.location.origin } }).then((result) => ({ ...result, authWindow })),
+      startFn({ data: { origin: window.location.origin, disclosureVersion: GOOGLE_DISCLOSURE_VERSION } }).then((result) => ({ ...result, authWindow })),
     onSuccess: ({ authorizationUrl, authWindow }) => openAuthorization(authorizationUrl, authWindow),
     onError: (error: Error, { authWindow }) => {
       authWindow?.close();
@@ -208,20 +211,32 @@ export function GoogleBusinessSetupGuide({ credentialsReady }: { credentialsRead
         : "A Google window opens — sign in with the account that manages the business and press Allow.",
       done: connected,
       action: (
-        <Button
-          size="sm"
-          disabled={!configured || connect.isPending}
-          onClick={() => {
-            // No "noopener" feature here: with it window.open always returns
-            // null, leaving an orphaned blank tab and no handle to navigate.
-            // openAuthorization clears the opener before navigating.
-            const authWindow = window.open("", "_blank");
-            connect.mutate({ authWindow });
-          }}
-        >
-          {connect.isPending && <Loader2 className="animate-spin" />}
-          {connected ? "Reconnect Google" : "Connect Google"}
-        </Button>
+        <>
+          <Button
+            size="sm"
+            disabled={!configured || connect.isPending}
+            onClick={() =>
+              // The data-access disclosure comes first; its Continue click is the
+              // user gesture that opens the Google window.
+              disclosure.request({
+                label: "Google Business Profile",
+                scopes: GOOGLE_BUSINESS_SCOPES,
+                businessProfile: true,
+                run: () => {
+                  // No "noopener" feature here: with it window.open always returns
+                  // null, leaving an orphaned blank tab and no handle to navigate.
+                  // openAuthorization clears the opener before navigating.
+                  const authWindow = window.open("", "_blank");
+                  connect.mutate({ authWindow });
+                },
+              })
+            }
+          >
+            {connect.isPending && <Loader2 className="animate-spin" />}
+            {connected ? "Reconnect Google" : "Connect Google"}
+          </Button>
+          {disclosure.dialog}
+        </>
       ),
     },
     {
