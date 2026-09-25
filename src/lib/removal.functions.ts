@@ -273,7 +273,7 @@ export const draftRemovalReply = createServerFn({ method: "POST" })
     );
 
     const { runAiText } = await import("@/lib/ai-gateway.server");
-    const { output } = await runAiText(system, prompt);
+    const { output } = await runAiText(system, prompt, { workspaceId });
     return { reply: output.trim() };
   });
 

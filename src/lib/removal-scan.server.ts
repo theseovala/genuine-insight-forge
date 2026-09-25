@@ -126,7 +126,7 @@ export async function runRemovalScan(
 
   try {
     const { runAiText } = await import("@/lib/ai-gateway.server");
-    const { output, model } = await runAiText(SCAN_SYSTEM, prompt);
+    const { output, model } = await runAiText(SCAN_SYSTEM, prompt, { workspaceId });
     const results = parseScanResults(output).filter((r) => pending.some((p) => p.id === r.id));
 
     const { detectRoutes, primaryRoute } = await import("@/lib/removal/routes");

@@ -23,8 +23,12 @@ export const getGoogleBusinessConnection = createServerFn({ method: "GET" })
     const { googleBusinessState, googleNextAction } = await import("./google-business-sync.server");
     const state = googleBusinessState(data);
     const nextAction = googleNextAction(state.code);
+    // OAuth client credentials: the workspace vault first, the server environment as fallback.
+    const { loadProviderCredentials } = await import("./integrations/credentials.server");
+    const { providerConfigured } = await import("./integrations/providers.server");
+    const googleCreds = await loadProviderCredentials(supabaseAdmin, member.workspace_id, "google_business");
     return {
-      configured: Boolean(process.env["GOOGLE_BUSINESS_CLIENT_ID"] && process.env["GOOGLE_BUSINESS_CLIENT_SECRET"]),
+      configured: providerConfigured("google_business", googleCreds),
       connected: state.code === "CONNECTED",
       email: data?.google_account_email ?? null,
       status: data && state.code !== "CONNECTED" && data.status === "connected" ? "needs_reconnect" : (data?.status ?? null),

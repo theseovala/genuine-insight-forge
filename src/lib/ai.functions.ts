@@ -10,9 +10,9 @@ const DraftInput = z.object({
   instruction: z.string().max(400).optional(),
 });
 
-async function runGateway(system: string, prompt: string) {
+async function runGateway(system: string, prompt: string, workspaceId: string) {
   const { runAiText } = await import("@/lib/ai-gateway.server");
-  return runAiText(system, prompt);
+  return runAiText(system, prompt, { workspaceId });
 }
 
 // Each call is a paid model request, so one account cannot trigger them without bound.
@@ -56,7 +56,7 @@ async function runAudited(
   await assertAiBudget(context.userId);
   const inputHash = createHash("sha256").update(`${system}\n${prompt}`).digest("hex");
   try {
-    const { output, model } = await runGateway(system, prompt);
+    const { output, model } = await runGateway(system, prompt, workspaceId);
     const { error } = await context.supabase.from("ai_runs").insert({
       workspace_id: workspaceId,
       user_id: context.userId,
@@ -233,7 +233,7 @@ export const generateReport = createServerFn({ method: "POST" })
     const started = Date.now();
     let generated: Awaited<ReturnType<typeof runGateway>>;
     try {
-      generated = await runGateway(system, prompt);
+      generated = await runGateway(system, prompt, workspaceId);
     } catch (error) {
       await context.supabase.from("ai_runs").insert({
         workspace_id: workspaceId,

@@ -151,7 +151,7 @@ export async function analyseWithAi(
   }
 
   try {
-    const result = await runAiJson(SYSTEM_PROMPT, JSON.stringify(context), validateAgainstContext(context));
+    const result = await runAiJson(SYSTEM_PROMPT, JSON.stringify(context), validateAgainstContext(context), 2, { workspaceId });
     const serialised = JSON.stringify(result.value);
     await admin.from("ai_runs").insert({
       workspace_id: workspaceId,

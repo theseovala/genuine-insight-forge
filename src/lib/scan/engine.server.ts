@@ -55,17 +55,25 @@ async function audit(admin: SupabaseClient, workspaceId: string, action: string,
   await admin.from("audit_logs").insert({ workspace_id: workspaceId, action, target_type: "scan", target_id: scanId, metadata });
 }
 
-/** Google API key for PageSpeed: credential vault first, server environment as fallback. */
+/**
+ * Google API key for PageSpeed: the PageSpeed provider's own vault key first,
+ * then the Google Maps vault key, then the server environment as fallback.
+ */
 async function pagespeedKey(admin: SupabaseClient, workspaceId: string) {
-  try {
-    const { loadProviderCredentials } = await import("@/lib/integrations/credentials.server");
-    const bag = await loadProviderCredentials(admin, workspaceId, "google_maps");
-    const fromVault = bag["GOOGLE_MAPS_API_KEY"] ?? bag["GOOGLE_API_KEY"];
-    if (fromVault) return fromVault;
-  } catch {
-    // Vault unavailable — fall through to the environment.
+  const { loadProviderCredentials } = await import("@/lib/integrations/credentials.server");
+  for (const [group, fields] of [
+    ["pagespeed", ["PAGESPEED_API_KEY"]],
+    ["google_maps", ["GOOGLE_MAPS_API_KEY", "GOOGLE_API_KEY"]],
+  ] as const) {
+    try {
+      const bag = await loadProviderCredentials(admin, workspaceId, group);
+      const fromVault = fields.map((field) => bag[field]).find(Boolean);
+      if (fromVault) return fromVault;
+    } catch {
+      // Vault unavailable — fall through to the next source.
+    }
   }
-  return process.env["GOOGLE_API_KEY"] ?? null;
+  return process.env["PAGESPEED_API_KEY"] || process.env["GOOGLE_API_KEY"] || null;
 }
 
 export interface RunScanResult {

@@ -1,5 +1,6 @@
 // Server-only helper that connects the AI SDK to the Lovable AI Gateway.
 import { createOpenAI } from "@ai-sdk/openai";
+import { resolveAiKeys } from "./ai-keys.server";
 
 export const AI_MODEL = "openai/gpt-6-astra";
 
@@ -23,8 +24,7 @@ export function createLovableAiGatewayRunIdFetch(initialRunId?: string | undefin
 }
 
 /** Creates the Responses-API provider bound to the Lovable AI Gateway. */
-export function createGateway() {
-  const key = process.env["LOVABLE_API_KEY"];
+export function createGateway(key: string | null | undefined = process.env["LOVABLE_API_KEY"]) {
   if (!key) throw new Error("AI is not configured for this project.");
   const runIdFetch = createLovableAiGatewayRunIdFetch();
   const provider = createOpenAI({
@@ -53,18 +53,16 @@ export const FALLBACK_MODEL = "gpt-4.1";
 export const CLAUDE_MODEL = "claude-sonnet-4-5";
 
 /**
- * Direct OpenAI provider built from the project's own OPENAI_API_KEY.
+ * Direct OpenAI provider built from an OpenAI key (workspace vault or OPENAI_API_KEY).
  * Used only as a backup when the Lovable AI Gateway call fails.
  */
-export function createDirectOpenAI() {
-  const key = process.env["OPENAI_API_KEY"];
+export function createDirectOpenAI(key: string | null | undefined = process.env["OPENAI_API_KEY"]) {
   if (!key) return null;
   return createOpenAI({ apiKey: key });
 }
 
-/** Direct Anthropic provider built from the project's own ANTHROPIC_API_KEY. */
-export async function createDirectAnthropic() {
-  const key = process.env["ANTHROPIC_API_KEY"];
+/** Direct Anthropic provider built from an Anthropic key (workspace vault or ANTHROPIC_API_KEY). */
+export async function createDirectAnthropic(key: string | null | undefined = process.env["ANTHROPIC_API_KEY"]) {
   if (!key) return null;
   const { createAnthropic } = await import("@ai-sdk/anthropic");
   return createAnthropic({ apiKey: key });
@@ -84,9 +82,10 @@ export interface AiTextResult {
  * project's own OpenAI key, then its Anthropic key, so AI never goes dark.
  * Returns the real model, latency and token usage the provider reported.
  */
-export async function runAiText(system: string, prompt: string): Promise<AiTextResult> {
+export async function runAiText(system: string, prompt: string, options: { workspaceId?: string | null } = {}): Promise<AiTextResult> {
   const { streamText } = await import("ai");
   const errors: unknown[] = [];
+  const keys = await resolveAiKeys(options.workspaceId);
 
   const finish = async (result: any, model: string, provider: string, started: number): Promise<AiTextResult> => {
     const output = (await result.text).trim();
@@ -108,7 +107,7 @@ export async function runAiText(system: string, prompt: string): Promise<AiTextR
 
   const gatewayStarted = Date.now();
   try {
-    const { provider } = createGateway();
+    const { provider } = createGateway(keys.lovable);
     const result = streamText({
       model: provider.responses(AI_MODEL),
       system,
@@ -121,7 +120,7 @@ export async function runAiText(system: string, prompt: string): Promise<AiTextR
     errors.push(error);
   }
 
-  const openai = createDirectOpenAI();
+  const openai = createDirectOpenAI(keys.openai);
   if (openai) {
     const started = Date.now();
     try {
@@ -138,7 +137,7 @@ export async function runAiText(system: string, prompt: string): Promise<AiTextR
     }
   }
 
-  const anthropic = await createDirectAnthropic();
+  const anthropic = await createDirectAnthropic(keys.anthropic);
   if (anthropic) {
     const started = Date.now();
     try {
@@ -157,7 +156,7 @@ export async function runAiText(system: string, prompt: string): Promise<AiTextR
   // Every provider failed. Report which one failed and why, in order, so the
   // stored ai_runs row names the real blocker instead of the last stream error.
   if (errors.length) {
-    const tried = ["lovable_ai", ...(createDirectOpenAI() ? ["openai"] : []), ...(anthropic ? ["anthropic"] : [])];
+    const tried = ["lovable_ai", ...(openai ? ["openai"] : []), ...(anthropic ? ["anthropic"] : [])];
     const detail = errors
       .map((error, index) => `${tried[index] ?? "provider"}: ${error instanceof Error ? error.message : String(error)}`)
       .join(" | ");
@@ -189,6 +188,7 @@ export async function runAiJson<T>(
   prompt: string,
   validate: (value: unknown) => T,
   attempts = 2,
+  options: { workspaceId?: string | null } = {},
 ): Promise<{ value: T; raw: string } & Omit<AiTextResult, "output">> {
   let lastError: unknown = null;
   let feedback = "";
@@ -197,6 +197,7 @@ export async function runAiJson<T>(
     const result = await runAiText(
       `${system}\n\nReply with a single JSON object and nothing else. No prose, no markdown fence.`,
       feedback ? `${prompt}\n\nYour previous reply was rejected: ${feedback}\nReturn corrected JSON.` : prompt,
+      options,
     );
     try {
       const parsed = JSON.parse(unfence(result.output));

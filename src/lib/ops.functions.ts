@@ -145,10 +145,13 @@ export const getSystemHealth = createServerFn({ method: "POST" })
     });
 
     // AI providers — a real call to the configured gateway.
-    // Same fallback order as runAiText: Lovable AI gateway, then OPENAI_API_KEY, then ANTHROPIC_API_KEY.
-    const aiKey = process.env["LOVABLE_API_KEY"];
-    const openaiKey = process.env["OPENAI_API_KEY"];
-    const anthropicKey = process.env["ANTHROPIC_API_KEY"];
+    // Same fallback order and key sources as runAiText: Lovable AI gateway, then the
+    // workspace's OpenAI key, then its Anthropic key (vault first, environment fallback).
+    const { resolveAiKeys } = await import("@/lib/ai-keys.server");
+    const aiKeys = await resolveAiKeys(member.workspace_id);
+    const aiKey = aiKeys.lovable;
+    const openaiKey = aiKeys.openai;
+    const anthropicKey = aiKeys.anthropic;
     const aiProbes = [
       aiKey && { name: "Lovable AI gateway", url: "https://ai.gateway.lovable.dev/v1/models", headers: { Authorization: `Bearer ${aiKey}` } as Record<string, string> },
       openaiKey && { name: "OpenAI", url: "https://api.openai.com/v1/models", headers: { Authorization: `Bearer ${openaiKey}` } as Record<string, string> },

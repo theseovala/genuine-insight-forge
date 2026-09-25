@@ -28,7 +28,8 @@ export interface OAuthProviderConfig {
   tokenAuth: "basic" | "body";
   extraAuthParams?: Record<string, string>;
   headers?: Record<string, string>;
-  test: (accessToken: string) => Promise<TestResult>;
+  /** `creds` is the workspace's vault bag, for tests that need an extra credential (e.g. a developer token). */
+  test: (accessToken: string, creds?: CredentialBag) => Promise<TestResult>;
 }
 
 const USER_AGENT = "Seovale/1.0 (reputation monitoring)";
@@ -279,8 +280,8 @@ export const OAUTH_PROVIDERS: Record<string, OAuthProviderConfig> = {
     usePkce: true,
     tokenAuth: "body",
     extraAuthParams: { access_type: "offline", prompt: "consent select_account", include_granted_scopes: "true" },
-    test: async (token) => {
-      const devToken = envValue(["GOOGLE_ADS_DEVELOPER_TOKEN"]);
+    test: async (token, creds = {}) => {
+      const devToken = envValue(["GOOGLE_ADS_DEVELOPER_TOKEN"], creds);
       if (!devToken) return notConfigured("A Google Ads developer token is required (Google Ads API access approval).");
       const response = await fetch("https://googleads.googleapis.com/v17/customers:listAccessibleCustomers", {
         headers: { Authorization: `Bearer ${token}`, "developer-token": devToken },
@@ -298,7 +299,22 @@ export function providerConfigured(providerId: string, creds: CredentialBag = {}
   if (oauth) return Boolean(envValue(oauth.clientIdEnv, creds) && envValue(oauth.clientSecretEnv, creds));
   const definition = integrationById(providerId);
   if (!definition || definition.requiredSecrets.length === 0) return false;
-  return definition.requiredSecrets.every((name) => Boolean(creds[name] ?? process.env[name]));
+  return missingRequiredSecrets(providerId, creds).length === 0;
+}
+
+/**
+ * Required credentials still absent from both the vault bag and the server
+ * environment. Empty when the required set, or any complete alternative set
+ * (e.g. Twilio API-key auth), is present.
+ */
+export function missingRequiredSecrets(providerId: string, creds: CredentialBag = {}) {
+  const definition = integrationById(providerId);
+  if (!definition) return [];
+  const has = (name: string) => Boolean(envValue([name], creds));
+  const missing = definition.requiredSecrets.filter((name) => !has(name));
+  if (missing.length === 0) return [];
+  if ((definition.alternativeSecrets ?? []).some((set) => set.every(has))) return [];
+  return missing;
 }
 
 export function buildAuthorizationUrl(providerId: string, redirectUri: string, state: string, challenge: string | null, creds: CredentialBag = {}) {
@@ -425,6 +441,52 @@ export async function testTripadvisor(query: string | null, creds: CredentialBag
   };
 }
 
+/**
+ * X app-only test with the saved bearer token (no user authorization needed).
+ * A 402 means the X account has no API credits left — reported as-is, never as connected.
+ */
+export async function testTwitterAppOnly(creds: CredentialBag = {}): Promise<TestResult> {
+  const bearer = envValue(["TWITTER_BEARER_TOKEN"], creds);
+  if (!bearer) return notConfigured("No X bearer token is configured.");
+  const response = await fetch("https://api.x.com/2/users/by/username/XDevelopers", { headers: { Authorization: `Bearer ${bearer}` } });
+  const payload = await readJson(response);
+  if (response.status === 402) {
+    const detail = String(payload["detail"] ?? payload["title"] ?? "Payment required.");
+    return { ok: false, status: 402, message: `X API credits depleted (HTTP 402): ${detail}`.slice(0, 300), code: "PROVIDER_ERROR" };
+  }
+  if (!response.ok) return failure(response, payload);
+  const user = payload["data"];
+  if (!user?.["id"]) return { ok: false, status: response.status, message: "X returned no user for the app-only test lookup.", code: "PROVIDER_ERROR" };
+  return { ok: true, status: response.status, message: "Live X API call (app-only bearer token) succeeded.", label: "X app-only access", accountRef: null, code: "CONNECTED" };
+}
+
+/**
+ * Verifies a Meta app ID + secret with an app access token. Valid credentials
+ * still do not unlock Business Suite data without App Review, so success is
+ * reported as APPROVAL_REQUIRED, never CONNECTED.
+ */
+export async function testMetaAppCredentials(creds: CredentialBag = {}): Promise<TestResult> {
+  const appId = envValue(["FACEBOOK_APP_ID"], creds);
+  const appSecret = envValue(["FACEBOOK_APP_SECRET"], creds);
+  if (!appId || !appSecret) return notConfigured("Meta app ID and app secret are required.");
+  const response = await fetch(
+    `https://graph.facebook.com/v21.0/${encodeURIComponent(appId)}?fields=id,name&access_token=${encodeURIComponent(`${appId}|${appSecret}`)}`,
+  );
+  const payload = await readJson(response);
+  if (!response.ok) {
+    const failed = failure(response, payload);
+    return payload["error"]?.["type"] === "OAuthException" ? { ...failed, code: "AUTHENTICATION_FAILED" } : failed;
+  }
+  return {
+    ok: false,
+    status: response.status,
+    message: `Meta app credentials verified${payload["name"] ? ` (${payload["name"]})` : ""}. business_management still requires Meta App Review approval.`,
+    label: payload["name"] ?? null,
+    accountRef: payload["id"] ?? null,
+    code: "APPROVAL_REQUIRED",
+  };
+}
+
 /* ---------- API-key providers: one live test per provider ---------- */
 
 async function simpleFetchTest(
@@ -473,11 +535,20 @@ export async function testApiKeyProvider(
       const token = envValue(["WHATSAPP_ACCESS_TOKEN"], creds);
       const phoneId = envValue(["WHATSAPP_PHONE_NUMBER_ID"], creds);
       if (!token || !phoneId) return notConfigured("WhatsApp access token and phone number ID are required.");
-      return simpleFetchTest(
+      const phone = await simpleFetchTest(
         `https://graph.facebook.com/v21.0/${encodeURIComponent(phoneId)}?access_token=${encodeURIComponent(token)}`,
         {},
         (p) => ({ ok: Boolean(p["id"]), message: "Phone number not found for this token.", label: p["display_phone_number"] ?? null, ref: p["id"] ?? null }),
       );
+      const wabaId = envValue(["WHATSAPP_BUSINESS_ACCOUNT_ID"], creds);
+      if (!phone.ok || !wabaId) return phone;
+      // The WABA ID is optional; when saved, the same token must be able to read it.
+      const waba = await simpleFetchTest(
+        `https://graph.facebook.com/v21.0/${encodeURIComponent(wabaId)}?fields=id,name&access_token=${encodeURIComponent(token)}`,
+        {},
+        (p) => ({ ok: Boolean(p["id"]), message: "WhatsApp Business Account not found for this token.", label: p["name"] ?? null, ref: p["id"] ?? null }),
+      );
+      return waba.ok ? phone : waba;
     }
     case "yelp": {
       const key = envValue(["YELP_FUSION_API_KEY"], creds);
@@ -585,24 +656,63 @@ export async function testApiKeyProvider(
     case "resend_email": {
       const key = envValue(["RESEND_API_KEY"], creds);
       if (!key) return notConfigured("No Resend API key is configured.");
-      return simpleFetchTest("https://api.resend.com/domains", { Authorization: `Bearer ${key}` }, (p) => ({
-        ok: p["object"] === "list" || Array.isArray(p["data"]),
-        message: "Resend rejected the API key.",
-        label: "Resend email API",
-        ref: null,
-      }));
+      const response = await fetch("https://api.resend.com/domains", { headers: { accept: "application/json", Authorization: `Bearer ${key}` } });
+      const payload = await readJson(response);
+      if (!response.ok) {
+        const failed = failure(response, payload);
+        // A sending-only key is valid but cannot list domains — a scope limit, not a bad key.
+        return /restricted to only send/i.test(failed.message) ? { ...failed, code: "INSUFFICIENT_SCOPE" } : failed;
+      }
+      if (!(payload["object"] === "list" || Array.isArray(payload["data"]))) {
+        return { ok: false, status: response.status, message: "Resend returned no domain list.", code: "PROVIDER_ERROR" };
+      }
+      const domain = envValue(["RESEND_FROM_DOMAIN"], creds)?.trim().toLowerCase();
+      if (domain) {
+        const match = (payload["data"] ?? []).find((d: Record<string, any>) => String(d["name"] ?? "").toLowerCase() === domain);
+        if (!match) {
+          return { ok: false, status: response.status, message: `The sending domain ${domain} is not added to this Resend account.`, code: "NOT_CONFIGURED" };
+        }
+        if (match["status"] !== "verified") {
+          return {
+            ok: false,
+            status: response.status,
+            message: `The sending domain ${domain} is not verified in Resend yet (status: ${String(match["status"] ?? "unknown")}).`,
+            code: "APPROVAL_REQUIRED",
+          };
+        }
+        return { ok: true, status: response.status, message: `Live API call succeeded; ${domain} is verified.`, label: domain, accountRef: String(match["id"] ?? domain), code: "CONNECTED" };
+      }
+      return { ok: true, status: response.status, message: "Live API call succeeded.", label: "Resend email API", accountRef: null, code: "CONNECTED" };
     }
     case "twilio_sms": {
       const sid = envValue(["TWILIO_ACCOUNT_SID"], creds);
       const token = envValue(["TWILIO_AUTH_TOKEN"], creds);
-      if (!sid || !token) return notConfigured("Twilio account SID and auth token are required.");
-      const basic = Buffer.from(`${sid}:${token}`).toString("base64");
-      return simpleFetchTest(`https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(sid)}.json`, { Authorization: `Basic ${basic}` }, (p) => ({
+      const apiKeySid = envValue(["TWILIO_API_KEY_SID"], creds);
+      const apiKeySecret = envValue(["TWILIO_API_KEY_SECRET"], creds);
+      // Twilio accepts either the account auth token or an API key SID + secret.
+      const user = apiKeySid && apiKeySecret ? apiKeySid : sid;
+      const password = apiKeySid && apiKeySecret ? apiKeySecret : token;
+      if (!sid || !user || !password) return notConfigured("Twilio account SID plus an auth token (or API key SID + secret) are required.");
+      const basic = Buffer.from(`${user}:${password}`).toString("base64");
+      const account = await simpleFetchTest(`https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(sid)}.json`, { Authorization: `Basic ${basic}` }, (p) => ({
         ok: p["sid"] === sid,
         message: "Twilio rejected the credentials.",
         label: p["friendly_name"] ?? null,
         ref: p["sid"] ?? null,
       }));
+      const number = envValue(["TWILIO_PHONE_NUMBER"], creds)?.trim();
+      if (!account.ok || !number) return account;
+      const numbers = await simpleFetchTest(
+        `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(sid)}/IncomingPhoneNumbers.json?PhoneNumber=${encodeURIComponent(number)}`,
+        { Authorization: `Basic ${basic}` },
+        (p) => ({
+          ok: Array.isArray(p["incoming_phone_numbers"]) && p["incoming_phone_numbers"].length > 0,
+          message: `The sender number ${number} is not an incoming number on this Twilio account.`,
+          label: account.label ?? null,
+          ref: account.accountRef ?? null,
+        }),
+      );
+      return numbers.ok ? account : { ...numbers, code: numbers.status === 200 ? "NOT_CONFIGURED" : (numbers.code ?? "PROVIDER_ERROR") };
     }
     case "stripe": {
       const key = envValue(["STRIPE_SECRET_KEY"], creds);

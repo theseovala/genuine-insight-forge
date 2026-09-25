@@ -57,7 +57,7 @@ export const Route = createFileRoute("/api/public/integrations/callback")({
           }
 
           const config = providers.OAUTH_PROVIDERS[saved.provider];
-          const test = config ? await config.test(accessToken) : { ok: false, status: 0, message: "Unknown integration.", label: null, accountRef: null };
+          const test = config ? await config.test(accessToken, creds) : { ok: false, status: 0, message: "Unknown integration.", label: null, accountRef: null };
 
           const { error } = await supabaseAdmin.from("integration_connections").upsert(
             {

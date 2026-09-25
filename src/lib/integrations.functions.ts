@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { INTEGRATIONS, integrationById } from "@/lib/integrations/registry";
+import { INTEGRATIONS, credentialGroupOf, integrationById } from "@/lib/integrations/registry";
 import type { TestResult } from "@/lib/integrations/providers.server";
 
 type Ctx = { supabase: any; userId: string };
@@ -22,6 +22,22 @@ async function workspace(context: Ctx) {
 function requireAdmin(member: { role: string }) {
   // Allow-list, not deny-list: any role other than owner/admin is refused.
   if (member.role !== "owner" && member.role !== "admin") throw new Error("Only a workspace owner or admin can manage integrations.");
+}
+
+/**
+ * Credentials changed or were removed: every provider sharing the vault group
+ * loses its cached health, so scans re-test with what is stored now instead of
+ * reusing a result measured with the old values.
+ */
+async function forgetCachedHealth(admin: any, workspaceId: string, providerId: string, options: { apiKeyOnly?: boolean } = {}) {
+  const group = credentialGroupOf(providerId);
+  const providerIds = INTEGRATIONS.filter((d) => (d.credentialGroup ?? d.id) === group && (!options.apiKeyOnly || d.kind === "api_key")).map((d) => d.id);
+  if (providerIds.length === 0) return;
+  await admin
+    .from("integration_health")
+    .update({ status: "unknown", outcome_code: "NOT_CONFIGURED", last_error: null, last_checked_at: new Date().toISOString() })
+    .eq("workspace_id", workspaceId)
+    .in("provider", providerIds);
 }
 
 /** Non-secret projection — credential columns are never selected. */
@@ -283,6 +299,15 @@ export const testIntegration = createServerFn({ method: "POST" })
       });
 
     if (definition.kind === "manual") {
+      // Meta Business Suite: the saved Meta app credentials can be verified for real,
+      // but the result stays APPROVAL_REQUIRED until Meta grants business_management.
+      if (definition.id === "meta_business" && providers.envValue(["FACEBOOK_APP_ID"], creds) && providers.envValue(["FACEBOOK_APP_SECRET"], creds)) {
+        const checked = await providers.testMetaAppCredentials(creds);
+        const code = checked.code ?? "PROVIDER_ERROR";
+        await log(code === "APPROVAL_REQUIRED" ? "warning" : "error", checked.message, checked.status || null);
+        await recordHealth(code, checked.message);
+        return { ok: false, status: checked.status, code, message: checked.message };
+      }
       // Partner-only APIs: reported honestly instead of pretending a test is possible.
       const message = definition.manualReason ?? "This provider has no public API for this workspace.";
       const code = definition.approvalRequired ? "APPROVAL_REQUIRED" : "UNAVAILABLE";
@@ -351,6 +376,9 @@ export const testIntegration = createServerFn({ method: "POST" })
 
     if (definition.kind === "api_key") {
       result = await providers.testApiKeyProvider(definition.id, row?.account_ref ?? null, creds);
+    } else if (definition.id === "twitter" && !row?.access_token_ciphertext && providers.envValue(["TWITTER_BEARER_TOKEN"], creds)) {
+      // No user authorization yet, but an app-only bearer token is saved: test with it.
+      result = await providers.testTwitterAppOnly(creds);
     } else {
       if (!row?.access_token_ciphertext) {
         const message = `${definition.label} is not connected yet.`;
@@ -401,7 +429,7 @@ export const testIntegration = createServerFn({ method: "POST" })
       }
       const config = providers.OAUTH_PROVIDERS[data.provider];
       if (!config) throw new Error("Unknown integration.");
-      result = await config.test(accessToken);
+      result = await config.test(accessToken, creds);
     }
 
     if (result.ok) {
@@ -541,7 +569,9 @@ export const saveProviderCredentials = createServerFn({ method: "POST" })
     if (saved.length === 0) throw new Error("Enter at least one credential value.");
 
     const bag = await credentials.loadProviderCredentials(supabaseAdmin, member.workspace_id, data.provider);
-    const missing = definition.requiredSecrets.filter((key) => !bag[key] && !process.env[key]);
+    const missing = providers.missingRequiredSecrets(data.provider, bag);
+    // API-key results measured with the previous credentials must not be reused by scans.
+    await forgetCachedHealth(supabaseAdmin, member.workspace_id, data.provider, { apiKeyOnly: true });
 
     const log = (level: string, message: string, eventType: string, httpStatus: number | null = null) =>
       supabaseAdmin.from("integration_events").insert({
@@ -583,8 +613,28 @@ export const saveProviderCredentials = createServerFn({ method: "POST" })
         },
         { onConflict: "workspace_id,provider" },
       );
+      const checkedAt = new Date().toISOString();
+      await supabaseAdmin.from("integration_health").upsert(
+        {
+          workspace_id: member.workspace_id,
+          provider: data.provider,
+          status: result.ok ? "healthy" : "unhealthy",
+          latency_ms: null,
+          outcome_code: result.code ?? (result.ok ? "CONNECTED" : "PROVIDER_ERROR"),
+          last_error: result.ok ? null : result.message,
+          last_checked_at: checkedAt,
+          ...(result.ok ? { last_ok_at: checkedAt } : {}),
+        },
+        { onConflict: "workspace_id,provider" },
+      );
       await log(result.ok ? "info" : "error", result.message, "connection_test", result.status || null);
       return { saved: saved.length, verified: result.ok, message: result.message };
+    }
+
+    if (definition.id === "meta_business") {
+      const result = await providers.testMetaAppCredentials(bag);
+      await log(result.code === "APPROVAL_REQUIRED" ? "warning" : "error", result.message, "connection_test", result.status || null);
+      return { saved: saved.length, verified: false, message: result.message };
     }
 
     return {
@@ -606,6 +656,7 @@ export const revokeProviderCredentials = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { deleteProviderCredentials } = await import("@/lib/integrations/credentials.server");
     await deleteProviderCredentials(supabaseAdmin, member.workspace_id, data.provider);
+    await forgetCachedHealth(supabaseAdmin, member.workspace_id, data.provider);
     await supabaseAdmin
       .from("integration_connections")
       .delete()
