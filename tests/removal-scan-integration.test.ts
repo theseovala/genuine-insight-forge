@@ -192,6 +192,11 @@ describe("runRemovalScan writes a complete, honest case", () => {
     expect(firstCase().evidence.review.url).toBe(FIXTURE_REVIEWS[0]!.review_url);
   });
 
+  test("records the stored place link at listing precision, not as a review permalink", () => {
+    expect(firstCase().evidence.review.urlPrecision).toBe("location_reviews");
+    expect(firstCase().evidence.review.urlDerivation).toBe("derived_from_place_id");
+  });
+
   test("records the BEFORE phase and nothing beyond it", () => {
     expect(firstCase().evidence.verification.phases).toEqual({
       BEFORE: true,

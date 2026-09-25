@@ -12,6 +12,8 @@ export const Route = createFileRoute("/auth")({
   // Client-only: a server-rendered form accepts typing/clicks before React
   // hydrates, which silently discards the credentials on hydration.
   ssr: false,
+  validateSearch: (search: Record<string, unknown>): { mode?: "signin" | "signup" } =>
+    search["mode"] === "signup" ? { mode: "signup" } : {},
   head: () => ({
     meta: [
       { title: `Sign in — ${BRAND.name}` },
@@ -33,7 +35,8 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const search = Route.useSearch();
+  const [mode, setMode] = useState<"signin" | "signup">(search.mode ?? "signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");

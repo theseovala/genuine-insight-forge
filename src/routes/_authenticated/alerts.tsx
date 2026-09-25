@@ -65,6 +65,7 @@ function AlertsPage() {
   const { data: rules } = useAlertRules();
   const updateRules = useUpdateAlertRules();
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [resolvingAll, setResolvingAll] = useState(false);
   const [ruleForm, setRuleForm] = useState({ negative: 2, unanswered: 24, drop: 0.3, spike: 100 });
   const qc = useQueryClient();
   const evaluate = useServerFn(evaluateAlertRules);
@@ -78,7 +79,11 @@ function AlertsPage() {
       .then((result) => {
         if (result?.created) void qc.invalidateQueries({ queryKey: ["alerts"] });
       })
-      .catch(() => undefined);
+      .catch((error: unknown) => {
+        toast.error("Alert rules could not be evaluated", {
+          description: error instanceof Error ? error.message : "The evaluation request failed.",
+        });
+      });
   }, [evaluate, qc]);
 
   const list = alerts.filter((a) => {
@@ -106,11 +111,26 @@ function AlertsPage() {
               setRulesOpen(true);
             }}><BellOff /> Alert rules</Button>
             <Button
-              disabled={open.length === 0 || resolve.isPending}
-              onClick={() => {
-                const count = open.length;
-                open.forEach((a) => resolve.mutate({ id: a.id, resolved: true }));
-                toast.success(`${count} alerts resolved`);
+              disabled={open.length === 0 || resolve.isPending || resolvingAll}
+              onClick={async () => {
+                setResolvingAll(true);
+                try {
+                  const results = await Promise.allSettled(
+                    open.map((a) => resolve.mutateAsync({ id: a.id, resolved: true })),
+                  );
+                  const ok = results.filter((r) => r.status === "fulfilled").length;
+                  const failed = results.length - ok;
+                  if (failed === 0) {
+                    toast.success(`${ok} alert${ok === 1 ? "" : "s"} resolved`);
+                  } else {
+                    const firstError = results.find((r): r is PromiseRejectedResult => r.status === "rejected");
+                    toast.error(`${ok} resolved, ${failed} failed`, {
+                      description: firstError ? (firstError.reason as Error)?.message : undefined,
+                    });
+                  }
+                } finally {
+                  setResolvingAll(false);
+                }
               }}
             >
               <CheckCheck /> Resolve all

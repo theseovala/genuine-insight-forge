@@ -145,21 +145,38 @@ export const getSystemHealth = createServerFn({ method: "POST" })
     });
 
     // AI providers — a real call to the configured gateway.
+    // Same fallback order as runAiText: Lovable AI gateway, then OPENAI_API_KEY, then ANTHROPIC_API_KEY.
     const aiKey = process.env["LOVABLE_API_KEY"];
-    if (!aiKey) {
-      components.push({ component: "AI providers", status: "not_configured", detail: "No AI gateway key is configured.", latencyMs: null, checkedAt: now() });
+    const openaiKey = process.env["OPENAI_API_KEY"];
+    const anthropicKey = process.env["ANTHROPIC_API_KEY"];
+    const aiProbes = [
+      aiKey && { name: "Lovable AI gateway", url: "https://ai.gateway.lovable.dev/v1/models", headers: { Authorization: `Bearer ${aiKey}` } as Record<string, string> },
+      openaiKey && { name: "OpenAI", url: "https://api.openai.com/v1/models", headers: { Authorization: `Bearer ${openaiKey}` } as Record<string, string> },
+      anthropicKey && { name: "Anthropic", url: "https://api.anthropic.com/v1/models", headers: { "x-api-key": anthropicKey, "anthropic-version": "2023-06-01" } as Record<string, string> },
+    ].filter(Boolean) as Array<{ name: string; url: string; headers: Record<string, string> }>;
+    if (aiProbes.length === 0) {
+      components.push({ component: "AI providers", status: "not_configured", detail: "No AI provider key is configured.", latencyMs: null, checkedAt: now() });
     } else {
-      const ai = await timed(() =>
-        fetchWithTimeout("https://ai.gateway.lovable.dev/v1/models", { headers: { Authorization: `Bearer ${aiKey}` } }, 10_000),
-      );
-      const response = ai.value as Response | null;
+      const outcomes: string[] = [];
+      let answered: { name: string; ms: number } | null = null;
+      let totalMs = 0;
+      for (const probe of aiProbes) {
+        const ai = await timed(() => fetchWithTimeout(probe.url, { headers: probe.headers }, 10_000));
+        totalMs += ai.ms;
+        const response = ai.value as Response | null;
+        if (!ai.error && response && response.ok) {
+          answered = { name: probe.name, ms: ai.ms };
+          break;
+        }
+        outcomes.push(ai.error ? `${probe.name} unreachable: ${(ai.error as Error).message}` : `${probe.name} answered HTTP ${response?.status}`);
+      }
       components.push({
         component: "AI providers",
-        status: ai.error ? "failed" : response && response.ok ? "healthy" : "degraded",
-        detail: ai.error
-          ? `Gateway unreachable: ${(ai.error as Error).message}`
-          : `Gateway answered HTTP ${response?.status}.`,
-        latencyMs: ai.ms,
+        status: answered ? "healthy" : "failed",
+        detail: answered
+          ? `${answered.name} answered.${outcomes.length ? ` Earlier in the fallback order: ${outcomes.join("; ")}.` : ""}`
+          : outcomes.join("; "),
+        latencyMs: answered ? answered.ms : totalMs,
         checkedAt: now(),
       });
     }
@@ -348,7 +365,7 @@ export const getObservability = createServerFn({ method: "POST" })
       const entry = stageStats.get(row.source) ?? { source: row.source, runs: 0, totalMs: 0, failures: 0 };
       entry.runs += 1;
       entry.totalMs += row.duration_ms ?? 0;
-      if (row.status !== "ok" && row.status !== "success") entry.failures += 1;
+      if (row.status === "failed" || row.status === "error") entry.failures += 1;
       stageStats.set(row.source, entry);
     }
 

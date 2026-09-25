@@ -19,7 +19,11 @@ export const Route = createFileRoute("/api/public/removal-scan")({
           .select("token")
           .eq("name", "removal-scan")
           .maybeSingle();
-        if (!bearer || bearer !== tokenRow?.token) {
+        const { timingSafeEqual } = await import("node:crypto");
+        const bearerBuf = Buffer.from(bearer ?? "");
+        const tokenBuf = Buffer.from(typeof tokenRow?.token === "string" ? tokenRow.token : "");
+        const tokenMatches = !!bearer && tokenBuf.length > 0 && bearerBuf.length === tokenBuf.length && timingSafeEqual(bearerBuf, tokenBuf);
+        if (!tokenMatches) {
           const { authenticateCronRequest } = await import("@/integrations/supabase/cron-auth");
           const denied = await authenticateCronRequest(request);
           if (denied) return denied;

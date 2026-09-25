@@ -16,15 +16,20 @@ export const getGoogleBusinessConnection = createServerFn({ method: "GET" })
     // Token ciphertext is owner/admin-only at the database level, so this status read
     // runs server-side after membership has already been verified above.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await supabaseAdmin.from("google_business_connections").select("google_account_email,status,last_synced_at,last_error").eq("workspace_id", member.workspace_id).maybeSingle();
+    const { data, error } = await supabaseAdmin.from("google_business_connections").select("google_account_email,status,last_synced_at,last_error,scopes").eq("workspace_id", member.workspace_id).maybeSingle();
     if (error) throw error;
+    // A stored "connected" row without the business.manage grant cannot read or
+    // reply to a single review, so it is not reported as connected.
+    const { googleBusinessState } = await import("./google-business-sync.server");
+    const state = googleBusinessState(data);
     return {
       configured: Boolean(process.env["GOOGLE_BUSINESS_CLIENT_ID"] && process.env["GOOGLE_BUSINESS_CLIENT_SECRET"]),
-      connected: data?.status === "connected",
+      connected: state.code === "CONNECTED",
       email: data?.google_account_email ?? null,
-      status: data?.status ?? null,
+      status: data && state.code !== "CONNECTED" && data.status === "connected" ? "needs_reconnect" : (data?.status ?? null),
+      statusCode: state.code,
       lastSyncedAt: data?.last_synced_at ?? null,
-      lastError: data?.last_error ?? null,
+      lastError: state.code === "CONNECTED" || state.code === "NOT_CONFIGURED" ? null : state.message,
     };
   });
 
@@ -58,10 +63,19 @@ export const syncGoogleBusinessReviews = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const member = await workspace(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: connection, error } = await supabaseAdmin.from("google_business_connections").select("access_token_ciphertext,refresh_token_ciphertext,token_expires_at,status").eq("workspace_id", member.workspace_id).maybeSingle();
+    const { data: connection, error } = await supabaseAdmin.from("google_business_connections").select("access_token_ciphertext,refresh_token_ciphertext,token_expires_at,status,scopes").eq("workspace_id", member.workspace_id).maybeSingle();
     if (error) throw error;
-    if (!connection || connection.status !== "connected") throw new Error("Connect Google Business Profile first.");
-    const { fetchGoogleReviews, usableAccessToken } = await import("./google-business-sync.server");
+    // A needs_reconnect row is still tried when it holds the Business Profile
+    // scope: an "API not approved" failure clears as soon as Google approves the
+    // project, and only a real call can show that.
+    if (!connection || connection.status === "revoked") throw new Error("Connect Google Business Profile first.");
+    const { fetchGoogleReviews, usableAccessToken, hasBusinessScope, markGoogleConnectionUnusable, GoogleConnectionUnusableError, MISSING_BUSINESS_SCOPE_MESSAGE } = await import("./google-business-sync.server");
+    // Without business.manage every Business Profile call returns 403, so the
+    // connection is recorded as needing reconnection instead of being tried.
+    if (!hasBusinessScope(connection.scopes)) {
+      await markGoogleConnectionUnusable(supabaseAdmin, member.workspace_id, MISSING_BUSINESS_SCOPE_MESSAGE);
+      throw new Error(MISSING_BUSINESS_SCOPE_MESSAGE);
+    }
     const { data: run, error: runError } = await context.supabase.from("sync_runs").insert({ workspace_id: member.workspace_id, platform: "google" }).select("id").single();
     if (runError) throw runError;
     try {
@@ -76,6 +90,7 @@ export const syncGoogleBusinessReviews = createServerFn({ method: "POST" })
       let created = 0;
       let updated = 0;
       let alerts = 0;
+      let rejected = 0;
       for (const batch of batches) {
         const { data: existingLocation } = await context.supabase.from("locations").select("id").eq("workspace_id", member.workspace_id).eq("external_ref", batch.location.externalRef).maybeSingle();
         if (existingLocation) {
@@ -85,50 +100,35 @@ export const syncGoogleBusinessReviews = createServerFn({ method: "POST" })
           if (locationError) throw locationError;
         }
         const reviewUrl = deriveReviewUrl({ platform: "google", placeId: batch.location.placeId }).url;
-        for (const review of batch.reviews) {
-          found += 1;
-          const sentiment = review.rating >= 4 ? "positive" : review.rating === 3 ? "neutral" : "negative";
-          const priority = review.rating <= 2 ? "high" : review.rating === 3 ? "medium" : "low";
-          const { data: existing } = await context.supabase.from("reviews").select("id").eq("workspace_id", member.workspace_id).eq("platform", "google").eq("external_id", review.id).maybeSingle();
-          let storedReviewId: string;
-          if (existing) {
-            const { error: updateError } = await context.supabase.from("reviews").update({ author: review.author, rating: review.rating, body: review.body, sentiment, priority, location_name: batch.location.name, external_created_at: review.createdAt, review_url: reviewUrl }).eq("id", existing.id);
-            if (updateError) throw updateError;
-            storedReviewId = existing.id;
-            updated += 1;
-          } else {
-            const { data: inserted, error: insertError } = await context.supabase.from("reviews").insert({ workspace_id: member.workspace_id, platform: "google", external_id: review.id, source: "google_business", author: review.author, rating: review.rating, sentiment, status: "pending", priority, location_name: batch.location.name, body: review.body, external_created_at: review.createdAt, review_url: reviewUrl }).select("id").single();
-            if (insertError) throw insertError;
-            storedReviewId = inserted.id;
-            created += 1;
-          }
-          if (review.rating <= (rules?.negative_rating_threshold ?? 2)) {
-            const { data: existingAlert, error: alertLookupError } = await context.supabase
-              .from("alerts")
-              .select("id")
-              .eq("workspace_id", member.workspace_id)
-              .eq("review_id", storedReviewId)
-              .eq("kind", "negative_review")
-              .limit(1)
-              .maybeSingle();
-            if (alertLookupError) throw alertLookupError;
-            if (!existingAlert) {
-              const { error: alertError } = await context.supabase.from("alerts").insert({ workspace_id: member.workspace_id, review_id: storedReviewId, kind: "negative_review", severity: review.rating === 1 ? "critical" : "high", title: `${review.rating}-star Google review`, detail: review.body.slice(0, 240), location_name: batch.location.name });
-              if (alertError) throw alertError;
-              alerts += 1;
-            }
-          }
-        }
+        const { normalizeGoogleReview } = await import("@/lib/reviews/normalized");
+        const { ingestNormalizedReviews } = await import("@/lib/reviews/ingest.server");
+        const stored = await ingestNormalizedReviews(context.supabase, {
+          workspaceId: member.workspace_id,
+          results: batch.reviews.map((review) => normalizeGoogleReview(review, { locationName: batch.location.name, reviewUrl })),
+          negativeThreshold: rules?.negative_rating_threshold ?? 2,
+          platformLabel: "Google",
+        });
+        found += stored.found;
+        created += stored.created;
+        updated += stored.updated;
+        alerts += stored.alerts;
+        rejected += stored.rejected.length;
       }
       const now = new Date().toISOString();
       await context.supabase.from("sync_runs").update({ status: "completed", locations_found: batches.length, reviews_found: found, reviews_created: created, reviews_updated: updated, alerts_created: alerts, completed_at: now }).eq("id", run.id);
-      await supabaseAdmin.from("google_business_connections").update({ last_synced_at: now, last_error: null }).eq("workspace_id", member.workspace_id);
+      await supabaseAdmin.from("google_business_connections").update({ status: "connected", last_synced_at: now, last_error: null }).eq("workspace_id", member.workspace_id);
       await context.supabase.from("connected_platforms").update({ status: "connected", last_synced_at: now, last_sync_error: null }).eq("workspace_id", member.workspace_id).eq("platform", "google");
-      return { locations: batches.length, reviewsFound: found, reviewsCreated: created, reviewsUpdated: updated, alertsCreated: alerts };
+      return { locations: batches.length, reviewsFound: found, reviewsCreated: created, reviewsUpdated: updated, alertsCreated: alerts, reviewsRejected: rejected };
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Google sync failed";
       await context.supabase.from("sync_runs").update({ status: "failed", error_message: message, completed_at: new Date().toISOString() }).eq("id", run.id);
-      await supabaseAdmin.from("google_business_connections").update({ last_error: message }).eq("workspace_id", member.workspace_id);
+      if (caught instanceof GoogleConnectionUnusableError) {
+        // Scope missing, API not approved or refresh failed: the connection stops
+        // being reported as connected until the owner reconnects.
+        await markGoogleConnectionUnusable(supabaseAdmin, member.workspace_id, message);
+      } else {
+        await supabaseAdmin.from("google_business_connections").update({ last_error: message }).eq("workspace_id", member.workspace_id);
+      }
       throw caught;
     }
   });
@@ -138,8 +138,63 @@ export const disconnectGoogleBusiness = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const member = await workspace(context);
     if (member.role === "member") throw new Error("Only a workspace owner or admin can disconnect Google.");
+    // Revoke at Google first so the stored refresh token stops working there too.
+    // A failed revoke does not block the disconnect; the owner can also remove
+    // access from their Google account settings.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: stored } = await supabaseAdmin.from("google_business_connections").select("refresh_token_ciphertext").eq("workspace_id", member.workspace_id).maybeSingle();
+    if (stored?.refresh_token_ciphertext) {
+      try {
+        const { decryptSecret } = await import("@/lib/google-business.server");
+        await fetch("https://oauth2.googleapis.com/revoke", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ token: await decryptSecret(stored.refresh_token_ciphertext) }), signal: AbortSignal.timeout(20_000) });
+      } catch {
+        // Revocation is best effort; the local connection is removed below regardless.
+      }
+    }
     const { error } = await context.supabase.from("google_business_connections").delete().eq("workspace_id", member.workspace_id);
     if (error) throw error;
     await context.supabase.from("connected_platforms").update({ status: "disconnected", account_ref: null }).eq("workspace_id", member.workspace_id).eq("platform", "google");
     return { disconnected: true };
+  });
+
+/**
+ * Publishes a reply from the review inbox. For a Google Business Profile review
+ * with a working connection the reply is posted to Google first and saved only
+ * once Google accepted it. Every other platform has no posting API here, so the
+ * reply is saved and the caller is told it still has to be copied across.
+ */
+export const publishReviewReply = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ reviewId: z.string().uuid(), reply: z.string().trim().min(1).max(4000) }).parse(input))
+  .handler(async ({ data, context }) => {
+    const member = await workspace(context);
+    const { data: review, error: reviewError } = await context.supabase.from("reviews").select("id, platform, external_id").eq("id", data.reviewId).eq("workspace_id", member.workspace_id).maybeSingle();
+    if (reviewError) throw reviewError;
+    if (!review) throw new Error("That review no longer exists.");
+    let postedToGoogle = false;
+    let notPostedReason: string | null = null;
+    if (review.platform === "google" && typeof review.external_id === "string" && review.external_id.startsWith("gbp:")) {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: connection, error: connectionError } = await supabaseAdmin.from("google_business_connections").select("access_token_ciphertext,refresh_token_ciphertext,token_expires_at,status,scopes").eq("workspace_id", member.workspace_id).maybeSingle();
+      if (connectionError) throw connectionError;
+      const { usableAccessToken, postGoogleReviewReply, hasBusinessScope, markGoogleConnectionUnusable, GoogleConnectionUnusableError } = await import("./google-business-sync.server");
+      if (connection && connection.status === "connected" && hasBusinessScope(connection.scopes)) {
+        try {
+          const token = await usableAccessToken(supabaseAdmin, member.workspace_id, connection);
+          await postGoogleReviewReply(token, review.external_id, data.reply);
+          postedToGoogle = true;
+        } catch (caught) {
+          if (caught instanceof GoogleConnectionUnusableError) await markGoogleConnectionUnusable(supabaseAdmin, member.workspace_id, caught.message);
+          throw caught;
+        }
+      } else {
+        notPostedReason = "Google Business Profile is not connected with reply permission.";
+      }
+    }
+    const { error } = await context.supabase.from("reviews").update({ reply: data.reply, replied_at: new Date().toISOString(), replied_by: context.userId, status: "replied", unread: false }).eq("id", review.id).eq("workspace_id", member.workspace_id);
+    if (error) throw error;
+    // A public reply speaks for the business, so who sent it is kept in the audit trail.
+    const { supabaseAdmin: auditClient } = await import("@/integrations/supabase/client.server");
+    await auditClient.from("audit_logs").insert({ workspace_id: member.workspace_id, actor: context.userId, action: postedToGoogle ? "review_reply_posted" : "review_reply_saved", target_type: "review", target_id: review.id, metadata: { platform: review.platform, via: "review_center" } });
+    return { postedToGoogle, platform: review.platform as string, notPostedReason };
   });

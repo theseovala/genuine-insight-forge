@@ -20,7 +20,8 @@ async function workspace(context: Ctx) {
 }
 
 function requireAdmin(member: { role: string }) {
-  if (member.role === "member") throw new Error("Only a workspace owner or admin can manage integrations.");
+  // Allow-list, not deny-list: any role other than owner/admin is refused.
+  if (member.role !== "owner" && member.role !== "admin") throw new Error("Only a workspace owner or admin can manage integrations.");
 }
 
 /** Non-secret projection — credential columns are never selected. */
@@ -96,9 +97,11 @@ export const listIntegrations = createServerFn({ method: "GET" })
 
     const google = await supabaseAdmin
       .from("google_business_connections")
-      .select("google_account_email,status,last_synced_at,last_error")
+      .select("google_account_email,status,last_synced_at,last_error,scopes")
       .eq("workspace_id", member.workspace_id)
       .maybeSingle();
+    const { googleBusinessState } = await import("@/lib/google-business-sync.server");
+    const googleState = googleBusinessState(google.data);
 
     return {
       role: member.role,
@@ -109,15 +112,16 @@ export const listIntegrations = createServerFn({ method: "GET" })
             provider: definition.id,
             configured: providerConfigured(definition.id, bags[definition.credentialGroup ?? definition.id]),
             credentials: maskedFor(definition),
-            status: row?.status === "connected" ? "connected" : row?.last_error ? "error" : "disconnected",
+            // Connected only once Google has returned authorized data; tokens alone are not enough.
+            status: googleState.code === "CONNECTED" ? "connected" : googleState.code === "NOT_CONFIGURED" ? "disconnected" : "error",
             accountLabel: row?.google_account_email ?? null,
             accountRef: null,
             scopes: definition.scopes,
             tokenExpiresAt: null,
             connectedAt: null,
             lastTestedAt: row?.last_synced_at ?? null,
-            lastTestOk: row?.status === "connected" ? true : null,
-            lastError: row?.last_error ?? null,
+            lastTestOk: googleState.code === "CONNECTED" ? true : row ? false : null,
+            lastError: googleState.code === "CONNECTED" || googleState.code === "NOT_CONFIGURED" ? null : `${googleState.code}: ${googleState.message}`,
             ...liveState(definition.id),
           };
         }
@@ -234,6 +238,7 @@ export const testIntegration = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ provider: z.string() }).parse(input))
   .handler(async ({ data, context }) => {
     const member = await workspace(context);
+    requireAdmin(member);
     const definition = integrationById(data.provider);
     if (!definition) throw new Error("Unknown integration.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -289,28 +294,38 @@ export const testIntegration = createServerFn({ method: "POST" })
     if (definition.id === "google_business") {
       const { data: connection } = await supabaseAdmin
         .from("google_business_connections")
-        .select("access_token_ciphertext,refresh_token_ciphertext,token_expires_at,status")
+        .select("access_token_ciphertext,refresh_token_ciphertext,token_expires_at,status,scopes")
         .eq("workspace_id", member.workspace_id)
         .maybeSingle();
-      if (!connection || connection.status !== "connected") {
-        const message = "Google Business Profile is not connected yet.";
-        await log("warning", message, null);
-        await recordHealth("NOT_CONFIGURED", message);
-        return { ok: false, status: 0, code: "NOT_CONFIGURED" as const, message };
+      const { usableAccessToken, googleBusinessState, probeGoogleBusinessAccess, hasBusinessScope, MISSING_BUSINESS_SCOPE_MESSAGE, markGoogleConnectionUnusable } = await import("@/lib/google-business-sync.server");
+      if (!connection || connection.status === "revoked") {
+        const state = googleBusinessState(null);
+        await log("warning", state.message, null);
+        await recordHealth(state.code, state.message);
+        return { ok: false, status: 0, code: state.code, message: state.message };
       }
-      const { usableAccessToken } = await import("@/lib/google-business-sync.server");
+      if (!hasBusinessScope(connection.scopes)) {
+        await markGoogleConnectionUnusable(supabaseAdmin, member.workspace_id, MISSING_BUSINESS_SCOPE_MESSAGE);
+        await log("error", MISSING_BUSINESS_SCOPE_MESSAGE, null);
+        await recordHealth("INSUFFICIENT_SCOPE", MISSING_BUSINESS_SCOPE_MESSAGE);
+        return { ok: false, status: 0, code: "INSUFFICIENT_SCOPE" as const, message: MISSING_BUSINESS_SCOPE_MESSAGE };
+      }
       try {
         const token = await usableAccessToken(supabaseAdmin, member.workspace_id, connection as any);
-        const response = await fetch("https://mybusinessaccountmanagement.googleapis.com/v1/accounts?pageSize=1", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const ok = response.ok;
-        await log(ok ? "info" : "error", ok ? "Google Business Profile API reachable." : `Google returned HTTP ${response.status}.`, response.status);
-        return { ok, status: response.status, message: ok ? "Google Business Profile API reachable." : `Google returned HTTP ${response.status}.` };
+        const probe = await probeGoogleBusinessAccess(token);
+        const ok = probe.code === "CONNECTED";
+        // The stored row follows the live answer, so every screen reports the same state.
+        await supabaseAdmin.from("google_business_connections").update(ok ? { status: "connected", last_error: null } : { last_error: probe.message }).eq("workspace_id", member.workspace_id);
+        await supabaseAdmin.from("connected_platforms").update(ok ? { status: "connected", last_sync_error: null } : { status: "error", last_sync_error: probe.message }).eq("workspace_id", member.workspace_id).eq("platform", "google");
+        await log(ok ? "info" : "error", probe.message, probe.httpStatus);
+        await recordHealth(probe.code, probe.message, ok);
+        return { ok, status: probe.httpStatus, code: probe.code, message: probe.message };
       } catch (caught) {
         const message = caught instanceof Error ? caught.message : "Google test failed.";
+        const code = /expired|reconnect/i.test(message) ? ("AUTHENTICATION_FAILED" as const) : ("PROVIDER_ERROR" as const);
         await log("error", message, null);
-        return { ok: false, status: 0, message };
+        await recordHealth(code, message);
+        return { ok: false, status: 0, code, message };
       }
     }
 
@@ -672,8 +687,10 @@ export const getIntegrationHealth = createServerFn({ method: "GET" })
       .select("platform,last_synced_at")
       .eq("workspace_id", wid);
     for (const row of platforms ?? []) {
-      const existing = syncBy.get(row.platform);
-      if (row.last_synced_at && (!existing || row.last_synced_at > existing)) syncBy.set(row.platform, row.last_synced_at);
+      // connected_platforms stores Google Business as "google"; the registry id is "google_business".
+      const provider = row.platform === "google" ? "google_business" : row.platform;
+      const existing = syncBy.get(provider);
+      if (row.last_synced_at && (!existing || row.last_synced_at > existing)) syncBy.set(provider, row.last_synced_at);
     }
 
     const items: ProviderHealth[] = INTEGRATIONS.map((definition) => {
@@ -782,10 +799,10 @@ export const getIntegrationOverview = createServerFn({ method: "GET" })
         .eq("workspace_id", member.workspace_id),
       supabaseAdmin
         .from("integration_api_logs")
-        .select("provider,created_at,status_code")
+        .select("provider,created_at,http_status")
         .eq("workspace_id", member.workspace_id)
         .gte("created_at", since)
-        .gte("status_code", 400),
+        .gte("http_status", 400),
       supabaseAdmin
         .from("audit_logs")
         .select("id,action,target_type,target_id,created_at")

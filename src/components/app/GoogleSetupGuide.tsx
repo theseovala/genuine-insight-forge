@@ -15,8 +15,9 @@ import { saveProviderCredentials, testIntegration } from "@/lib/integrations.fun
 /** Opens Google authorization reliably, even inside a sandboxed preview frame. */
 function openAuthorization(url: string, authWindow: Window | null) {
   const fallback = () => {
-    const popup = window.open(url, "_blank", "noopener,noreferrer");
-    if (!popup) window.location.assign(url);
+    const popup = window.open(url, "_blank");
+    if (popup) popup.opener = null;
+    else window.location.assign(url);
   };
   if (!authWindow || authWindow.closed) {
     fallback();
@@ -210,7 +211,13 @@ export function GoogleBusinessSetupGuide({ credentialsReady }: { credentialsRead
         <Button
           size="sm"
           disabled={!configured || connect.isPending}
-          onClick={() => connect.mutate({ authWindow: window.open("", "_blank", "noopener,noreferrer") })}
+          onClick={() => {
+            // No "noopener" feature here: with it window.open always returns
+            // null, leaving an orphaned blank tab and no handle to navigate.
+            // openAuthorization clears the opener before navigating.
+            const authWindow = window.open("", "_blank");
+            connect.mutate({ authWindow });
+          }}
         >
           {connect.isPending && <Loader2 className="animate-spin" />}
           {connected ? "Reconnect Google" : "Connect Google"}
@@ -221,7 +228,7 @@ export function GoogleBusinessSetupGuide({ credentialsReady }: { credentialsRead
       title: "Bring in your reviews",
       detail: synced
         ? `Last synced ${relativeTime(connection.data?.lastSyncedAt as string)}.`
-        : "Pulls your real locations and reviews. After this, syncing continues automatically.",
+        : "Pulls your real locations and reviews. Syncing is not scheduled — press Sync now whenever you want the latest reviews.",
       done: synced,
       action: (
         <Button size="sm" variant="outline" disabled={!connected || sync.isPending} onClick={() => sync.mutate()}>

@@ -3,6 +3,12 @@
 // simulated responses and no success status without a real HTTP 2xx.
 import { integrationById, type TestOutcomeCode } from "./registry";
 
+// Every provider call in this module gets a 20 s ceiling unless it sets its own
+// signal, so one unresponsive provider cannot hang a connection test or a scan.
+const PROVIDER_TIMEOUT_MS = 20_000;
+const fetch: typeof globalThis.fetch = (input, init) =>
+  globalThis.fetch(input, { ...init, signal: init?.signal ?? AbortSignal.timeout(PROVIDER_TIMEOUT_MS) });
+
 export interface TestResult {
   ok: boolean;
   status: number;
@@ -43,7 +49,7 @@ export function outcomeFor(ok: boolean, status: number, message: string): TestOu
   if (ok) return "CONNECTED";
   if (status === 0) {
     const lower = message.toLowerCase();
-    return lower.includes("not configured") || lower.includes("missing") || lower.includes("required") || lower.includes("add your")
+    return lower.includes("not configured") || (lower.startsWith("no ") && lower.includes("configured")) || lower.includes("missing") || lower.includes("required") || lower.includes("add your")
       ? "NOT_CONFIGURED"
       : "PROVIDER_ERROR";
   }
@@ -54,7 +60,7 @@ export function outcomeFor(ok: boolean, status: number, message: string): TestOu
     // that is a provider-side setup state, not a bad credential.
     if (/has not been used in project|is disabled|blocked|not enabled|enable it by visiting|accessNotConfigured/i.test(message))
       return "APPROVAL_REQUIRED";
-    return "INVALID_CREDENTIALS";
+    return "AUTHENTICATION_FAILED";
   }
   if (status === 429) return "RATE_LIMITED";
   return "PROVIDER_ERROR";
@@ -689,7 +695,7 @@ export async function testApiKeyProvider(
           ok: false,
           status: response.status,
           message: String(payload["error"]?.["message"] ?? "UptimeRobot rejected the key."),
-          code: "INVALID_CREDENTIALS",
+          code: "AUTHENTICATION_FAILED",
         };
       }
       return {

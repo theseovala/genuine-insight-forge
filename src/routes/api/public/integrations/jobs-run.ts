@@ -11,22 +11,22 @@ export const Route = createFileRoute("/api/public/integrations/jobs-run")({
         const auth = request.headers.get("authorization") ?? "";
         const expected = process.env["LOVABLE_CRON_SECRET"];
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        if (expected) {
-          const token = auth.replace(/^Bearer\s+/i, "");
-          const ok =
-            (token.length === expected.length && timingSafeEqual(Buffer.from(token), Buffer.from(expected))) ||
-            (await (async () => {
-              const { data } = await supabaseAdmin
-                .from("scheduler_tokens")
-                .select("token")
-                .eq("name", "integration-jobs")
-                .maybeSingle();
-              return Boolean(data && token === data.token);
-            })());
-          if (!ok) return new Response("Unauthorized", { status: 401 });
-        } else {
-          return new Response("Unauthorized", { status: 401 });
-        }
+        const token = auth.replace(/^Bearer\s+/i, "");
+        const safeEqual = (a: string, b: string) => {
+          const left = Buffer.from(a);
+          const right = Buffer.from(b);
+          return left.length === right.length && timingSafeEqual(left, right);
+        };
+        // Scheduler token first (works even when LOVABLE_CRON_SECRET is unset), then the platform cron secret.
+        const { data: tokenRow } = await supabaseAdmin
+          .from("scheduler_tokens")
+          .select("token")
+          .eq("name", "integration-jobs")
+          .maybeSingle();
+        const ok =
+          token.length > 0 &&
+          ((typeof tokenRow?.token === "string" && safeEqual(token, tokenRow.token)) || (!!expected && safeEqual(token, expected)));
+        if (!ok) return new Response("Unauthorized", { status: 401 });
 
         const { claimDueJobs, completeJob, failJob } = await import("@/lib/jobs.server");
         const claimed = await claimDueJobs(supabaseAdmin, 25);

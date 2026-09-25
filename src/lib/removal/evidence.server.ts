@@ -243,7 +243,9 @@ export function buildEvidencePackage(input: BuildEvidenceInput): EvidencePackage
         detail:
           review.urlDerivation === "derived_from_place_id"
             ? "Built from the place id the provider returned, using the provider's documented link format"
-            : "Supplied by the provider for this review",
+            : review.urlDerivation === "stored_link_unclassified"
+              ? "Stored on the review row by the sync; not a recognised single-review link"
+              : "Supplied by the provider for this review",
         url: review.urlPatternSource,
         retrievedAt: now,
       },
@@ -288,37 +290,7 @@ export function buildEvidencePackage(input: BuildEvidenceInput): EvidencePackage
       "An assessment, not an observation. It is the model's reading of the captured text and carries the model's own confidence.",
   });
 
-  for (const route of input.routes) {
-    items.push({
-      id: `policy_basis_${route.route}`,
-      claim: `Route ${route.route} relies on: ${route.policyBasis.ruleName}`,
-      value:
-        route.policyBasis.source === "POLICY_SOURCE_REQUIRED"
-          ? "POLICY_SOURCE_REQUIRED"
-          : `${route.policyBasis.source.url} (retrieved ${route.policyBasis.source.retrievedAt})`,
-      source:
-        route.policyBasis.source === "POLICY_SOURCE_REQUIRED"
-          ? {
-              type: "policy_source_required",
-              detail:
-                "No retrieved policy document is attached, so the rule is named but not cited.",
-              url: null,
-              retrievedAt: now,
-            }
-          : {
-              type: "retrieved_policy_document",
-              detail: `Jurisdiction: ${route.policyBasis.source.jurisdiction ?? "not stated"}`,
-              url: route.policyBasis.source.url,
-              retrievedAt: route.policyBasis.source.retrievedAt,
-            },
-      timestamp: now,
-      confidence: route.policyBasis.source === "POLICY_SOURCE_REQUIRED" ? 0 : 1,
-      explanation:
-        route.policyBasis.source === "POLICY_SOURCE_REQUIRED"
-          ? "The rule is named from the project's own mapping. Confidence is 0 because no document has been retrieved to cite."
-          : "Cited from a policy document the system retrieved and stored.",
-    });
-  }
+  for (const route of input.routes) items.push(policyBasisItem(route, now));
 
   const resolved = resolveOutcome(input.ledger);
 
@@ -367,6 +339,39 @@ export function buildEvidencePackage(input: BuildEvidenceInput): EvidencePackage
   return pkg;
 }
 
+/** The evidence item naming the rule a route relies on, and whether it is cited. */
+function policyBasisItem(route: DetectedRoute, now: string): EvidenceItem {
+  return {
+      id: `policy_basis_${route.route}`,
+      claim: `Route ${route.route} relies on: ${route.policyBasis.ruleName}`,
+      value:
+        route.policyBasis.source === "POLICY_SOURCE_REQUIRED"
+          ? "POLICY_SOURCE_REQUIRED"
+          : `${route.policyBasis.source.url} (retrieved ${route.policyBasis.source.retrievedAt})`,
+      source:
+        route.policyBasis.source === "POLICY_SOURCE_REQUIRED"
+          ? {
+              type: "policy_source_required",
+              detail:
+                "No retrieved policy document is attached, so the rule is named but not cited.",
+              url: null,
+              retrievedAt: now,
+            }
+          : {
+              type: "retrieved_policy_document",
+              detail: `Jurisdiction: ${route.policyBasis.source.jurisdiction ?? "not stated"}`,
+              url: route.policyBasis.source.url,
+              retrievedAt: route.policyBasis.source.retrievedAt,
+            },
+      timestamp: now,
+      confidence: route.policyBasis.source === "POLICY_SOURCE_REQUIRED" ? 0 : 1,
+      explanation:
+        route.policyBasis.source === "POLICY_SOURCE_REQUIRED"
+          ? "The rule is named from the project's own mapping. Confidence is 0 because no document has been retrieved to cite."
+          : "Cited from a policy document the system retrieved and stored.",
+  };
+}
+
 /** True when the package is byte-for-byte what was sealed at assembly. */
 export function verifyPackageIntegrity(pkg: EvidencePackage): boolean {
   return pkg.integrity.packageSha256 === sha256(stableStringify({ ...pkg, integrity: undefined }));
@@ -389,6 +394,28 @@ export function resealWithLedger(pkg: EvidencePackage, ledger: Ledger): Evidence
       providerDecision: providerDecision(ledger),
       ledger,
     },
+    integrity: { packageSha256: "" },
+  };
+  next.integrity.packageSha256 = sha256(stableStringify({ ...next, integrity: undefined }));
+  validateEvidencePackage(next);
+  return next;
+}
+
+/**
+ * Re-seals a package with a newly detected set of routes, e.g. once the platform
+ * has rejected the report and its appeal channel opens. The review, finding,
+ * ledger and every non-route item are carried over untouched; only the routes
+ * and the policy-basis items that describe them are replaced.
+ */
+export function resealWithRoutes(pkg: EvidencePackage, routes: DetectedRoute[], now: Date = new Date()): EvidencePackage {
+  const at = now.toISOString();
+  const next: EvidencePackage = {
+    ...pkg,
+    items: [
+      ...pkg.items.filter((item) => !item.id.startsWith("policy_basis_")),
+      ...routes.map((route) => policyBasisItem(route, at)),
+    ],
+    routes,
     integrity: { packageSha256: "" },
   };
   next.integrity.packageSha256 = sha256(stableStringify({ ...next, integrity: undefined }));

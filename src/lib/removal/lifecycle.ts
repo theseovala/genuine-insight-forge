@@ -86,6 +86,39 @@ export function assertTransition(from: CaseStatus, to: CaseStatus): void {
   }
 }
 
+/**
+ * The status a settled recheck moves the case to, or null to leave it alone.
+ *
+ * A submitted case closes on the observation. A case marked "approved" because
+ * the platform said it accepted the report, but whose recheck still finds the
+ * review published, goes to "rejected": the platform's claim was contradicted
+ * by what was observed, and that is what reopens resubmission and the appeal
+ * route. This is only reachable from a recheck, never from a status click, so
+ * the manual state machine above is unchanged.
+ */
+export function statusAfterRecheck(status: string, outcome: Outcome): CaseStatus | null {
+  if (status === "submitted" && outcome === "removed") return "approved";
+  if (status === "submitted" && outcome === "retained") return "rejected";
+  if (status === "approved" && outcome === "retained") return "rejected";
+  return null;
+}
+
+/** Allowed clock skew for a caller-supplied observation time. */
+export const MAX_FUTURE_SKEW_MS = 5 * 60_000;
+
+/**
+ * Refuses an observation dated in the future. The latest RECHECK decides the
+ * outcome, so a future-dated entry would outrank every real recheck made after
+ * it and pin the outcome regardless of what is later observed.
+ */
+export function assertNotFuture(at: string, now: Date = new Date()): void {
+  const time = Date.parse(at);
+  if (Number.isNaN(time)) throw new Error(`"${at}" is not a date.`);
+  if (time - now.getTime() > MAX_FUTURE_SKEW_MS) {
+    throw new Error("An observation cannot be dated in the future.");
+  }
+}
+
 function latest(ledger: Ledger, phase: Phase): LedgerEntry | null {
   let found: LedgerEntry | null = null;
   for (const entry of ledger) {
@@ -204,4 +237,14 @@ export function nextRecheckDue(ledger: Ledger, intervalHours = 72): string | nul
   const resolved = resolveOutcome(ledger);
   if (resolved.outcome === "removed") return null;
   return new Date(Date.parse(anchor.at) + intervalHours * 3_600_000).toISOString();
+}
+
+/**
+ * True once the platform has actually decided against this case: the case was
+ * set to "rejected", or the ledger holds a provider RESPONSE with a rejected
+ * decision. This is what opens the platform's appeal route.
+ */
+export function hasPriorRejection(ledger: Ledger, status?: string | null): boolean {
+  if (status === "rejected") return true;
+  return ledger.some((e) => e.phase === "RESPONSE" && e.providerResponse?.decision === "rejected");
 }

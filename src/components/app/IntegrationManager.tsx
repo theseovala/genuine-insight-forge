@@ -88,8 +88,13 @@ function IntegrationOverview() {
 }
 
 function openAuthorization(url: string) {
-  const popup = window.open(url, "_blank", "noopener,noreferrer");
-  if (!popup) window.location.assign(url);
+  // window.open with the "noopener" feature always returns null (HTML spec),
+  // which made every call look like a blocked popup and also navigated this
+  // tab away. Open normally, then sever the opener link by hand; only fall
+  // back to same-tab navigation when the popup really was blocked.
+  const popup = window.open(url, "_blank");
+  if (popup) popup.opener = null;
+  else window.location.assign(url);
 }
 
 
@@ -293,7 +298,7 @@ export function IntegrationManager() {
     mutationFn: ({ provider, accountRef }: { provider: string; accountRef: string }) =>
       saveFn({ data: { provider, accountRef } }),
     onSuccess: (_result, variables) => {
-      toast.success("Saved — run Test connection to verify it against the live API");
+      toast.success("Saved — verifying it against the live API now");
       refresh();
       setBusy(variables.provider);
       test.mutate(variables.provider);
@@ -464,7 +469,7 @@ export function IntegrationManager() {
                       )}
                       {item?.lastError && <p className="mt-1 text-xs text-negative">{item.lastError}</p>}
                       {item?.tokenExpiresAt && status === "connected" && (
-                        <p className="mt-1 text-[11px] text-muted-foreground">Access renews automatically · expires {relativeTime(item.tokenExpiresAt)}</p>
+                        <p className="mt-1 text-[11px] text-muted-foreground">Access token expires {relativeTime(item.tokenExpiresAt)} · refreshed on the next test or sync if the provider issued a refresh token</p>
                       )}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">

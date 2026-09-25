@@ -31,6 +31,11 @@ export const Route = createFileRoute("/api/public/google-business/callback")({
           const refreshToken = tokens.refreshToken ? await encryptSecret(tokens.refreshToken) : existing?.refresh_token_ciphertext;
           if (!refreshToken) throw new Error("Google did not return offline access.");
           const email = await getGoogleAccountEmail(tokens.accessToken);
+          // Google lets the user untick the Business Profile permission on the
+          // consent screen. Sign-in scopes alone cannot read or reply to a review,
+          // so such a grant is stored as needing reconnection, never as connected.
+          const { hasBusinessScope, MISSING_BUSINESS_SCOPE_MESSAGE } = await import("@/lib/google-business-sync.server");
+          const granted = hasBusinessScope(tokens.scopes);
           const { error: saveError } = await supabaseAdmin.from("google_business_connections").upsert({
             workspace_id: saved.workspace_id,
             google_account_email: email,
@@ -38,10 +43,24 @@ export const Route = createFileRoute("/api/public/google-business/callback")({
             refresh_token_ciphertext: refreshToken,
             token_expires_at: new Date(Date.now() + tokens.expiresIn * 1000).toISOString(),
             scopes: tokens.scopes,
-            status: "connected",
-            last_error: null,
+            status: granted ? "connected" : "needs_reconnect",
+            last_error: granted ? null : MISSING_BUSINESS_SCOPE_MESSAGE,
           }, { onConflict: "workspace_id" });
           if (saveError) throw saveError;
+          if (!granted) {
+            await supabaseAdmin.from("connected_platforms").update({ status: "disconnected", account_ref: email, last_sync_error: MISSING_BUSINESS_SCOPE_MESSAGE }).eq("workspace_id", saved.workspace_id).eq("platform", "google");
+            return Response.redirect(`${saved.redirect_origin}/settings?google=permission_missing`, 302);
+          }
+          // Holding tokens is not the same as having access: Google can still refuse
+          // every Business Profile call until it approves the project. One real call
+          // decides whether this is reported as connected.
+          const { probeGoogleBusinessAccess } = await import("@/lib/google-business-sync.server");
+          const probe = await probeGoogleBusinessAccess(tokens.accessToken);
+          if (probe.code !== "CONNECTED") {
+            await supabaseAdmin.from("google_business_connections").update({ last_error: probe.message }).eq("workspace_id", saved.workspace_id);
+            await supabaseAdmin.from("connected_platforms").update({ status: "error", account_ref: email, last_sync_error: probe.message }).eq("workspace_id", saved.workspace_id).eq("platform", "google");
+            return Response.redirect(`${saved.redirect_origin}/settings?google=${probe.code === "APPROVAL_REQUIRED" ? "approval_required" : "error"}`, 302);
+          }
           await supabaseAdmin.from("connected_platforms").update({ status: "connected", account_ref: email, last_sync_error: null }).eq("workspace_id", saved.workspace_id).eq("platform", "google");
           return Response.redirect(`${saved.redirect_origin}/settings?google=connected`, 302);
         } catch {

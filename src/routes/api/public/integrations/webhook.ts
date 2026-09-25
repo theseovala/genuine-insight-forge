@@ -47,7 +47,11 @@ export const Route = createFileRoute("/api/public/integrations/webhook")({
         const token = url.searchParams.get("hub.verify_token");
         const challenge = url.searchParams.get("hub.challenge");
         const expected = process.env["META_WEBHOOK_VERIFY_TOKEN"];
-        if (mode === "subscribe" && challenge && expected && token === expected) {
+        const providedToken = Buffer.from(token ?? "");
+        const expectedToken = Buffer.from(expected ?? "");
+        const tokenMatches =
+          !!expected && providedToken.length === expectedToken.length && timingSafeEqual(providedToken, expectedToken);
+        if (mode === "subscribe" && challenge && tokenMatches) {
           return new Response(challenge, { status: 200 });
         }
         return new Response("Forbidden", { status: 403 });
@@ -83,8 +87,11 @@ export const Route = createFileRoute("/api/public/integrations/webhook")({
           if (!secret) verifyError = "No X consumer secret configured for signature verification.";
           else {
             const expected = createHmac("sha256", secret).update(raw).digest("base64");
+            // X sends "sha256=<base64>"; compare only the digest part.
+            const provided = Buffer.from(header.replace(/^sha256=/i, ""));
+            const wanted = Buffer.from(expected);
             try {
-              signatureValid = timingSafeEqual(Buffer.from(header), Buffer.from(expected));
+              signatureValid = provided.length === wanted.length && timingSafeEqual(provided, wanted);
             } catch {
               signatureValid = false;
             }
@@ -97,13 +104,20 @@ export const Route = createFileRoute("/api/public/integrations/webhook")({
           if (!secret) verifyError = "No Trustpilot webhook secret configured.";
           else {
             const expected = createHmac("sha256", secret).update(raw).digest("hex");
-            signatureValid = header === expected;
+            const provided = Buffer.from(header);
+            const wanted = Buffer.from(expected);
+            signatureValid = provided.length === wanted.length && timingSafeEqual(provided, wanted);
             if (!signatureValid) verifyError = "Trustpilot signature mismatch.";
           }
         }
         if (!signatureValid) {
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-          await supabaseAdmin.from("integration_webhook_events").insert({
+          // Anyone can reach this endpoint unauthenticated, so the audit rows for
+          // rejected deliveries are capped per provider; past the cap the request
+          // is still refused, it is just not stored again.
+          const { consumeAbuseLimit } = await import("@/lib/ops.server");
+          const logBudget = await consumeAbuseLimit(supabaseAdmin, "webhook_rejected_log", provider, 100, 600);
+          if (logBudget.allowed) await supabaseAdmin.from("integration_webhook_events").insert({
             provider,
             event_type: "rejected",
             signature_valid: false,

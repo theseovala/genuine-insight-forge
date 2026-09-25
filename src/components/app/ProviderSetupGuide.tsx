@@ -176,8 +176,11 @@ export function ProviderSetupGuide({
   const connect = useMutation({
     mutationFn: () => startFn({ data: { provider: definition.id, origin: window.location.origin } }),
     onSuccess: (r) => {
-      const popup = window.open(r.authorizationUrl, "_blank", "noopener,noreferrer");
-      if (!popup) window.location.assign(r.authorizationUrl);
+      // "noopener" in the feature string makes window.open always return null,
+      // so open normally, sever the opener, and only fall back when blocked.
+      const popup = window.open(r.authorizationUrl, "_blank");
+      if (popup) popup.opener = null;
+      else window.location.assign(r.authorizationUrl);
     },
     onError: (error: Error) => toast.error(error.message),
   });

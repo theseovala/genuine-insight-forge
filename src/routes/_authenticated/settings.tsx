@@ -15,6 +15,7 @@ import {
   Boxes,
 } from "lucide-react";
 import { IntegrationManager } from "@/components/app/IntegrationManager";
+import { integrationById } from "@/lib/integrations/registry";
 import { AppShell } from "@/components/app/AppShell";
 import { PageHeader, Section, PlatformIcon, StatusBadge, EmptyState } from "@/components/app/primitives";
 import { Button } from "@/components/ui/button";
@@ -148,7 +149,7 @@ function SettingsPage() {
 
         <div className="min-w-0 space-y-4">
           {tab === "business" && <BusinessProfileTab />}
-          {tab === "platforms" && <PlatformsTab />}
+          {tab === "platforms" && <PlatformsTab onOpenIntegrations={() => setTab("integrations")} />}
           {tab === "integrations" && <IntegrationManager />}
           {tab === "notifications" && <NotificationsTab />}
           {tab === "locations" && <LocationsTab />}
@@ -188,8 +189,18 @@ function BusinessProfileTab() {
     setForm((f) => ({ ...f, [key]: value }));
 
   const save = () => {
+    // Only the fields this form edits are sent. The loaded row also carries
+    // id / workspace_id and the notification toggles, which must not be
+    // written back from here.
+    const patch: Partial<BrandSettings> = {};
+    if (form.brand_name !== undefined) patch.brand_name = form.brand_name;
+    if (form.industry !== undefined) patch.industry = form.industry;
+    if (form.website !== undefined) patch.website = form.website;
+    if (form.reply_tone !== undefined) patch.reply_tone = form.reply_tone;
+    if (form.reply_signature !== undefined) patch.reply_signature = form.reply_signature;
+    if (form.alert_email !== undefined) patch.alert_email = form.alert_email;
     update.mutate(
-      { id: brand.id, patch: form },
+      { id: brand.id, patch },
       {
         onSuccess: () => toast.success("Business profile updated"),
         onError: (err) => toast.error(err.message || "Could not save changes"),
@@ -205,7 +216,7 @@ function BusinessProfileTab() {
         <Field label="Website" value={form.website ?? ""} onChange={(v) => set("website", v)} />
         <Field label="Reply tone" value={form.reply_tone ?? ""} onChange={(v) => set("reply_tone", v)} hint="Used when drafting AI replies to reviews." />
         <Field label="Reply signature" value={form.reply_signature ?? ""} onChange={(v) => set("reply_signature", v)} />
-        <Field label="Alert email" value={form.alert_email ?? ""} onChange={(v) => set("alert_email", v)} />
+        <Field label="Alert email" value={form.alert_email ?? ""} onChange={(v) => set("alert_email", v)} hint="Saved for when email delivery is connected — no emails are sent yet." />
       </div>
       <div className="mt-5 flex gap-2 border-t pt-4">
         <Button onClick={save} disabled={update.isPending}>
@@ -217,8 +228,19 @@ function BusinessProfileTab() {
   );
 }
 
-function PlatformsTab() {
+function PlatformsTab({ onOpenIntegrations }: { onOpenIntegrations: () => void }) {
   const { data: platformsList, isLoading } = useConnectedPlatforms();
+  // Non-Google platforms are connected through the Integration manager, which
+  // runs the real OAuth / API-key flow. Send the user there instead of a toast
+  // that does nothing.
+  const openInIntegrationManager = (platform: string, label: string) => {
+    if (integrationById(platform)) {
+      toast.message(`Connect ${label} from the Integration manager`);
+    } else {
+      toast.message(`${label} has no self-serve connection in the Integration manager yet`);
+    }
+    onOpenIntegrations();
+  };
   const disconnect = useDisconnectPlatform();
   const queryClient = useQueryClient();
   const statusFn = useServerFn(getGoogleBusinessConnection);
@@ -235,8 +257,11 @@ function PlatformsTab() {
       // popup first, then verify it actually left about:blank; if not, fall
       // back to a fresh popup and finally to a full-tab redirect.
       const assignFallback = () => {
-        const popup = window.open(authorizationUrl, "_blank", "noopener,noreferrer");
-        if (!popup) window.location.assign(authorizationUrl);
+        // No "noopener" feature: with it window.open always returns null, so
+        // this tab was navigated away every time. Sever the opener by hand.
+        const popup = window.open(authorizationUrl, "_blank");
+        if (popup) popup.opener = null;
+        else window.location.assign(authorizationUrl);
       };
       if (authWindow && !authWindow.closed) {
         try {
@@ -334,7 +359,7 @@ function PlatformsTab() {
                   disabled={isGoogle && (!google.data?.configured || connectGoogle.isPending)}
                   onClick={() => {
                     if (!isGoogle) {
-                      toast("This platform connection will be available in a future provider rollout.");
+                      openInIntegrationManager(p.platform, p.display_name || platformName(p.platform));
                       return;
                     }
                     const authWindow = window.open("about:blank", "seovale-google-business");
@@ -351,7 +376,7 @@ function PlatformsTab() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => toast("This platform doesn't support self-serve connection. Submit a connection request and our team will set it up.")}
+                  onClick={() => openInIntegrationManager(p.platform, p.display_name || platformName(p.platform))}
                 >
                   <ExternalLink /> Connection request
                 </Button>
@@ -408,6 +433,13 @@ function NotificationsTab() {
           )
         }
       />
+      <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
+        <Bell className="mt-0.5 size-4 shrink-0 text-primary" />
+        <span>
+          Email delivery is not connected yet (no email provider such as Resend is set up to send), so these preferences are
+          saved but no notification emails are sent. New alerts still appear on the Alerts page.
+        </span>
+      </div>
     </Section>
   );
 }

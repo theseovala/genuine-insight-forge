@@ -3737,6 +3737,10 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      consume_rate_limit: {
+        Args: { p_bucket: string; p_key_hash: string; p_window_start: string }
+        Returns: number
+      }
       has_admin_role: {
         Args: { _roles: string[]; _user_id: string }
         Returns: boolean

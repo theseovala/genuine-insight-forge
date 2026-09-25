@@ -99,7 +99,7 @@ function Landing() {
               </Link>
             </Button>
             <Button asChild size="lg" variant="outline">
-              <Link to="/auth" search={{}}>
+              <Link to="/auth" search={{ mode: "signup" }}>
                 Create an account
               </Link>
             </Button>

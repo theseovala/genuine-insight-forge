@@ -49,29 +49,43 @@ export const syncTrustpilotReviews = createServerFn({ method: "POST" })
       .single();
     if (runError) throw runError;
 
-    const startedAt = Date.now();
     try {
-      const url = new URL(`https://api.trustpilot.com/v1/business-units/${encodeURIComponent(connection.account_ref)}/reviews`);
-      url.searchParams.set("apikey", apiKey);
-      url.searchParams.set("perPage", "100");
-      const response = await fetch(url.toString(), { headers: { accept: "application/json" } });
-      const payload = await response.json().catch(() => ({}));
-      await supabaseAdmin.from("integration_api_logs").insert({
-        workspace_id: member.workspace_id,
-        provider: "trustpilot",
-        operation: "reviews_sync",
-        method: "GET",
-        endpoint: "/v1/business-units/{id}/reviews",
-        http_status: response.status,
-        duration_ms: Date.now() - startedAt,
-        outcome_code: response.ok ? "CONNECTED" : response.status === 401 || response.status === 403 ? "INVALID_CREDENTIALS" : "PROVIDER_ERROR",
-        error_message: response.ok ? null : (payload?.message ?? `Trustpilot returned HTTP ${response.status}`),
-      });
-      if (!response.ok) {
-        throw new Error(payload?.message ?? `Trustpilot sync failed with HTTP ${response.status}.`);
+      // Every page is read, not just the first: a page shorter than perPage, an
+      // empty page or a missing "next-page" link ends the walk, and MAX_PAGES
+      // bounds one sync (100 x 50 = 5,000 reviews).
+      const PER_PAGE = 100;
+      const MAX_PAGES = 50;
+      const reviews: any[] = [];
+      const { outcomeFor } = await import("@/lib/integrations/providers.server");
+      for (let page = 1; page <= MAX_PAGES; page += 1) {
+        const startedAt = Date.now();
+        const url = new URL(`https://api.trustpilot.com/v1/business-units/${encodeURIComponent(connection.account_ref)}/reviews`);
+        url.searchParams.set("apikey", apiKey);
+        url.searchParams.set("perPage", String(PER_PAGE));
+        url.searchParams.set("page", String(page));
+        // Bounded, so one hung page fails this sync (recorded below) instead of hanging it.
+        const response = await fetch(url.toString(), { headers: { accept: "application/json" }, signal: AbortSignal.timeout(20_000) });
+        const payload = await response.json().catch(() => ({}));
+        await supabaseAdmin.from("integration_api_logs").insert({
+          workspace_id: member.workspace_id,
+          provider: "trustpilot",
+          operation: "reviews_sync",
+          method: "GET",
+          endpoint: "/v1/business-units/{id}/reviews",
+          http_status: response.status,
+          duration_ms: Date.now() - startedAt,
+          outcome_code: outcomeFor(response.ok, response.status, String(payload?.message ?? "")),
+          error_message: response.ok ? null : (payload?.message ?? `Trustpilot returned HTTP ${response.status}`),
+        });
+        if (!response.ok) {
+          throw new Error(payload?.message ?? `Trustpilot sync failed with HTTP ${response.status}.`);
+        }
+        const pageReviews = Array.isArray(payload?.reviews) ? payload.reviews : [];
+        reviews.push(...pageReviews);
+        const hasNext = Array.isArray(payload?.links) ? payload.links.some((link: any) => link?.rel === "next-page") : pageReviews.length === PER_PAGE;
+        if (pageReviews.length === 0 || pageReviews.length < PER_PAGE || !hasNext) break;
       }
 
-      const reviews = Array.isArray(payload?.reviews) ? payload.reviews : [];
       const locationName = connection.account_label ?? "Trustpilot";
       const { data: rules } = await context.supabase
         .from("alert_rules")
@@ -79,98 +93,30 @@ export const syncTrustpilotReviews = createServerFn({ method: "POST" })
         .eq("workspace_id", member.workspace_id)
         .maybeSingle();
 
-      let created = 0;
-      let updated = 0;
-      let alerts = 0;
-      for (const review of reviews) {
-        const rating = typeof review.stars === "number" ? review.stars : 0;
-        if (!review.id || rating < 1) continue;
-        const author = review.consumer?.displayName ?? "Trustpilot reviewer";
-        const body = [review.title, review.text].filter(Boolean).join(" — ") || "(no written review)";
-        const createdAt = review.createdAt ?? new Date().toISOString();
-        const sentiment = rating >= 4 ? "positive" : rating === 3 ? "neutral" : "negative";
-        const priority = rating <= 2 ? "high" : rating === 3 ? "medium" : "low";
-        const reply = review.reply?.message ?? null;
-
-        const { data: existing } = await context.supabase
-          .from("reviews")
-          .select("id")
-          .eq("workspace_id", member.workspace_id)
-          .eq("platform", "trustpilot")
-          .eq("external_id", String(review.id))
-          .maybeSingle();
-
-        let storedReviewId: string;
-        if (existing) {
-          const { error: updateError } = await context.supabase
-            .from("reviews")
-            .update({ author, rating, body, sentiment, priority, location_name: locationName, external_created_at: createdAt, ...(reply ? { reply } : {}) })
-            .eq("id", existing.id);
-          if (updateError) throw updateError;
-          storedReviewId = existing.id;
-          updated += 1;
-        } else {
-          const { data: inserted, error: insertError } = await context.supabase
-            .from("reviews")
-            .insert({
-              workspace_id: member.workspace_id,
-              platform: "trustpilot",
-              external_id: String(review.id),
-              source: "trustpilot",
-              author,
-              rating,
-              sentiment,
-              status: reply ? "replied" : "pending",
-              priority,
-              location_name: locationName,
-              body,
-              reply,
-              replied_at: reply ? (review.reply?.publishedAt ?? createdAt) : null,
-              external_created_at: createdAt,
-            })
-            .select("id")
-            .single();
-          if (insertError) throw insertError;
-          storedReviewId = inserted.id;
-          created += 1;
-        }
-
-        if (rating <= (rules?.negative_rating_threshold ?? 2)) {
-          const { data: existingAlert } = await context.supabase
-            .from("alerts")
-            .select("id")
-            .eq("workspace_id", member.workspace_id)
-            .eq("review_id", storedReviewId)
-            .eq("kind", "negative_review")
-            .limit(1)
-            .maybeSingle();
-          if (!existingAlert) {
-            const { error: alertError } = await context.supabase.from("alerts").insert({
-              workspace_id: member.workspace_id,
-              review_id: storedReviewId,
-              kind: "negative_review",
-              severity: rating === 1 ? "critical" : "high",
-              title: `${rating}-star Trustpilot review`,
-              detail: body.slice(0, 240),
-              location_name: locationName,
-            });
-            if (alertError) throw alertError;
-            alerts += 1;
-          }
-        }
-      }
+      // Normalized and stored through the same path as every other provider.
+      const { normalizeTrustpilotReview } = await import("@/lib/reviews/normalized");
+      const { ingestNormalizedReviews } = await import("@/lib/reviews/ingest.server");
+      const stored = await ingestNormalizedReviews(context.supabase, {
+        workspaceId: member.workspace_id,
+        results: reviews.map((review) => normalizeTrustpilotReview(review, { locationName })),
+        negativeThreshold: rules?.negative_rating_threshold ?? 2,
+        platformLabel: "Trustpilot",
+      });
+      const created = stored.created;
+      const updated = stored.updated;
+      const alerts = stored.alerts;
 
       const now = new Date().toISOString();
       await context.supabase
         .from("sync_runs")
-        .update({ status: "completed", locations_found: 1, reviews_found: reviews.length, reviews_created: created, reviews_updated: updated, alerts_created: alerts, completed_at: now })
+        .update({ status: "completed", locations_found: 1, reviews_found: stored.found, reviews_created: created, reviews_updated: updated, alerts_created: alerts, completed_at: now })
         .eq("id", run.id);
       await context.supabase
         .from("connected_platforms")
         .update({ status: "connected", last_synced_at: now, last_sync_error: null })
         .eq("workspace_id", member.workspace_id)
         .eq("platform", "trustpilot");
-      return { reviewsFound: reviews.length, reviewsCreated: created, reviewsUpdated: updated, alertsCreated: alerts };
+      return { reviewsFound: stored.found, reviewsCreated: created, reviewsUpdated: updated, alertsCreated: alerts, reviewsRejected: stored.rejected.length };
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Trustpilot sync failed";
       await context.supabase
